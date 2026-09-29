@@ -1,7 +1,7 @@
 /* 蛋糕店：猫猫排队买蛋糕（排序谜题）
    规则：每队只能动队首那一只，只能放进空队，或者放在同一种猫的前面（黑猫只能放在黑猫前面）；一队凑齐同一种猫，就进店买到一块蛋糕角。
    关卡来自 levels.js（tools/gen_levels.py 生成，保证有解，par 是求解器算出的最少步数）。
-   猫头是阿琳画的图（assets/cats/cat0-7.webp），蛋糕还是占位的 SVG（cakeSVG）。 */
+   猫头是阿琳画的图（assets/cats/cat0-7.webp），蛋糕使用手绘切角（assets/cakes/cake0-7.webp）。 */
 (function () {
   'use strict';
   var NT = window.NT, LV = window.NT_LEVELS;
@@ -53,23 +53,8 @@
   var CATIMG = CATS.map(function (c, i) { var im = new Image(); im.src = 'assets/cats/cat' + i + '.webp'; return im; }); /* 提前加载 */
   function catHTML(k) { return '<img src="assets/cats/cat' + k + '.webp" alt="" draggable="false">'; }
 
-  function cakeSVG(id) {
-    var c = CAKES[id].c, st = 'stroke="' + INK + '" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"';
-    var s = '<svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="57" rx="25" ry="4" fill="rgba(84,57,47,.16)"/>';
-    s += '<path d="M44 32L58 20V42L44 54Z" fill="' + c[3] + '" ' + st + '/>';
-    s += '<rect x="8" y="32" width="36" height="22" rx="3" fill="' + c[0] + '" ' + st + '/>';
-    s += '<rect x="9" y="41" width="34" height="5" fill="' + c[1] + '"/><path d="M8 41.500H44M8 46H44" stroke="' + INK + '" stroke-width="1.200" opacity=".5" fill="none"/>';
-    s += '<path d="M8 32L22 20H58L44 32Z" fill="' + c[2] + '" ' + st + '/>';
-    var spark = function (x, y, r, col) { return '<path d="M' + x + ' ' + (y - r) + 'Q' + x + ' ' + y + ' ' + (x + r) + ' ' + y + 'Q' + x + ' ' + y + ' ' + x + ' ' + (y + r) + 'Q' + x + ' ' + y + ' ' + (x - r) + ' ' + y + 'Q' + x + ' ' + y + ' ' + x + ' ' + (y - r) + 'Z" fill="' + col + '" stroke="' + INK + '" stroke-width="1.200" stroke-linejoin="round"/>'; };
-    if (id === 0) s += '<path d="M28 28q3-8 8-3q6-3 7 3q-7 4-15 0z" fill="#fffaf0" ' + st + '/><circle cx="36" cy="20" r="3" fill="#e2574c" ' + st + '/>';
-    if (id === 1) s += '<path d="M29 25q0-6 6-4q6-2 6 4q0 5-6 8q-6-3-6-8z" fill="#e2574c" ' + st + '/><path d="M32 21l3-3 3 3" fill="none" stroke="#5c9a63" stroke-width="2.400" stroke-linecap="round"/>';
-    if (id === 2) s += '<circle cx="30" cy="26" r="2.600" fill="#3b2219"/><circle cx="38" cy="24" r="2.600" fill="#3b2219"/><circle cx="45" cy="26" r="2.200" fill="#3b2219"/><circle cx="36" cy="28.500" r="1.600" fill="#fffaf0"/>';
-    if (id === 3) s += '<circle cx="34" cy="25" r="3.400" fill="#fffaf0" ' + st + '/><circle cx="42" cy="24" r="2.200" fill="#b05a52"/><circle cx="28" cy="27" r="1.800" fill="#fffaf0"/>';
-    if (id === 4) s += '<path d="M28 29q6-13 16-5z" fill="#ffb23f" ' + st + '/><path d="M32 27q4-6 9-3" fill="none" stroke="#fff3c4" stroke-width="1.600" stroke-linecap="round"/>';
-    if (id === 5) s += '<circle cx="35" cy="22" r="7.500" fill="#f9c6d8" ' + st + '/><circle cx="32" cy="20" r="1.200" fill="#8fa3bf"/><circle cx="38" cy="19" r="1.200" fill="#f4b04a"/><circle cx="36" cy="25" r="1.200" fill="#9ccbb0"/>';
-    if (id === 6) s += spark(30, 26, 5, '#fafbff') + spark(43, 24, 4, '#fafbff') + spark(36, 20, 2.800, '#fafbff');
-    if (id === 7) s += spark(30, 26, 5, '#fff3b0') + spark(43, 24, 4, '#fff3b0') + '<path d="M28 21l2-6 5 3 5-3 2 6z" fill="#f4b04a" ' + st + '/>';
-    return s + '</svg>';
+  function cakeHTML(id) {
+    return '<img class="cq-cake-image" src="assets/cakes/cake' + id + '.webp" alt="" draggable="false">';
   }
 
   /* ---------- 存档里的蛋糕店数据 ---------- */
@@ -297,7 +282,7 @@
     c.cakes[id]++; c.seen[id] = 1; G.got.push(id);
     var S = NT.S(); S.mood = NT.clamp(S.mood + 1);
     var pop = document.createElement('div'); pop.className = 'cq-pop'; pop.style.left = G.door.x + 'px'; pop.style.top = (G.door.y + 4) + 'px';
-    pop.innerHTML = '<span class="pc">' + cakeSVG(id) + '</span><b>' + CAKES[id].n + (isNew ? ' <i>新！</i>' : '') + '</b>';
+    pop.innerHTML = '<span class="pc">' + cakeHTML(id) + '</span><b>' + CAKES[id].n + (isNew ? ' <i>新！</i>' : '') + '</b>';
     el.field.appendChild(pop); setTimeout(function () { if (pop.parentNode) pop.parentNode.removeChild(pop); }, 1700);
     paintGot(); NT.save(); paintBtns();
     G.pending--;
@@ -315,7 +300,7 @@
   }
   function paintGot() {
     var cnt = {}; G.got.forEach(function (i) { cnt[i] = (cnt[i] || 0) + 1; });
-    el.got.innerHTML = Object.keys(cnt).map(function (i) { return '<span class="cq-mini">' + cakeSVG(+i) + (cnt[i] > 1 ? '<i>' + cnt[i] + '</i>' : '') + '</span>'; }).join('');
+    el.got.innerHTML = Object.keys(cnt).map(function (i) { return '<span class="cq-mini">' + cakeHTML(+i) + (cnt[i] > 1 ? '<i>' + cnt[i] + '</i>' : '') + '</span>'; }).join('');
   }
 
   function undo() {
@@ -342,7 +327,7 @@
     $('#cqWinS').textContent = '用了 ' + G.steps + ' 步（' + (G.limit ? '限 ' + G.limit + '，' : '') + (G.exact ? '最少 ' : '参考 ') + G.par + ' 步）' + (first && !last ? ' · 解锁下一关' : '');
     $('#cqWinR').innerHTML = '小鱼干 +' + fish;
     var cnt = {}; G.got.forEach(function (i) { cnt[i] = (cnt[i] || 0) + 1; });
-    $('#cqWinC').innerHTML = G.got.length ? '<small>这一局买到的蛋糕角</small><div>' + Object.keys(cnt).map(function (i) { return '<span class="cq-mini big">' + cakeSVG(+i) + '<i>×' + cnt[i] + '</i></span>'; }).join('') + '</div>' : '';
+    $('#cqWinC').innerHTML = G.got.length ? '<small>这一局买到的蛋糕角</small><div>' + Object.keys(cnt).map(function (i) { return '<span class="cq-mini big">' + cakeHTML(+i) + '<i>×' + cnt[i] + '</i></span>'; }).join('') + '</div>' : '';
     $('#cqWinNext').textContent = last ? '再玩一次' : '下一关'; $('#cqWinNext').setAttribute('data-act', last ? 'again' : 'next');
     el.win.hidden = false;
   }
@@ -372,7 +357,7 @@
     CAKES.forEach(function (k, i) {
       var have = c.seen[i], n = c.cakes[i]; dup += n; worth += n * k.p;
       var d = document.createElement('div'); d.className = 'cq-cake' + (have ? '' : ' lock');
-      d.innerHTML = '<span class="cv">' + cakeSVG(i) + '</span><b>' + (have ? k.n : '？？？') + '</b><small>' + (have ? '×' + n : '还没买到') + '</small>';
+      d.innerHTML = '<span class="cv">' + cakeHTML(i) + '</span><b>' + (have ? k.n : '？？？') + '</b><small>' + (have ? '×' + n : '还没买到') + '</small>';
       var s = document.createElement('button'); s.type = 'button'; s.className = 'cq-sell'; s.disabled = n < 1; s.innerHTML = '卖 ' + FISH + k.p; s.setAttribute('aria-label', '卖掉 1 个' + k.n + '，得到小鱼干 ' + k.p);
       s.addEventListener('click', function () { if (c.cakes[i] < 1) return; c.cakes[i]--; NT.addFish(k.p); NT.save(); SND.pick(); paintBook(); });
       d.appendChild(s); g.appendChild(d);
