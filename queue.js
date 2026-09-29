@@ -387,6 +387,7 @@
 
   /* ---------- 进入 / 离开小屋 ---------- */
   function enter() {
+    if (NT.isBusy()) return;
     var S = NT.S();
     if (S.sleeping) { NT.say('奶团睡着了，先叫醒它'); return; }
     NT.ext.active = true; NT.hideCat(true); NT.setChrome(true); NT.setBusyUI(true);

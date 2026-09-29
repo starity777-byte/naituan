@@ -115,25 +115,15 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .p-lights circle:nth-of-type(3n) { animation-delay: 1.5s; }
 @keyframes twinkle { 50% { opacity: .35; } }
 
-.catbox { position: absolute; left: 12%; top: 10%; width: 76%; aspect-ratio: 1; }
+.catbox { position: absolute; left: 15%; bottom: 22%; width: 70%; aspect-ratio: 503 / 402; }
 .catbtn { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
-.cat { width: 100%; height: 100%; transform-origin: 50% 84%; }
+.cat { width: 100%; height: 100%; transform-origin: 50% 99%; }
 .cat img { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
-.cat img { transform-origin: 50% 84%; }
+.cat img { transform-origin: 50% 99%; }
 .cat img.pop { animation: pop .32s ease-out; }
 @keyframes pop { 0% { transform: scale(.9, 1.08); } 60% { transform: scale(1.05, .95); } 100% { transform: none; } }
 
-.cat[data-pose="sit"], .cat[data-pose="stretch"], .cat[data-pose="box"] { animation: breathe 3.4s ease-in-out infinite; }
-.cat[data-pose="box"] { animation-duration: 4.6s; }
-@keyframes breathe { 50% { transform: scale(1.012, 1.03); } }
-.cat[data-pose="happy"] { animation: hop .55s ease-in-out infinite; }
-@keyframes hop { 40% { transform: translateY(-5%) scale(.98, 1.03); } 80% { transform: translateY(0) scale(1.04, .96); } }
-.cat[data-pose="fish"] { animation: chew .42s ease-in-out infinite; }
-@keyframes chew { 50% { transform: rotate(-2.2deg) scale(1.02, .985); } }
-.cat[data-pose="cry"] { animation: tremble .28s linear infinite; }
-@keyframes tremble { 25% { transform: translateX(-.6%); } 75% { transform: translateX(.6%); } }
-.cat[data-pose="shy"] { animation: wiggle .7s ease-in-out infinite; }
-@keyframes wiggle { 25% { transform: rotate(-2.5deg); } 75% { transform: rotate(2.5deg); } }
+/* The transparent WebP files contain the pose animation; keep only interaction effects. */
 .cat.shake { animation: shake .4s linear; }
 @keyframes shake { 20% { transform: translateX(-2.5%); } 40% { transform: translateX(2.5%); } 60% { transform: translateX(-1.6%); } 80% { transform: translateX(1.6%); } }
 
@@ -199,6 +189,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 /* ---------- box stacking ---------- */
 .sg { position: absolute; inset: 0; z-index: 5; }
 .sg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; cursor: pointer; }
+.sg-cat { position: absolute; left: 0; top: 0; width: 100px; height: auto; aspect-ratio: 503 / 402; pointer-events: none; -webkit-user-drag: none; }
 .sg .hs-bar { position: absolute; left: 12px; right: 12px; top: 12px; z-index: 2; pointer-events: none; }
 .sg .hs-bar > * { pointer-events: auto; }
 .sg-hint { position: absolute; left: 0; right: 0; top: 22%; text-align: center; z-index: 2; pointer-events: none; font-size: 14px; }

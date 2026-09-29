@@ -1,13 +1,13 @@
 (function () {
   'use strict';
   var SPR = /*SPR:BEGIN*/{
-    sit: 'assets/sit.webp',
-    happy: 'assets/happy.webp',
-    fish: 'assets/fish.webp',
-    cry: 'assets/cry.webp',
-    shy: 'assets/shy.webp',
-    stretch: 'assets/stretch.webp',
-    box: 'assets/box.webp',
+    sit: 'assets/animated/眨眼.webp',
+    happy: 'assets/animated/开心.webp',
+    fish: 'assets/animated/吃小鱼.webp',
+    cry: 'assets/animated/哭哭.webp',
+    shy: 'assets/animated/偷笑.webp',
+    stretch: 'assets/animated/伸懒腰.webp',
+    box: 'assets/animated/纸箱.webp',
     peek: 'assets/peek.webp',
     peekc: 'assets/peekc.webp'
   }/*SPR:END*/;
@@ -15,12 +15,12 @@
   var $ = function (s) { return document.querySelector(s); };
   var cat = $('#cat'), catimg = $('#catimg'), stage = $('#stage'), bubble = $('#bubble'), zzz = $('#zzz');
   var btnFeed = $('#btnFeed'), btnSleep = $('#btnSleep'), btnHide = $('#btnHide'), sleepLabel = $('#sleepLabel');
-  var btnStack = $('#btnStack'), coinEl = $('#coins');
+  var btnStack = $('#btnStack'), btnCake = $('#btnCake'), coinEl = $('#coins');
   var hsEl = $('#hs'), slots = [];
   var meters = { hunger: $('#m-hunger'), mood: $('#m-mood'), energy: $('#m-energy') };
   var S, curPose = '', override = null, sayUntil = 0, sayText = '', lastTap = [], RH = { active: false }, EXT = { active: false }, SG = { active: false, over: false };
   var busy = function () { return RH.active || SG.active || EXT.active; };
-  function setBusyUI(b) { btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = b; }
+  function setBusyUI(b) { btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = btnCake.disabled = b; }
 
   var clamp = function (v) { return Math.max(0, Math.min(100, v)); };
   var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
@@ -426,7 +426,7 @@
 
   /* ---------- box stacking ---------- */
   var BH = 26, TONES = ['#dcae82', '#d4a173', '#e3b98f'];
-  var sgEl = $('#sg'), cv = $('#sgCanvas'), cx = cv.getContext('2d'), sgScore = $('#sgScore'), sgOver = $('#sgOver'), sgHint = $('#sgHint');
+  var sgEl = $('#sg'), cv = $('#sgCanvas'), cx = cv.getContext('2d'), sgCat = $('#sgCat'), sgScore = $('#sgScore'), sgOver = $('#sgOver'), sgHint = $('#sgHint');
   var COL = { ink: '#54392f', floor: '#ecd8b8' };
   try { var cs = getComputedStyle(document.documentElement); COL.ink = cs.getPropertyValue('--ink').trim() || COL.ink; COL.floor = cs.getPropertyValue('--floor').trim() || COL.floor; } catch (e) {}
 
@@ -456,6 +456,7 @@
     sgScore.textContent = '0 层'; sgOver.hidden = true; sgHint.hidden = false;
   }
   function sgStart() {
+    if (busy()) return;
     if (S.sleeping) { say('奶团睡着了，先叫醒它'); return; }
     SG.active = true;
     sgEl.hidden = false; stage.classList.add('stacking'); $('#catbox').style.visibility = 'hidden'; bubble.hidden = true; setBusyUI(true);
@@ -528,15 +529,19 @@
     cx.fillStyle = COL.floor; cx.fillRect(0, SG.ground, SG.W, SG.H * 2);
     cx.strokeStyle = COL.ink; cx.lineWidth = 2.5; cx.beginPath(); cx.moveTo(0, SG.ground); cx.lineTo(SG.W, SG.ground); cx.stroke();
     SG.tower.forEach(function (b, i) { drawBox(b.x, SG.ground - (i + 1) * BH, b.w, BH, i); });
-    var top = SG.tower[SG.tower.length - 1], size = 100, catX, catY;
+    var top = SG.tower[SG.tower.length - 1], size = 100, footY = size * 397 / 503, catX, catY;
     if (SG.m) {
       drawBox(SG.m.x, SG.ground - (SG.m.level + 1) * BH, SG.m.w, BH, SG.m.level);
-      catX = SG.m.x + SG.m.w / 2 - size / 2; catY = SG.ground - (SG.m.level + 1) * BH - size * 0.83;
+      catX = SG.m.x + SG.m.w / 2 - size / 2; catY = SG.ground - (SG.m.level + 1) * BH - footY;
     } else {
-      catX = top.x + top.w / 2 - size / 2; catY = SG.ground - SG.tower.length * BH - size * 0.83;
+      catX = top.x + top.w / 2 - size / 2; catY = SG.ground - SG.tower.length * BH - footY;
     }
     var pose = SG.pose; if (pose === 'happy' && t > SG.poseUntil) { SG.pose = pose = 'sit'; }
-    var im = IMG[pose] || IMG.sit; if (im && im.complete) cx.drawImage(im, catX, catY, size, size);
+    /* A DOM image keeps animated WebP playing; canvas drawImage only uses its default frame. */
+    if (sgCat.getAttribute('data-pose') !== pose) {
+      sgCat.src = SPR[pose]; sgCat.setAttribute('data-pose', pose);
+    }
+    sgCat.style.transform = 'translate(' + catX + 'px,' + (catY + SG.cam) + 'px)';
     SG.debris.forEach(function (d) {
       cx.save(); cx.translate(d.x + d.w / 2, d.y + d.h / 2); cx.rotate(d.rot); cx.translate(-d.w / 2, -d.h / 2);
       var sx = cx; drawBoxAt(d);
@@ -761,7 +766,7 @@
   /* small bridge for the separate mini-games (queue.js) */
   window.NT = {
     S: function () { return S; }, save: save, say: say, addFish: addFish, clamp: clamp, pick: pick, render: render, setPose: setPose, heartAt: heartAt, textAt: textAt,
-    stage: stage, ext: EXT, setChrome: setChrome, setBusyUI: setBusyUI, hideCat: function (h) { $('#catbox').style.visibility = h ? 'hidden' : ''; bubble.hidden = !!h; stage.classList.toggle('playing', !!h); }
+    stage: stage, ext: EXT, isBusy: busy, setChrome: setChrome, setBusyUI: setBusyUI, hideCat: function (h) { $('#catbox').style.visibility = h ? 'hidden' : ''; bubble.hidden = !!h; stage.classList.toggle('playing', !!h); }
   };
 
   var hot = window.claude && window.claude.hot;
