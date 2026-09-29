@@ -18,8 +18,8 @@
   var btnStack = $('#btnStack'), coinEl = $('#coins');
   var hsEl = $('#hs'), slots = [];
   var meters = { hunger: $('#m-hunger'), mood: $('#m-mood'), energy: $('#m-energy') };
-  var S, curPose = '', override = null, sayUntil = 0, sayText = '', lastTap = [], RH = { active: false }, SG = { active: false, over: false };
-  var busy = function () { return RH.active || SG.active; };
+  var S, curPose = '', override = null, sayUntil = 0, sayText = '', lastTap = [], RH = { active: false }, EXT = { active: false }, SG = { active: false, over: false };
+  var busy = function () { return RH.active || SG.active || EXT.active; };
   function setBusyUI(b) { btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = b; }
 
   var clamp = function (v) { return Math.max(0, Math.min(100, v)); };
@@ -31,7 +31,7 @@
   Object.keys(SPR).forEach(function (k) { var im = new Image(); im.src = SPR[k]; IMG[k] = im; });
 
   /* ---------- state ---------- */
-  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, mute: false, t: now() }; }
+  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, mute: false, cq: null, t: now() }; }
   function load(hotData) {
     var d = null;
     if (hotData && typeof hotData.hunger === 'number') d = hotData;
@@ -39,7 +39,7 @@
     S = fresh(); loadDecor(d);
     if (d && typeof d.hunger === 'number') {
       S.hunger = clamp(d.hunger); S.mood = clamp(d.mood); S.energy = clamp(d.energy);
-      S.sleeping = !!d.sleeping; S.secs = +d.secs || 0; S.fish = Math.max(0, Math.floor(+d.fish || 0)); S.best = Math.max(0, Math.floor(+d.best || 0)); S.bestBeat = Math.max(0, Math.floor(+d.bestBeat || 0)); S.mute = !!d.mute;
+      S.sleeping = !!d.sleeping; S.secs = +d.secs || 0; S.fish = Math.max(0, Math.floor(+d.fish || 0)); S.best = Math.max(0, Math.floor(+d.best || 0)); S.bestBeat = Math.max(0, Math.floor(+d.bestBeat || 0)); S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
       var away = Math.min(Math.max((now() - (+d.t || now())) / 1000, 0), 1800);
       if (away > 20) { /* time away: slower decay, never below 20 */
         if (S.sleeping) { S.energy = clamp(S.energy + away * 0.6); S.hunger = Math.max(20, S.hunger - away * 0.03); if (S.energy >= 100) S.sleeping = false; }
@@ -735,6 +735,12 @@
     window.addEventListener('pagehide', save);
     try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(function () { return S; }); } catch (e) {}
   }
+  /* small bridge for the separate mini-games (queue.js) */
+  window.NT = {
+    S: function () { return S; }, save: save, say: say, addFish: addFish, clamp: clamp, pick: pick, render: render, setPose: setPose, heartAt: heartAt, textAt: textAt,
+    stage: stage, ext: EXT, setChrome: setChrome, setBusyUI: setBusyUI, hideCat: function (h) { $('#catbox').style.visibility = h ? 'hidden' : ''; bubble.hidden = !!h; stage.classList.toggle('playing', !!h); }
+  };
+
   var hot = window.claude && window.claude.hot;
   if (hot && hot.ready) hot.ready(start); else start(hot && hot.data ? hot.data : null);
 })();
