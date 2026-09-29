@@ -16,16 +16,51 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+KuaiLe&display=swap">
 <link rel="stylesheet" href="style.css?v=walk-20260929">
 <link rel="stylesheet" href="decor-shop.css?v=cake-peach-20260929">
+<link rel="stylesheet" href="house.css?v=house-sync-20260929">
+<link rel="stylesheet" href="planner.css?v=house-20260929">
 </head>
 <body>
-<div class="app" id="app">
+<svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="i-paw" viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="15" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19.5" cy="10" rx="2" ry="2.7"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v11h-6v-7H9v7H3Z"/></symbol>
+  <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M12 21V10M12 14C5 14 3 10 3 5c6 0 9 3 9 9ZM12 10c0-5 3-7 9-7 0 6-4 9-9 9"/></symbol>
+  <symbol id="i-fish" viewBox="0 0 24 24"><path d="M2 12c4-5 9-6 14-3l5-3v12l-5-3c-5 3-10 2-14-3Z"/><circle cx="6.5" cy="11" r=".7" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-gem" viewBox="0 0 24 24"><path d="m3 8 4-5h10l4 5-9 13ZM3 8h18M7 3l5 18 5-18M7 8l5-5 5 5"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 21S2 15 2 8a5 5 0 0 1 10-1A5 5 0 0 1 22 8c0 7-10 13-10 13Z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M18 3A9 9 0 1 0 21 18 8 8 0 0 1 18 3Z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4.5"/><path d="M3 22c0-6 3-10 9-10s9 4 9 10Z"/></symbol>
+  <symbol id="i-game" viewBox="0 0 24 24"><path d="M7 6h10c3 0 4 2 5 7 1 4-2 6-5 3l-2-2H9l-2 2c-3 3-6 1-5-3 1-5 2-7 5-7Z"/><path d="M7 9v5M4.5 11.5h5M16 10h.01M19 13h.01"/></symbol>
+  <symbol id="i-shop" viewBox="0 0 24 24"><path d="M3 9 5 3h14l2 6M3 9c0 4 5 4 6 0 0 4 6 4 6 0 1 4 6 4 6 0ZM4 12v9h16v-9M10 21v-6h5v6"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 3h14v19H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2ZM5 18h14"/><path d="m12 6 1 2.5 2.5.3-1.9 1.8.6 2.5-2.2-1.3-2.2 1.3.6-2.5-1.9-1.8 2.5-.3Z"/></symbol>
+  <symbol id="i-sofa" viewBox="0 0 24 24"><path d="M5 10V7c0-3 2-4 7-4s7 1 7 4v3M5 16h14M5 10c-4-3-4 6-2 7v3h18v-3c2-1 2-10-2-7v6M5 10v6M5 20v2M19 20v2"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 7h5l2-3h4l2 3h5v14H3Z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 6"/></symbol>
+</svg>
+<div class="app house-app" id="app" data-page="home">
+<main class="home-view" id="homeView" aria-label="奶团的窝">
   <header class="top">
-    <h1>奶团小屋</h1>
+    <h1 class="sr-only">奶团小屋</h1>
     <div class="top-r">
       <button class="coins" id="coins" type="button" aria-label="小鱼干，点开装扮小铺"><svg viewBox="0 0 32 32" fill="none" stroke="#54392f" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M3 16c4-7 12-9 18-4l6-4v16l-6-4c-6 5-14 3-18-4z" fill="#8fa3bf"/></svg><b id="coinNum">0</b></button>
-      <span class="time" id="together">已陪伴 0 分钟</span>
+      <button class="gem-chip" id="gemChip" type="button" aria-label="成长宝石，查看生活打卡"><svg class="ui-icon"><use href="#i-gem"/></svg><b id="gemNum">0</b></button>
     </div>
   </header>
+  <button class="paw-toggle" id="pawToggle" type="button" aria-label="打开爪爪菜单" aria-expanded="false" aria-controls="pawMenu"><svg class="ui-icon"><use href="#i-paw"/></svg></button>
+  <nav class="paw-menu" id="pawMenu" aria-label="小屋菜单" hidden>
+    <button type="button" data-house-action="profile"><svg class="ui-icon"><use href="#i-user"/></svg><span>我的</span></button>
+    <button type="button" data-house-action="games"><svg class="ui-icon"><use href="#i-game"/></svg><span>游戏</span></button>
+    <button type="button" data-house-action="shop"><svg class="ui-icon"><use href="#i-shop"/></svg><span>小铺</span></button>
+    <button type="button" data-house-action="book"><svg class="ui-icon"><use href="#i-book"/></svg><span>图鉴</span></button>
+    <button type="button" data-house-action="arrange"><svg class="ui-icon"><use href="#i-sofa"/></svg><span>布置</span></button>
+  </nav>
+  <div class="quick-stats" id="quickStats" aria-label="照顾奶团">
+    <button class="stat-ring hunger-ring" id="quickFeed" type="button" aria-label="喂小鱼"><svg class="ring-dial" viewBox="0 0 40 40" aria-hidden="true"><circle class="ring-track" cx="20" cy="20" r="16"/><circle class="ring-progress" cx="20" cy="20" r="16"/></svg><svg class="ui-icon"><use href="#i-fish"/></svg></button>
+    <button class="stat-ring mood-ring" id="quickPet" type="button" aria-label="摸摸奶团"><svg class="ring-dial" viewBox="0 0 40 40" aria-hidden="true"><circle class="ring-track" cx="20" cy="20" r="16"/><circle class="ring-progress" cx="20" cy="20" r="16"/></svg><svg class="ui-icon"><use href="#i-heart"/></svg></button>
+    <button class="stat-ring energy-ring" id="quickSleep" type="button" aria-label="让奶团睡觉"><svg class="ring-dial" viewBox="0 0 40 40" aria-hidden="true"><circle class="ring-track" cx="20" cy="20" r="16"/><circle class="ring-progress" cx="20" cy="20" r="16"/></svg><svg class="ui-icon"><use href="#i-moon"/></svg></button>
+  </div>
 
   <section class="stage" id="stage" data-wall="dots" aria-label="奶团的房间">
     <div class="room-scene" id="roomScene">
@@ -184,6 +219,80 @@
 
   <button class="linkbtn" id="btnSave" type="button">存档：导出 / 导入</button>
   <p class="hint" id="hint">点家具，奶团会自己走过去：到窗下看风景、在软垫踩奶、凑近其他家具闻闻。闲着会走走停停，摸摸或提起就会停下陪你~</p>
+</main>
+
+<main class="life-view paper-view" id="lifeView" aria-labelledby="lifeTitle" hidden>
+  <header class="life-heading"><h1 id="lifeTitle">生活</h1><time id="lifeDate"></time></header>
+  <section class="paper-card calendar-card" aria-label="生活日历">
+    <div class="section-line"><span id="calendarMonth">9月</span><button class="text-button" id="calendarToggle" type="button" aria-expanded="false" aria-controls="calendarExpanded">展开日历 <span aria-hidden="true">›</span></button></div>
+    <div class="week-labels" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+    <div class="calendar-days" id="calendarWeek"></div>
+    <div id="calendarExpanded" hidden>
+      <div class="month-nav"><button id="calendarPrev" class="icon-button" type="button" aria-label="上个月">‹</button><b id="expandedMonth"></b><button id="calendarNext" class="icon-button" type="button" aria-label="下个月">›</button></div>
+      <div class="calendar-days full-month" id="calendarGrid"></div>
+    </div>
+    <button class="text-button back-today" id="calendarToday" type="button" hidden>回到今天</button>
+  </section>
+  <section class="paper-card checkin-card" aria-labelledby="checkinTitle">
+    <h2 id="checkinTitle">今日打卡</h2>
+    <div class="checkin-grid">
+      <button class="word-checkin" id="wordCheckin" type="button"><img src="assets/shy.webp" alt="" draggable="false"><span><b>单词</b><small id="wordStatus">学一点，进步一点</small></span></button>
+      <button class="food-checkin" id="foodCheckin" type="button"><img id="foodThumbnail" alt="" hidden><span class="food-caption"><svg class="ui-icon"><use href="#i-camera"/></svg><b>饮食</b><small id="foodStatus">拍下今天吃了什么</small></span></button>
+    </div>
+  </section>
+  <section class="paper-card focus-card" aria-labelledby="focusTitle">
+    <div><h2 id="focusTitle">自习室</h2><output id="focusTime" aria-label="专注剩余时间">25:00</output><p id="focusNote">奶团陪你一起专注</p></div>
+    <div class="focus-actions"><button class="primary-button" id="focusToggle" type="button">开始专注</button><button class="text-button" id="focusReset" type="button" hidden>重新计时</button></div>
+  </section>
+  <section class="paper-card todo-card" aria-labelledby="todoTitle">
+    <div class="section-line"><h2 id="todoTitle">待办</h2><button class="text-button" id="todoAdd" type="button"><svg class="ui-icon"><use href="#i-plus"/></svg>添加</button></div>
+    <form class="todo-form" id="todoForm" hidden><input id="todoInput" aria-label="新的待办" placeholder="想完成的一件小事" maxlength="120" autocomplete="off" required><button type="submit" class="icon-button" aria-label="保存待办"><svg class="ui-icon"><use href="#i-check"/></svg></button><button type="button" id="todoCancel" class="icon-button" aria-label="取消添加"><svg class="ui-icon"><use href="#i-close"/></svg></button></form>
+    <ul class="todo-list" id="todoList"></ul><p class="empty-note" id="todoEmpty" hidden>今天留一点时间给自己吧。</p>
+  </section>
+  <p id="lifeStatus" class="life-status" role="status" aria-live="polite"></p>
+</main>
+
+<main class="games-view paper-view" id="gamesView" aria-labelledby="gamesTitle" hidden>
+  <header class="page-heading"><button class="back-home" data-house-action="home" type="button"><svg class="ui-icon"><use href="#i-back"/></svg>回窝</button><h1 id="gamesTitle">游戏</h1><span class="game-coins"><svg class="ui-icon"><use href="#i-fish"/></svg><b id="gamesCoinNum">0</b></span></header>
+  <div class="game-grid">
+    <button class="game-tile" data-play="btnHide" type="button"><span class="game-art peek-art"><img src="assets/peek.webp" alt="" draggable="false"></span><span class="game-description"><b>躲猫猫</b><small>跟着节拍找奶团</small></span></button>
+    <button class="game-tile" data-play="btnStack" type="button"><span class="game-art box-art"><img src="assets/box.webp" alt="" draggable="false"></span><span class="game-description"><b>堆纸箱</b><small>一层一层往上叠</small></span></button>
+    <button class="game-tile cake-tile" data-play="btnCake" type="button"><span class="game-art cake-art"><img src="assets/cats/cat0.webp" alt="" draggable="false"></span><span class="game-description"><b>蛋糕店 <em>新</em></b><small>排好队，三只一样的猫猫能买到蛋糕</small></span></button>
+  </div>
+  <section class="coming-section" aria-labelledby="comingTitle"><h2 id="comingTitle">还在做的小游戏</h2><div class="coming-grid"><div><b>喵了个喵</b><small>制作中</small></div><div><b>合成大狮子</b><small>制作中</small></div><div><b>数独喵</b><small>制作中</small></div><div><b>逻辑喵</b><small>制作中</small></div></div></section>
+  <footer class="games-footer"><img src="assets/shy.webp" alt="偷笑的奶团" draggable="false"><p>新游戏在路上啦～</p></footer>
+</main>
+
+<nav class="bottom-nav" id="bottomNav" aria-label="主要页面">
+  <button type="button" id="navHome" data-house-action="home" aria-current="page"><svg class="ui-icon"><use href="#i-home"/></svg>窝</button>
+  <button type="button" id="navLife" data-house-action="life"><svg class="ui-icon"><use href="#i-leaf"/></svg>生活</button>
+</nav>
+
+<dialog class="house-dialog" id="profileDialog" aria-labelledby="profileTitle">
+  <button class="dialog-close icon-button" data-close-dialog type="button" aria-label="关闭我的页面"><svg class="ui-icon"><use href="#i-close"/></svg></button>
+  <img class="profile-cat" src="assets/happy.webp" alt="">
+  <h2 id="profileTitle">和奶团的日子</h2><p id="together">已陪伴 0 分钟</p>
+  <div class="profile-stats"><span><b id="profileFish">0</b>小鱼干</span><span><b id="profileGems">0</b>成长宝石</span><span><b id="profileFocus">0</b>专注分钟</span></div>
+  <p class="profile-help">右上角的小鱼、爱心、月亮，分别可以喂食、摸摸和哄睡。轻点奶团也会有回应哦。</p>
+  <button class="secondary-button" id="profileSound" type="button" aria-pressed="true">音效：开</button>
+  <button class="secondary-button" id="profileSave" type="button">存档 · 导出 / 导入</button>
+  <p class="local-note">小屋与生活记录保存在这台设备的浏览器里</p>
+</dialog>
+
+<dialog class="house-dialog" id="wordDialog" aria-labelledby="wordTitle">
+  <button class="dialog-close icon-button" data-close-dialog type="button" aria-label="关闭单词打卡"><svg class="ui-icon"><use href="#i-close"/></svg></button>
+  <img class="dialog-cat" src="assets/shy.webp" alt=""><h2 id="wordTitle">今天也有一点进步</h2><p>记录今天学过的单词，奶团送你一颗成长宝石。</p>
+  <form id="wordForm"><label for="wordCount">今天学了多少个单词？</label><input id="wordCount" type="number" min="1" max="9999" value="50" required><button class="primary-button" type="submit">完成打卡 · +1 宝石</button></form>
+  <p id="wordMessage" class="form-message" role="status"></p>
+</dialog>
+
+<dialog class="house-dialog" id="foodDialog" aria-labelledby="foodTitle">
+  <button class="dialog-close icon-button" data-close-dialog type="button" aria-label="关闭饮食记录"><svg class="ui-icon"><use href="#i-close"/></svg></button>
+  <h2 id="foodTitle">好好吃饭的一天</h2><p>留下一张照片，或写下今天的小美味。</p>
+  <form id="foodForm"><label class="photo-picker" for="foodFile"><img id="foodPreview" alt="饮食照片预览" hidden><span><svg class="ui-icon"><use href="#i-camera"/></svg>选择照片</span></label><input class="file-input" id="foodFile" type="file" accept="image/*"><label for="foodNote">今天吃了什么</label><textarea id="foodNote" maxlength="240" rows="3" placeholder="比如：热乎乎的番茄鸡蛋面"></textarea><button class="primary-button" id="foodSubmit" type="submit">保存饮食记录</button></form>
+  <p id="foodMessage" class="form-message" role="status"></p><p class="local-note">照片只保存在本机，不会上传</p>
+</dialog>
+<div class="house-toast" id="houseToast" role="status" aria-live="polite" hidden></div>
 
   <div class="modal" id="saveModal" hidden role="dialog" aria-modal="true" aria-labelledby="saveTitle">
     <div class="modal-card">
@@ -201,8 +310,13 @@
 <script src="levels.js?v=cq15-20260929"></script>
 <script src="decor-catalog.js?v=depth-20260929"></script>
 <script src="walking.js?v=walk-20260929"></script>
-<script src="room.js?v=walk-20260929"></script>
-<script src="game.js?v=walk-20260929"></script>
-<script src="queue.js?v=cake-peach-20260929"></script>
+<script src="room.js?v=sound-20260929"></script>
+<script src="sound.js?v=sound-20260929"></script>
+<script src="game.js?v=sound-20260929"></script>
+<script src="queue.js?v=sound-20260929"></script>
+<script src="life.js?v=sound-20260929"></script>
+<script src="planner-state.js?v=house-20260929"></script>
+<script src="planner.js?v=house-20260929"></script>
+<script src="house.js?v=sound-20260929"></script>
 </body>
 </html>

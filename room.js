@@ -359,7 +359,10 @@
       var catDrop = !cancelled && points.size === 1 && !multi && g && g.kind === 'cat' && g.dragging;
       if (cancelled) { cancelGesture(); multi = true; }
       else endHold(g, false);
-      if (catDrop && o.commitCat) o.commitCat(getCatPosition());
+      if (catDrop) {
+        if (o.commitCat) o.commitCat(getCatPosition());
+        if (o.catDrop) o.catDrop();
+      }
       points.delete(e.pointerId);
       if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
       beginGesture(null);
@@ -405,7 +408,10 @@
     window.addEventListener('blur', stopPointers);
     window.addEventListener('pagehide', function () { finish(); stopPointers(); });
     document.addEventListener('visibilitychange', function () { if (document.hidden) { finish(); stopPointers(); } });
-    new ResizeObserver(function () { stopPointers(); drawView(); paintLayout(); restoreCat(); if (o.onLayout) o.onLayout(); }).observe(stage);
+    new ResizeObserver(function () {
+      if (!scene.clientWidth || !scene.clientHeight) return;
+      stopPointers(); drawView(); paintLayout(); restoreCat(); if (o.onLayout) o.onLayout();
+    }).observe(stage);
     return { refresh: refresh, finish: finish, isEditing: function () { return editing; }, cancelInteraction: stopPointers,
       getCatPosition: getCatPosition, placeCat: placeCat, restoreCat: restoreCat, itemPoint: itemPoint, getItemGeometry: getItemGeometry,
       floorY: floorY, depthScale: depthScale, groundPoint: boundCat, walkTo: walkTo, stopWalk: stopWalk,

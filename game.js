@@ -56,7 +56,7 @@
     var d = null;
     if (hotData && typeof hotData.hunger === 'number') d = hotData;
     else { try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { d = null; } }
-    S = fresh(); loadDecor(d);
+    S = fresh(); S.life = d && d.life && typeof d.life === 'object' ? d.life : null; loadDecor(d);
     if (d && typeof d.hunger === 'number') {
       S.hunger = clamp(d.hunger); S.mood = clamp(d.mood); S.energy = clamp(d.energy);
       S.sleeping = !!d.sleeping; S.secs = +d.secs || 0; S.fish = Math.max(0, Math.floor(+d.fish || 0)); S.best = Math.max(0, Math.floor(+d.best || 0)); S.bestBeat = Math.max(0, Math.floor(+d.bestBeat || 0)); S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
@@ -67,7 +67,7 @@
       }
     }
   }
-  function save() { S.t = now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+  function save() { S.t = now(); try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
 
   /* ---------- speech ---------- */
   function say(t, ms) { sayText = t; sayUntil = now() + (ms || 3800); bubble.textContent = t; }
@@ -78,7 +78,7 @@
     if (S.energy < 20) return '眼睛快睁不开了……';
     if (S.hunger < 50) return '有点饿了呢';
     if (S.mood > 85 && S.hunger > 60) return '今天也是好奶团！';
-    return '摸摸头，或者挠挠肚子吧';
+    return new Date().getHours() < 11 ? '早呀，今天也一起加油～' : '今天也一起加油～';
   }
 
   /* ---------- pose ---------- */
@@ -167,7 +167,11 @@
     chin: { ms: 5600, lines: ['下巴也要摸摸……呼噜~', '再抬高一点点，好舒服'] },
     paw: { ms: 5600, lines: ['小爪交给你，牵好了~', '轻轻握住，陪我待一会儿'] }
   };
-  function roomAvailable() { return !busy() && !SH.open && saveModal.hidden && !(roomView && roomView.isEditing()); }
+  function roomEnabled() {
+    return !busy() && !SH.open && saveModal.hidden && !$('#homeView').hidden && !document.querySelector('dialog[open]');
+  }
+  function roomAvailable() { return roomEnabled() && !(roomView && roomView.isEditing()); }
+  function sound(kind) { return window.NaituanSound.play(kind, S.mute); }
   function pet(ev, chosenPart) {
     if (!roomAvailable()) return;
     roomView.stopWalk();
@@ -175,8 +179,9 @@
     var r = stage.getBoundingClientRect();
     var x = (ev && ev.clientX != null ? ev.clientX : r.left + r.width / 2) - r.left;
     var y = (ev && ev.clientY != null ? ev.clientY : r.top + r.height / 2) - r.top - 10;
-    if (S.sleeping) { S.sleeping = false; setPose('stretch', 2000); say('被戳醒啦……'); render(); save(); return; }
+    if (S.sleeping) { S.sleeping = false; sound('wake'); setPose('stretch', 2000); say('被戳醒啦……'); render(); save(); return; }
     var part = chosenPart || petPart(ev), t = now();
+    sound(S.hunger < 25 ? 'tail' : part);
     lastTap = part === 'head' ? lastTap.filter(function (v) { return t - v < 4000; }) : [];
     if (part === 'head') lastTap.push(t);
     heartAt(x, y);
@@ -192,6 +197,7 @@
     if (!roomAvailable() || S.sleeping || S.hunger < 25 || ['head', 'ear', 'nose', 'chin'].indexOf(petPart(ev)) < 0) return false;
     roomView.stopWalk(); endVisit(); deferIdle(); lastTap = []; rubbing = true;
     setPose('rub', Infinity); say('把脸贴过来……呼噜呼噜~', Infinity);
+    sound('rub');
     return true;
   }
   function endRub(cancelled) {
@@ -209,6 +215,7 @@
   function startCatDrag() {
     // Picking up or interrupting a visit keeps the current foot point.
     var p = roomView.getCatPosition();
+    sound('lift');
     endVisit(); override = null; sayUntil = 0; render(); roomView.placeCat(p);
   }
   function furnitureAction(key) {
@@ -245,11 +252,12 @@
     applyPose(walkPose);
   }
   function walkStopped() { deferIdle(); render(); }
-  function visitFurniture(key) {
+  function visitFurniture(key, quiet) {
     if (!roomAvailable()) return;
     deferIdle();
     if (S.sleeping) { say('先让奶团睡一会儿，醒来再去玩'); return; }
     cancelRoomInteraction(); endVisit();
+    if (!quiet) sound('tap');
     if (key === 'room') { setPose('sniff', 5200); say('新房间的味道，我要慢慢熟悉~', 5200); return; }
     var pose = furnitureAction(key);
     var point = furnitureDestination(key, pose);
@@ -262,6 +270,7 @@
       visiting = { pose: pose, key: key };
       roomView.placeCat(arrived, false, { onItem: pose === 'knead' ? key : null });
       setPose(pose, ms);
+      if (!quiet) sound(pose);
       say(pose === 'watch' ? '窗外有什么呀……陪我看一会儿~' : pose === 'knead' ? '软乎乎，左踩踩、右踩踩~' : '凑近闻闻，这个我还不熟呢~', ms);
     }, key)) { say('这里有点挤，帮我挪出一点位置吧~'); render(); }
   }
@@ -269,7 +278,7 @@
     deferIdle(); endVisit();
     if (S.hunger >= 25 && S.mood >= 25 && Math.random() < 0.22) { idleAction(); return; }
     var furniture = roomView.visibleItems();
-    if (furniture.length && Math.random() < 0.35) { visitFurniture(pick(furniture)); return; }
+    if (furniture.length && Math.random() < 0.35) { visitFurniture(pick(furniture), true); return; }
     var from = roomView.getCatPosition();
     for (var attempt = 0; attempt < 6; attempt++) {
       var x = 0.12 + Math.random() * 0.76, back = roomView.floorY(x);
@@ -294,15 +303,16 @@
     if (S.sleeping) { say('睡着啦，等它醒了再吃'); return; }
     if (S.hunger >= 92) { say('吃不下啦，肚子圆圆的'); shake(); return; }
     S.hunger = clamp(S.hunger + 28); S.mood = clamp(S.mood + 2);
+    sound('feed');
     setPose('fish', 3200); say(pick(['好吃！', '小鱼最棒了', '咔哧咔哧……']), 3200);
     render(); save();
   }
   function toggleSleep() {
     if (busy()) return;
     cancelRoomInteraction(); endVisit();
-    if (S.sleeping) { S.sleeping = false; setPose('stretch', 2200); say(S.energy >= 100 ? '睡饱啦！' : '才睡了一会儿……'); render(); save(); return; }
+    if (S.sleeping) { S.sleeping = false; sound('wake'); setPose('stretch', 2200); say(S.energy >= 100 ? '睡饱啦！' : '才睡了一会儿……'); render(); save(); return; }
     if (S.energy >= 90) { say('还不困呢，再玩一会儿'); return; }
-    override = null; S.sleeping = true; say('蜷好身子，晚安……', 3000); render(); save();
+    override = null; S.sleeping = true; sound('sleep'); say('蜷好身子，晚安……', 3000); render(); save();
   }
 
   /* ---------- rhythm hide-and-seek ---------- */
@@ -328,9 +338,17 @@
         }
       } catch (e) { AC = null; }
     }
-    if (AC && AC.state === 'suspended') { try { AC.resume(); } catch (e) {} }
+    if (AC && AC.state === 'suspended') { try { AC.resume().catch(function () {}); } catch (e) {} }
+    if (master) master.gain.value = S.mute ? 0 : 0.55;
   }
-  function setMute(m) { S.mute = !!m; if (master) master.gain.value = S.mute ? 0 : 0.55; rhSoundBtn.textContent = S.mute ? '音效：关' : '音效：开'; save(); }
+  function setMute(m) {
+    S.mute = !!m;
+    if (master) master.gain.value = S.mute ? 0 : 0.55;
+    if (S.mute) window.NaituanSound.stop();
+    rhSoundBtn.textContent = S.mute ? '音效：关' : '音效：开';
+    window.dispatchEvent(new CustomEvent('naituan:sound-change'));
+    save();
+  }
   function clock() { return useAC ? AC.currentTime : performance.now() / 1000; }
   function env(g, t, a, d, v) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
   function tone(freq, t, dur, type, vol, freqEnd) {
@@ -762,6 +780,24 @@
   var roomBackdrop = document.createElement('img');
   roomBackdrop.className = 'room-backdrop'; roomBackdrop.alt = ''; roomBackdrop.draggable = false; roomBackdrop.hidden = true;
   $('#roomScene').prepend(roomBackdrop);
+  roomBackdrop.addEventListener('load', function () {
+    if (roomView && !$('#homeView').hidden) roomView.refresh();
+  });
+
+  function roomFloorBoundary() {
+    var wall = findItem('wall', stage.getAttribute('data-wall'));
+    var edge = wall && wall.floorBoundary || [[0, 0.63], [1, 0.63]];
+    if (!wall || !wall.image || !roomBackdrop.naturalWidth) return edge;
+    var style = getComputedStyle(roomBackdrop), width = roomBackdrop.clientWidth, height = roomBackdrop.clientHeight;
+    if (style.objectFit !== 'cover' || !width || !height) return edge;
+    // The portrait room crops its square artwork; project the wall edge through that same crop.
+    var scale = Math.max(width / roomBackdrop.naturalWidth, height / roomBackdrop.naturalHeight);
+    var drawnWidth = roomBackdrop.naturalWidth * scale, drawnHeight = roomBackdrop.naturalHeight * scale;
+    var position = style.objectPosition.split(' ');
+    var left = (width - drawnWidth) * parseFloat(position[0]) / 100;
+    var top = (height - drawnHeight) * parseFloat(position[1]) / 100;
+    return edge.map(function (p) { return [(p[0] * drawnWidth + left) / width, (p[1] * drawnHeight + top) / height]; });
+  }
 
   winEl.innerHTML = WIN_INNER;
   Object.keys(PROPS).forEach(function (id) {
@@ -782,7 +818,14 @@
     S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0;
     S.roomLayout = window.NaituanRoom.cleanLayout(d && d.roomLayout);
     S.catPosition = window.NaituanRoom.cleanPoint(d && d.catPosition);
-    if (!d) return;
+    if (!d) {
+      S.own['wall:scene-attic'] = 1;
+      S.eq.wall = 'scene-attic';
+      S.eq.prop = ['attic-cloud-rug', 'attic-moon-bed', 'attic-telescope'];
+      S.eq.prop.forEach(function (id) { S.own['prop:' + id] = 1; });
+      S.roomLayout = { 'prop:attic-cloud-rug': { x: 0.50, y: 0.79 }, 'prop:attic-moon-bed': { x: 0.18, y: 0.72 }, 'prop:attic-telescope': { x: 0.84, y: 0.62 } };
+      return;
+    }
     if (d.own && typeof d.own === 'object') Object.keys(d.own).forEach(function (k) { var p = k.split(':'); if (d.own[k] && hasItem(p[0], p[1])) S.own[k] = 1; });
     if (d.eq && typeof d.eq === 'object') {
       ['wall', 'rug', 'win'].forEach(function (c) { if (hasItem(c, d.eq[c]) && S.own[c + ':' + d.eq[c]]) S.eq[c] = d.eq[c]; });
@@ -873,6 +916,7 @@
     updateBuy(); paintDecor(); renderCoins();
   }
   function celebrate(selection) {
+    sound('reward');
     pendingFurniture = selection.cat === 'wall' ? 'room' : selection.cat === 'prop' ? 'prop:' + selection.id : selection.cat;
     if (S.sleeping) return;
     var r = stage.getBoundingClientRect();
@@ -954,8 +998,9 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !saveModal.hidden) closeSave(); });
 
   /* ---------- wiring ---------- */
-  document.addEventListener('pointerdown', deferIdle);
-  document.addEventListener('keydown', deferIdle);
+  function userInteraction() { deferIdle(); window.NaituanSound.unlock(S.mute); }
+  document.addEventListener('pointerdown', userInteraction);
+  document.addEventListener('keydown', userInteraction);
   $('#catbtn').addEventListener('keydown', function (e) {
     if (e.repeat) return;
     var part = { e: 'ear', n: 'nose', c: 'chin', p: 'paw' }[e.key.toLowerCase()];
@@ -1005,6 +1050,8 @@
   }
   /* small bridge for the separate mini-games (queue.js) */
   window.NT = {
+    sound: sound,
+    setMute: setMute, finishRoom: function () { cancelRoomInteraction(); endVisit(); if (roomView) roomView.finish(); deferIdle(); },
     S: function () { return S; }, save: save, say: say, addFish: addFish, clamp: clamp, pick: pick, render: render, setPose: setPose, heartAt: heartAt, textAt: textAt,
     stage: stage, ext: EXT, isBusy: busy, setChrome: setChrome, setBusyUI: setBusyUI, hideCat: function (h) { $('#catbox').style.visibility = h ? 'hidden' : ''; bubble.hidden = !!h; stage.classList.toggle('playing', !!h); }
   };
@@ -1014,13 +1061,13 @@
     items: [{ key: 'win', name: '窗户', el: winEl }, { key: 'rug', name: '地毯', el: rugEl }].concat(
       CATALOG.prop.map(function (it) { return { key: 'prop:' + it.id, name: it.name, depthAware: !!it.depthAware,
         obstacle: it.placement === 'floor' || /^(cushion|plant|lamp)$/.test(it.id), anchors: it.interactionAnchors, el: propsEl.querySelector('[data-prop="' + it.id + '"]') }; })),
-    floorBoundary: function () { var wall = findItem('wall', stage.getAttribute('data-wall')); return wall && wall.floorBoundary || [[0, 0.63], [1, 0.63]]; },
-    enabled: function () { return !busy() && !SH.open && saveModal.hidden; },
+    floorBoundary: roomFloorBoundary,
+    enabled: roomEnabled,
     layout: function () { return S && S.roomLayout || {}; },
     commit: function (layout) { S.roomLayout = layout; save(); },
     catPosition: function () { return S && S.catPosition; },
     commitCat: function (p) { S.catPosition = p; deferIdle(); save(); },
-    pet: pet, petHold: beginRub, endPetHold: endRub, catDragStart: startCatDrag, interactItem: visitFurniture, onLayout: positionVisit,
+    pet: pet, petHold: beginRub, endPetHold: endRub, catDragStart: startCatDrag, catDrop: function () { sound('land'); }, interactItem: visitFurniture, onLayout: positionVisit,
     walkStep: walkStep, walkStop: walkStopped
   });
   window.NT.room = roomView;

@@ -68,7 +68,7 @@ function fixture(initialLayout = {}, options = {}) {
   document.createElement = id => new Element(id); window.NaituanDecor = { items: [] };
   let time = 0, timerId = 0, resize, savedCat = null, savedLayout = initialLayout;
   const timers = new Map();
-  const calls = { taps: 0, holds: 0, ends: [], drags: 0, drops: [], furniture: [], layouts: [], onLayout: 0 };
+  const calls = { taps: 0, holds: 0, ends: [], drags: 0, drops: [], landings: 0, furniture: [], layouts: [], onLayout: 0 };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../room.js'), 'utf8'), {
     window, document,
     setTimeout: (fn, ms) => { timers.set(++timerId, { fn, at: time + ms }); return timerId; },
@@ -82,6 +82,7 @@ function fixture(initialLayout = {}, options = {}) {
     catPosition: () => savedCat, commitCat: p => { savedCat = p; calls.drops.push(p); },
     pet: () => calls.taps++, petHold: () => { calls.holds++; return true; },
     endPetHold: cancelled => calls.ends.push(cancelled), catDragStart: () => calls.drags++,
+    catDrop: () => calls.landings++,
     interactItem: key => calls.furniture.push(key),
     onLayout: () => calls.onLayout++,
     items: [{ key: 'rug', name: '地毯', el: rug }, { key: 'win', name: '窗户', el: win, anchors: { watch: { x: 0.2, y: 0.8 } } },
@@ -121,6 +122,7 @@ test('cat drag uses zoom-correct room deltas, persists feet, and survives refres
   f.pointer('pointerdown', 1, 500, 500); f.pointer('pointermove', 1, 600, 540);
   f.pointer('pointermove', 1, 700, 580); f.pointer('pointerup', 1, 700, 580);
   assert.equal(f.calls.drags, 1); assert.equal(f.calls.drops.length, 1);
+  assert.equal(f.calls.landings, 1);
   point(f.calls.drops[0], 0.6, 0.8); assert.equal(f.calls.taps, 0);
   f.room.placeCat({ x: 0.1, y: 0.2 }); f.room.refresh(); point(f.room.getCatPosition(), 0.6, 0.8);
   f.resize(); point(f.room.getCatPosition(), 0.6, 0.8);
@@ -142,6 +144,7 @@ test('second finger cancels hold/drag, rolls back cat and suppresses the remaini
   f.pointer('pointermove', 4, 850, 540); assert.equal(f.controls.roomZoomLabel.textContent, '200%');
   f.pointer('pointerup', 4, 850, 540); f.pointer('pointermove', 3, 600, 560);
   f.pointer('pointerup', 3, 600, 560); assert.equal(f.calls.drops.length, 0); assert.equal(f.calls.taps, 0);
+  assert.equal(f.calls.landings, 0);
   f.pointer('pointerdown', 5, 450, 500); f.pointer('pointerup', 5, 450, 500);
   assert.equal(f.calls.taps, 1);
 });
@@ -155,6 +158,7 @@ test('cancel, blur and explicit cancellation discard unfinished interactions', (
   f.pointer('pointerdown', 3, 450, 500); f.tick(450); f.room.cancelInteraction();
   f.pointer('pointerup', 3, 450, 500);
   assert.deepEqual(f.calls.ends, [true]); assert.equal(f.calls.drops.length, 0); assert.equal(f.calls.taps, 0);
+  assert.equal(f.calls.landings, 0);
 });
 
 test('furniture tap/keyboard interact; arranging instead moves and commits furniture', () => {

@@ -370,10 +370,12 @@
   }
 
   /* ---------- 进入 / 离开小屋 ---------- */
+  var bookOnly = false;
   function enter() {
     if (NT.isBusy()) return;
     var S = NT.S();
     if (S.sleeping) { NT.say('奶团睡着了，先叫醒它'); return; }
+    bookOnly = false;
     NT.ext.active = true; NT.hideCat(true); NT.setChrome(true); NT.setBusyUI(true);
     root.hidden = false; window.scrollTo(0, 0); root.classList.add('on'); NT.stage.classList.add('cqmode');
     audioInit(); openMenu();
@@ -397,10 +399,18 @@
   $('#cqRedo').addEventListener('click', function () { if (G && !G.over) { G.token++; loadVariant(G.lv, G.vi); } });
   $('#cqUndo').addEventListener('click', undo);
   $('#cqBookBtn').addEventListener('click', function () { paintBook(); el.menu.hidden = true; el.book.hidden = false; });
-  $('#cqBookX').addEventListener('click', function () { el.book.hidden = true; paintMenu(); el.menu.hidden = false; });
+  $('#cqBookX').addEventListener('click', function () { if (bookOnly) { bookOnly = false; leave(); return; } el.book.hidden = true; paintMenu(); el.menu.hidden = false; });
   $('#cqBookSell').addEventListener('click', sellAll);
-  el.snd.addEventListener('click', function () { var S = NT.S(); S.mute = !S.mute; if (master) master.gain.value = S.mute ? 0 : 0.5; NT.save(); paintMenu(); });
+  el.snd.addEventListener('click', function () { NT.setMute(!NT.S().mute); paintMenu(); });
+  window.addEventListener('naituan:sound-change', function () { if (master) master.gain.value = NT.S().mute ? 0 : 0.5; });
   window.addEventListener('resize', function () { if (G && !root.hidden) layout(true); });
   window.addEventListener('orientationchange', function () { setTimeout(function () { if (G && !root.hidden) layout(true); }, 250); });
-  window.NTQ = { get: function () { return G; }, CAKES: CAKES, cq: cq };
+  function openCollection() {
+    if (NT.isBusy()) return;
+    bookOnly = true; NT.ext.active = true; NT.hideCat(true); NT.setChrome(true); NT.setBusyUI(true);
+    root.hidden = false; root.classList.add('on'); NT.stage.classList.add('cqmode');
+    el.play.hidden = el.menu.hidden = el.win.hidden = el.lose.hidden = true;
+    paintBook(); el.book.hidden = false;
+  }
+  window.NTQ = { get: function () { return G; }, CAKES: CAKES, cq: cq, openBook: openCollection };
 })();
