@@ -4,7 +4,7 @@
   "themes": [
     {
       "id": "peach",
-      "name": "杏桃小物"
+      "name": "杏桃奶油屋"
     },
     {
       "id": "garden",
@@ -1175,6 +1175,123 @@
       "x": 0.5,
       "y": 0.8,
       "w": 0.65
+    },
+    {
+      "id": "peach-bed",
+      "name": "杏桃软被木床",
+      "price": 500,
+      "theme": "peach",
+      "image": "assets/decor/peach/bed.webp",
+      "placement": "floor",
+      "width": 406,
+      "height": 363,
+      "x": 0.16,
+      "y": 0.58,
+      "w": 0.3
+    },
+    {
+      "id": "peach-sofa",
+      "name": "杏桃奶油沙发",
+      "price": 499,
+      "theme": "peach",
+      "image": "assets/decor/peach/sofa.webp",
+      "placement": "floor",
+      "width": 481,
+      "height": 325,
+      "x": 0.77,
+      "y": 0.57,
+      "w": 0.34
+    },
+    {
+      "id": "peach-table",
+      "name": "杏桃椭圆茶几",
+      "price": 299,
+      "theme": "peach",
+      "image": "assets/decor/peach/table.webp",
+      "placement": "floor",
+      "width": 368,
+      "height": 225,
+      "x": 0.73,
+      "y": 0.72,
+      "w": 0.27
+    },
+    {
+      "id": "peach-cabinet",
+      "name": "杏桃双抽床头柜",
+      "price": 299,
+      "theme": "peach",
+      "image": "assets/decor/peach/cabinet.webp",
+      "placement": "floor",
+      "width": 326,
+      "height": 323,
+      "x": 0.34,
+      "y": 0.59,
+      "w": 0.16
+    },
+    {
+      "id": "peach-shelf",
+      "name": "杏桃圆角书柜",
+      "price": 399,
+      "theme": "peach",
+      "image": "assets/decor/peach/shelf.webp",
+      "placement": "floor",
+      "width": 430,
+      "height": 341,
+      "x": 0.5,
+      "y": 0.55,
+      "w": 0.23
+    },
+    {
+      "id": "peach-lamp",
+      "name": "杏桃花边落地灯",
+      "price": 249,
+      "theme": "peach",
+      "image": "assets/decor/peach/lamp.webp",
+      "placement": "floor",
+      "width": 272,
+      "height": 423,
+      "x": 0.93,
+      "y": 0.53,
+      "w": 0.13
+    },
+    {
+      "id": "peach-cat-bed",
+      "name": "杏桃软软猫窝",
+      "price": 299,
+      "theme": "peach",
+      "image": "assets/decor/peach/cat-bed.webp",
+      "placement": "floor",
+      "width": 462,
+      "height": 296,
+      "x": 0.17,
+      "y": 0.89,
+      "w": 0.24
+    },
+    {
+      "id": "peach-scratcher",
+      "name": "杏桃猫抓柱",
+      "price": 249,
+      "theme": "peach",
+      "image": "assets/decor/peach/scratcher.webp",
+      "placement": "floor",
+      "width": 309,
+      "height": 356,
+      "x": 0.89,
+      "y": 0.88,
+      "w": 0.14
+    },
+    {
+      "id": "peach-stool",
+      "name": "杏桃软垫小凳",
+      "price": 199,
+      "theme": "peach",
+      "image": "assets/decor/peach/stool.webp",
+      "placement": "floor",
+      "width": 281,
+      "height": 267,
+      "x": 0.34,
+      "y": 0.86,
+      "w": 0.15
     }
   ]
 };

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function fixture() {
+function fixture(initialLayout = {}) {
   class Element {
     constructor(id) {
       this.id = id; this.style = {}; this.dataset = {}; this.attributes = {}; this.listeners = {};
@@ -40,12 +40,19 @@ function fixture() {
         left = parseFloat(this.style.left) / 100 * 1000 - width / 2;
         top = parseFloat(this.style.top) / 100 * 800 - height * (this === catBox ? 1 : 0.5);
       }
+      const itemScale = (this.style.transform || '').match(/scale\(([^,]+),([^)]+)\)/);
+      if (itemScale) {
+        const sx = Math.abs(Number(itemScale[1])), sy = Math.abs(Number(itemScale[2]));
+        left -= width * (sx - 1) / 2; top -= height * (sy - 1) / 2;
+        width *= sx; height *= sy;
+      }
       return rect(22 + tx + left * scale, 32 + ty + top * scale, width * scale, height * scale);
     }
   }
   function rect(left, top, width, height) { return { left, top, width, height, right: left + width, bottom: top + height }; }
   const controls = {};
-  ['roomZoomIn', 'roomZoomOut', 'roomZoomLabel', 'roomArrange', 'roomEditTools', 'roomItem', 'roomTip', 'roomResetView', 'roomResetItem', 'roomCancel']
+  ['roomZoomIn', 'roomZoomOut', 'roomZoomLabel', 'roomArrange', 'roomEditTools', 'roomItem', 'roomTip', 'roomResetView', 'roomResetItem', 'roomCancel',
+    'roomSize', 'roomSizeLabel', 'roomSmaller', 'roomBigger', 'roomFlipX', 'roomFlipY', 'roomLeft', 'roomRight', 'roomUp', 'roomDown']
     .forEach(id => { controls[id] = new Element(id); });
   const stage = new Element('stage'), scene = new Element('scene'), tools = new Element('tools'), props = new Element('props');
   stage.clientLeft = stage.clientTop = 2; scene.clientWidth = 1000; scene.clientHeight = 800;
@@ -55,9 +62,9 @@ function fixture() {
   catBox.appendChild(cat);
   const window = new Element('window'), document = new Element('document');
   document.createElement = id => new Element(id); window.NaituanDecor = { items: [] };
-  let time = 0, timerId = 0, resize, savedCat = null, savedLayout = {};
+  let time = 0, timerId = 0, resize, savedCat = null, savedLayout = initialLayout;
   const timers = new Map();
-  const calls = { taps: 0, holds: 0, ends: [], drags: 0, drops: [], furniture: [], layouts: [] };
+  const calls = { taps: 0, holds: 0, ends: [], drags: 0, drops: [], furniture: [], layouts: [], onLayout: 0 };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../room.js'), 'utf8'), {
     window, document,
     setTimeout: (fn, ms) => { timers.set(++timerId, { fn, at: time + ms }); return timerId; },
@@ -71,6 +78,7 @@ function fixture() {
     pet: () => calls.taps++, petHold: () => { calls.holds++; return true; },
     endPetHold: cancelled => calls.ends.push(cancelled), catDragStart: () => calls.drags++,
     interactItem: key => calls.furniture.push(key),
+    onLayout: () => calls.onLayout++,
     items: [{ key: 'rug', name: '地毯', el: rug }, { key: 'win', name: '窗户', el: win, anchors: { watch: { x: 0.2, y: 0.8 } } }]
   });
   room.refresh();
@@ -166,4 +174,29 @@ test('furniture geometry and anchors remain in room coordinates through camera z
   f.win.hidden = true; assert.equal(f.room.itemPoint('win'), null);
   assert.equal(f.api.cleanPoint({ x: NaN, y: 0 }), null);
   point(f.api.cleanPoint({ x: -1, y: 2 }), 0, 1);
+});
+
+test('furniture scale and mirrored anchors survive editing, save and refresh', () => {
+  const f = fixture({ win: { x: 0.5, y: 0.5, scale: 1.5, flipX: true, flipY: true } });
+  for (let n = 0; n < 4; n++) f.controls.roomZoomIn.emit('click');
+  let geometry = f.room.getItemGeometry('win');
+  point(geometry.center, 0.5, 0.5); close(geometry.size.width, 0.375); close(geometry.size.height, 0.375);
+  point(f.room.itemPoint('win', 'watch'), 0.6125, 0.3875);
+
+  f.controls.roomArrange.emit('click');
+  f.controls.roomItem.value = 'win'; f.controls.roomItem.emit('change');
+  f.controls.roomSize.value = '200'; f.controls.roomSize.emit('input');
+  f.controls.roomFlipX.emit('click');
+  f.controls.roomRight.emit('click'); f.controls.roomUp.emit('click');
+  geometry = f.room.getItemGeometry('win');
+  point(geometry.center, 0.51, 0.49); close(geometry.size.width, 0.5); close(geometry.size.height, 0.5);
+  point(f.room.itemPoint('win', 'watch'), 0.36, 0.34);
+  f.controls.roomArrange.emit('click');
+  const saved = f.calls.layouts[0].win;
+  point(saved, 0.51, 0.49); assert.equal(saved.scale, 2); assert.equal(saved.flipX, false); assert.equal(saved.flipY, true);
+  const cleaned = f.api.cleanLayout(f.calls.layouts[0]).win;
+  assert.equal(cleaned.scale, 2); assert.equal(cleaned.flipX, false); assert.equal(cleaned.flipY, true);
+  f.room.refresh(); f.resize();
+  point(f.room.itemPoint('win', 'watch'), 0.36, 0.34);
+  assert.equal(f.calls.onLayout, 3);
 });

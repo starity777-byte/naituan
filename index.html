@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+KuaiLe&display=swap">
 <link rel="stylesheet" href="style.css?v=motions8-20260929">
-<link rel="stylesheet" href="decor-shop.css?v=decor-shop-20260929">
+<link rel="stylesheet" href="decor-shop.css?v=cake-peach-20260929">
 </head>
 <body>
 <div class="app" id="app">
@@ -105,10 +105,28 @@
       <button id="roomResetView" type="button">回正</button>
       <button id="roomArrange" class="room-arrange" type="button" aria-pressed="false">布置</button>
     </div>
-    <div class="room-edit-row" id="roomEditTools" hidden>
+    <div class="room-editor" id="roomEditTools" hidden>
+      <div class="room-edit-row">
       <select id="roomItem" aria-label="选择要摆放的家具"></select>
-      <button id="roomResetItem" type="button">放回原位</button>
+      <button id="roomResetItem" type="button" title="恢复这件家具的位置、大小和朝向">重置单件</button>
       <button id="roomCancel" type="button">取消</button>
+      </div>
+      <div class="room-size-row" role="group" aria-label="家具大小">
+        <label for="roomSize">大小 <output id="roomSizeLabel" for="roomSize">100%</output></label>
+        <button id="roomSmaller" type="button" aria-label="缩小家具">−</button>
+        <input id="roomSize" type="range" min="50" max="200" step="5" value="100" aria-label="家具大小百分比">
+        <button id="roomBigger" type="button" aria-label="放大家具">＋</button>
+      </div>
+      <div class="room-edit-row room-transform-row">
+        <div class="room-nudge" role="group" aria-label="微调家具位置">
+          <button id="roomLeft" type="button" aria-label="家具向左">←</button>
+          <button id="roomRight" type="button" aria-label="家具向右">→</button>
+          <button id="roomUp" type="button" aria-label="家具向上">↑</button>
+          <button id="roomDown" type="button" aria-label="家具向下">↓</button>
+        </div>
+        <button id="roomFlipX" type="button" aria-pressed="false">左右镜像</button>
+        <button id="roomFlipY" type="button" aria-pressed="false">上下镜像</button>
+      </div>
     </div>
     <p id="roomTip" class="room-tip" role="status">轻点摸摸，长按脸颊蹭蹭，拖动抱起；双指只缩放房间</p>
   </section>
@@ -180,9 +198,9 @@
 </div>
 
 <script src="levels.js?v=cq15-20260929"></script>
-<script src="decor-catalog.js?v=decor-shop-20260929"></script>
+<script src="decor-catalog.js?v=cake-peach-20260929"></script>
 <script src="room.js?v=motions8-20260929"></script>
 <script src="game.js?v=motions8-20260929"></script>
-<script src="queue.js?v=cq15-20260929"></script>
+<script src="queue.js?v=cake-peach-20260929"></script>
 </body>
 </html>

@@ -9,8 +9,12 @@
   function cleanLayout(value) {
     var out = {};
     KEYS.forEach(function (key) {
-      var p = cleanPoint(value && value[key]);
-      if (p) out[key] = p;
+      var p = value && value[key], point = cleanPoint(p);
+      if (point) {
+        point.scale = Number.isFinite(p.scale) ? limit(p.scale, 0.5, 2) : 1;
+        point.flipX = p.flipX === true; point.flipY = p.flipY === true;
+        out[key] = point;
+      }
     });
     return out;
   }
@@ -19,6 +23,8 @@
     var $ = function (id) { return tools.querySelector('#' + id); };
     var zoomIn = $('roomZoomIn'), zoomOut = $('roomZoomOut'), label = $('roomZoomLabel');
     var arrange = $('roomArrange'), editTools = $('roomEditTools'), picker = $('roomItem'), tip = $('roomTip');
+    var size = $('roomSize'), sizeLabel = $('roomSizeLabel'), smaller = $('roomSmaller'), bigger = $('roomBigger');
+    var flipX = $('roomFlipX'), flipY = $('roomFlipY');
     var view = { scale: 1, x: 0, y: 0 }, points = new Map(), gesture = null;
     var editing = false, draft = {}, selected = null, moved = false, multi = false, enabled = false;
     var items = o.items, byKey = {};
@@ -94,9 +100,14 @@
       var r = it.el.getBoundingClientRect(), s = scene.getBoundingClientRect();
       if (!r.width || !r.height || !s.width || !s.height) return null;
       var anchors = {}, definitions = Object.assign({ approach: { x: 0.5, y: 0.95 }, rest: { x: 0.5, y: 0.68 }, watch: { x: 0.5, y: 0.92 } }, it.anchors);
+      var layout = editing ? draft : o.layout(), transform = layout[key] || {};
       Object.keys(definitions).forEach(function (name) {
         var p = cleanPoint(definitions[name]);
-        if (p) anchors[name] = { x: (r.left + r.width * p.x - s.left) / s.width, y: (r.top + r.height * p.y - s.top) / s.height };
+        if (p) {
+          if (transform.flipX) p.x = 1 - p.x;
+          if (transform.flipY) p.y = 1 - p.y;
+          anchors[name] = { x: (r.left + r.width * p.x - s.left) / s.width, y: (r.top + r.height * p.y - s.top) / s.height };
+        }
       });
       return { key: key, center: center(it), size: { width: r.width / s.width, height: r.height / s.height }, anchors: anchors };
     }
@@ -105,31 +116,49 @@
       return geometry && geometry.anchors[anchor || 'approach'] || null;
     }
     function bounded(it, p) {
-      var hx = Math.min(0.5, it.el.offsetWidth / scene.clientWidth / 2);
-      var hy = Math.min(0.5, it.el.offsetHeight / scene.clientHeight / 2);
-      return { x: limit(p.x, hx, 1 - hx), y: limit(p.y, hy, 1 - hy) };
+      var scale = p.scale || 1;
+      var hx = Math.min(0.5, it.el.offsetWidth * scale / scene.clientWidth / 2);
+      var hy = Math.min(0.5, it.el.offsetHeight * scale / scene.clientHeight / 2);
+      return { x: limit(p.x, hx, 1 - hx), y: limit(p.y, hy, 1 - hy), scale: scale, flipX: !!p.flipX, flipY: !!p.flipY };
     }
     function apply(it, p) {
       if (p) {
         p = bounded(it, p);
         it.el.style.left = p.x * 100 + '%'; it.el.style.top = p.y * 100 + '%';
-        it.el.style.right = 'auto'; it.el.style.bottom = 'auto'; it.el.style.transform = 'translate(-50%,-50%)';
+        it.el.style.right = 'auto'; it.el.style.bottom = 'auto';
+        it.el.style.transform = 'translate(-50%,-50%) scale(' + p.scale * (p.flipX ? -1 : 1) + ',' + p.scale * (p.flipY ? -1 : 1) + ')';
       } else ['left', 'top', 'right', 'bottom', 'transform'].forEach(function (key) { it.el.style[key] = ''; });
     }
     function paintLayout() {
       var layout = editing ? draft : o.layout();
       items.forEach(function (it) { apply(it, layout[it.key]); });
     }
-    function place(it, p) { draft[it.key] = bounded(it, p); apply(it, draft[it.key]); }
+    function place(it, p) {
+      draft[it.key] = bounded(it, Object.assign({ scale: 1, flipX: false, flipY: false }, draft[it.key], p));
+      apply(it, draft[it.key]);
+    }
+    function transformUI() {
+      var p = selected && draft[selected.key] || {}, percent = Math.round((p.scale || 1) * 100);
+      size.value = percent; sizeLabel.textContent = percent + '%';
+      size.disabled = flipX.disabled = flipY.disabled = $('roomResetItem').disabled = !selected;
+      smaller.disabled = !selected || percent <= 50; bigger.disabled = !selected || percent >= 200;
+      flipX.setAttribute('aria-pressed', String(!!p.flipX)); flipY.setAttribute('aria-pressed', String(!!p.flipY));
+      ['roomLeft', 'roomRight', 'roomUp', 'roomDown'].forEach(function (id) { $(id).disabled = !selected; });
+    }
+    function resizeItem(percent) {
+      if (!editing || !selected) return;
+      place(selected, Object.assign(center(selected), { scale: limit(percent / 100, 0.5, 2) })); transformUI();
+    }
     function select(it) {
       selected = it;
       items.forEach(function (item) { item.el.classList.toggle('room-selected', item === it); });
       if (it) picker.value = it.key;
+      transformUI();
     }
     function editUI() {
       scene.classList.toggle('arranging', editing); editTools.hidden = !editing;
       arrange.textContent = editing ? '完成' : '布置'; arrange.setAttribute('aria-pressed', String(editing));
-      tip.textContent = editing ? '拖动家具摆放，双指仍可缩放；点「完成」保存' : '轻点摸摸，长按脸颊蹭蹭，拖动抱起；双指只缩放房间';
+      tip.textContent = editing ? '拖动家具 · 下方调大小和镜像 · 双指缩放房间' : '轻点摸摸，长按脸颊蹭蹭，拖动抱起；双指只缩放房间';
       o.props.setAttribute('aria-hidden', 'false');
       items.forEach(function (it) {
         it.el.tabIndex = it.el.hidden ? -1 : 0;
@@ -263,8 +292,24 @@
       if (editing) finish();
       else { stopPointers(); draft = cleanLayout(o.layout()); editing = true; editUI(); }
     });
-    picker.addEventListener('change', function () { select(byKey[picker.value]); if (selected) selected.el.focus({ preventScroll: true }); });
-    $('roomResetItem').addEventListener('click', function () { if (selected) { delete draft[selected.key]; apply(selected, null); } });
+    picker.addEventListener('change', function () { select(byKey[picker.value]); });
+    size.addEventListener('input', function () { resizeItem(Number(size.value)); });
+    smaller.addEventListener('click', function () { resizeItem(Number(size.value) - 10); });
+    bigger.addEventListener('click', function () { resizeItem(Number(size.value) + 10); });
+    [['roomFlipX', 'flipX'], ['roomFlipY', 'flipY']].forEach(function (pair) {
+      $(pair[0]).addEventListener('click', function () {
+        if (!editing || !selected) return;
+        var p = center(selected); p[pair[1]] = !(draft[selected.key] || {})[pair[1]];
+        place(selected, p); transformUI();
+      });
+    });
+    [['roomLeft', -1, 0], ['roomRight', 1, 0], ['roomUp', 0, -1], ['roomDown', 0, 1]].forEach(function (dir) {
+      $(dir[0]).addEventListener('click', function () {
+        if (!editing || !selected) return;
+        var p = center(selected); place(selected, { x: p.x + dir[1] * 0.01, y: p.y + dir[2] * 0.01 });
+      });
+    });
+    $('roomResetItem').addEventListener('click', function () { if (selected) { delete draft[selected.key]; apply(selected, null); transformUI(); } });
     $('roomCancel').addEventListener('click', function () { finish(true); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && editing) finish(true); });
     window.addEventListener('blur', stopPointers);
