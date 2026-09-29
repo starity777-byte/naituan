@@ -14,10 +14,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SOLVER = os.path.join(HERE, 'solver')
 
 
-def solve(lanes, limit=1_500_000, weight=1.0):
+def solve(lanes, caps, limit=1_500_000, weight=1.0):
     """返回 (步数, 展开的节点数)；步数 -1 表示超出搜索上限。
     weight=1 得到的是最少步数；weight>1 搜得更快，但只是“参考步数”。"""
-    inp = f"{CAP} {len(lanes)}\n" + "\n".join(" ".join(map(str, l + [0] * (CAP - len(l)))) for l in lanes) + f"\n{limit} {weight}\n"
+    inp = f"{CAP} {len(lanes)}\n" + "\n".join(f"{c} " + " ".join(map(str, l + [0] * (c - len(l)))) for l, c in zip(lanes, caps)) + f"\n{limit} {weight}\n"
     r = subprocess.run([SOLVER], input=inp, capture_output=True, text=True)
     m = int(r.stdout.split()[0])
     nodes = int(r.stderr.split()[1]) if r.stderr.startswith('nodes') else limit
@@ -28,11 +28,11 @@ def full_same(l):
     return len(l) == CAP and len(set(l)) == 1
 
 
-def scramble(kinds, nlanes, extra, rng):
+def scramble(kinds, caps, extra, rng):
     """倒着来：从空场开始，一组一组“反向买回”，每次先反向走一步，再随机打乱几步。
     lane[0] 是队首。kinds 是每一组猫的种类（可以重复）。
     返回 (开局, 从开局通关的一个解法[(从哪队, 到哪队)...])。"""
-    lanes = [[] for _ in range(nlanes)]
+    lanes = [[] for _ in caps]
     rev = []  # 倒着走的每一步：(从 b 拿走队首, 放到 a)
 
     def push(b, a):
@@ -50,7 +50,7 @@ def scramble(kinds, nlanes, extra, rng):
         srcs = [i for i, l in enumerate(lanes) if l and (len(l) == 1 or l[1] == l[0])]
         rng.shuffle(srcs)
         for b in srcs:
-            for a in pick_dst([a for a, l in enumerate(lanes) if a != b and len(l) < CAP]):
+            for a in pick_dst([a for a, l in enumerate(lanes) if a != b and len(l) < caps[a]]):
                 if not lanes[a] and len(lanes[b]) == 1:
                     continue  # 空队之间倒来倒去没意义
                 x = lanes[b][0]
@@ -62,11 +62,11 @@ def scramble(kinds, nlanes, extra, rng):
 
     order = list(kinds); rng.shuffle(order)
     for k in order:
-        empties = [i for i, l in enumerate(lanes) if not l]
+        empties = [i for i, l in enumerate(lanes) if not l and caps[i] >= CAP]  # 整组要放得下，短队放不下
         if not empties: return None
         e = rng.choice(empties); lanes[e] = [k] * CAP
         # 反向的“买走”：最后一步是有一只猫放到这队，把它拿走放到别的队
-        dsts = [b for b, l in enumerate(lanes) if b != e and len(l) < CAP]
+        dsts = [b for b, l in enumerate(lanes) if b != e and len(l) < caps[b]]
         if not dsts: return None
         a = pick_dst(dsts)[0]; push(e, a)
         if full_same(lanes[a]): return None
@@ -76,30 +76,39 @@ def scramble(kinds, nlanes, extra, rng):
     return lanes, fwd
 
 
-def replay(lanes, moves):
+def replay(lanes, caps, moves):
     """按规则把解法走一遍，确认真的能通关。"""
     L = [list(l) for l in lanes]
     for a, b in moves:
-        assert L[a] and len(L[b]) < CAP and (not L[b] or L[b][0] == L[a][0]), 'illegal'
+        assert L[a] and len(L[b]) < caps[b] and (not L[b] or L[b][0] == L[a][0]), 'illegal'
         x = L[a].pop(0); L[b].insert(0, x)
         if full_same(L[b]): L[b] = []
     return all(not l for l in L)
 
 
-# (关卡名, 每队几只, 几组猫, 队伍数, 打乱强度, 采样次数, 用哪几种猫[0-7])
-# 越往后：猫越多、每队越长、空队越少（最后都只有 1 个空队）。
+# (关卡名, 每组几只, 几组猫, 多出来的队的容量, 打乱强度, 采样次数, 用哪几种猫[0-7])
+# “多出来的队”通常是一个和别的一样长的空队；写成更小的数字就是“短队”：空位更少，更难。
+# 前 10 关按这个顺序；从第 11 关起的几关会按算出来的难度自动排序。
 LEVELS = [
-    ('小试身手',     3,  2,  3, 6,   60, [0, 1]),
-    ('排排站',       3,  4,  5, 12, 120, [0, 1, 2, 3]),
-    ('人多起来了',   4,  5,  6, 20, 200, [0, 1, 2, 3, 4]),
-    ('只剩一个空位', 4,  6,  7, 30, 250, [0, 1, 2, 3, 4, 5]),
-    ('加班的猫',     5,  6,  7, 40, 150, [0, 1, 2, 3, 4, 5]),
-    ('打烊前的长队', 4,  8,  9, 30, 300, [0, 1, 2, 3, 4, 5, 6, 7]),
-    ('排到街角',     5,  8,  9, 40, 100, [0, 1, 2, 3, 4, 5, 6, 7]),
-    ('新品上架',     4,  9, 10, 40, 200, [0, 1, 2, 3, 4, 5, 6, 7]),
-    ('最长的队',     5, 10, 11, 50,  80, [0, 1, 2, 3, 4, 5, 6, 7]),
-    ('满街都是猫',   4, 11, 12, 50, 150, [0, 1, 2, 3, 4, 5, 6, 7]),
+    ('小试身手',     3,  2, [3], 6,   60, [0, 1]),
+    ('排排站',       3,  4, [3], 12, 120, [0, 1, 2, 3]),
+    ('人多起来了',   4,  5, [4], 20, 200, [0, 1, 2, 3, 4]),
+    ('只剩一个空位', 4,  6, [4], 30, 250, [0, 1, 2, 3, 4, 5]),
+    ('加班的猫',     5,  6, [5], 40, 150, [0, 1, 2, 3, 4, 5]),
+    ('打烊前的长队', 4,  8, [4], 30, 300, list(range(8))),
+    ('排到街角',     5,  8, [5], 40, 100, list(range(8))),
+    ('新品上架',     4,  9, [4], 40, 200, list(range(8))),
+    ('最长的队',     5, 10, [5], 50,  80, list(range(8))),
+    ('满街都是猫',   4, 11, [4], 50, 150, list(range(8))),
+    ('备用小队',     4,  9, [2], 40, 200, list(range(8))),
+    ('窄窄的小门',   5,  8, [2], 40, 200, list(range(8))),
+    ('挤挤挨挨',     5, 10, [2], 50, 100, list(range(8))),
+    ('只剩一格',     4, 11, [1], 50, 120, list(range(8))),
+    ('打烊清场',     4, 11, [2], 50, 150, list(range(8))),
 ]
+FIXED = 10   # 前 FIXED 关顺序固定
+# 步数上限是最少步数的几倍（None = 不限步数），按最后的关卡顺序对应
+RATIOS = [None, None, 2.2, 2.0, 1.9, 1.75, 1.7, 1.6, 1.55, 1.5, 1.5, 1.45, 1.4, 1.35, 1.3]
 VARIANTS = 3
 
 
@@ -109,27 +118,27 @@ def main():
     only = [int(x) for x in sys.argv[2:]] if len(sys.argv) > 2 else None
     rng = random.Random(seed)
     out, sols = [], []
-    for li, (name, cap, groups, nl, extra, tries, cats) in enumerate(LEVELS):
+    for li, (name, cap, groups, spare, extra, tries, cats) in enumerate(LEVELS):
         CAP = cap
         if only and li + 1 not in only:
             continue
+        caps = [cap] * groups + spare
         seen, cand = set(), []
         pool = list(range(1, len(cats) + 1))
         for _ in range(tries):
-            kinds = pool[:groups] if groups <= len(pool) else pool + [rng.choice(pool) for _ in range(groups - len(pool))]
-            if groups < len(pool): kinds = rng.sample(pool, groups)
-            r = scramble(kinds, nl, extra, rng)
+            kinds = pool + [rng.choice(pool) for _ in range(groups - len(pool))] if groups > len(pool) else rng.sample(pool, groups)
+            r = scramble(kinds, caps, extra, rng)
             if not r: continue
             lanes, fwd = r
             if any(full_same(l) for l in lanes): continue
             key = tuple(map(tuple, lanes))
             if key in seen: continue
             seen.add(key)
-            assert replay(lanes, fwd), '生成的解法走不通'
-            m, nodes = solve(lanes)
+            assert replay(lanes, caps, fwd), '生成的解法走不通'
+            m, nodes = solve(lanes, caps)
             exact = m > 0
             if not exact:  # 太大了：加权搜索，只能得到参考步数
-                m, nodes = solve(lanes, 3_000_000, 2.5)
+                m, nodes = solve(lanes, caps, 3_000_000, 2.5)
                 if m < 0: continue
             m = min(m, len(fwd))
             cand.append((nodes, m, exact, lanes, fwd))
@@ -139,15 +148,21 @@ def main():
         vs = []
         for nodes, m, exact, lanes, fwd in pick:
             vs.append({'par': m, 'exact': exact, 'lanes': [[cats[k - 1] for k in l] for l in lanes], 'sol': fwd})
-        out.append({'name': name, 'cap': cap, 'kinds': cats, 'lanes': nl, 'variants': vs})
+        out.append({'name': name, 'cap': cap, 'caps': caps, 'kinds': cats, 'variants': vs, 'hard': sum(c[0] for c in pick) / max(1, len(pick))})
     if only:
         print('只测试，不写文件'); return
+    out = out[:FIXED] + sorted(out[FIXED:], key=lambda l: l['hard'])   # 后面几关按难度从小到大
+    for i, l in enumerate(out):
+        r = RATIOS[i] if i < len(RATIOS) else RATIOS[-1]
+        for v in l['variants']:
+            v['limit'] = None if r is None else int(-(-v['par'] * r // 1))
+    print('最终顺序：', ' → '.join(f"{i+1}{l['name']}({int(l['hard'])})" for i, l in enumerate(out)))
     path = os.path.join(HERE, '..', 'levels.js')
     def lv(l):
-        vs = ',\n    '.join('{"par":%d,"exact":%s,"lanes":%s}' % (v['par'], 'true' if v['exact'] else 'false', json.dumps(v['lanes'], separators=(',', ':'))) for v in l['variants'])
-        return ' {"name":%s,"cap":%d,"kinds":%s,"lanes":%d,"variants":[\n    %s]}' % (json.dumps(l['name'], ensure_ascii=False), l['cap'], json.dumps(l['kinds']), l['lanes'], vs)
+        vs = ',\n    '.join('{"par":%d,"exact":%s,"limit":%s,"lanes":%s}' % (v['par'], 'true' if v['exact'] else 'false', 'null' if v['limit'] is None else v['limit'], json.dumps(v['lanes'], separators=(',', ':'))) for v in l['variants'])
+        return ' {"name":%s,"cap":%d,"caps":%s,"kinds":%s,"variants":[\n    %s]}' % (json.dumps(l['name'], ensure_ascii=False), l['cap'], json.dumps(l['caps']), json.dumps(l['kinds']), vs)
     with open(path, 'w', encoding='utf-8') as f:
-        f.write('/* 由 tools/gen_levels.py 生成：每关几个开局，par 是求解器算出的最少步数（exact 为 false 时是参考步数） */\n')
+        f.write('/* 由 tools/gen_levels.py 生成：cap 是一组几只，caps 是每队最多放几只，par 是求解器算出的最少步数（exact 为 false 时是参考步数），limit 是步数上限 */\n')
         f.write('window.NT_LEVELS = [\n' + ',\n'.join(lv(l) for l in out) + '\n];\n')
     with open(os.path.join(HERE, 'solutions.json'), 'w') as f:
         json.dump([[v['sol'] for v in l['variants']] for l in out], f)

@@ -1,7 +1,7 @@
 /* 蛋糕店：猫猫排队买蛋糕（排序谜题）
    规则：每队只能动队首那一只，只能放进空队，或者放在同一种猫的前面（黑猫只能放在黑猫前面）；一队凑齐同一种猫，就进店买到一块蛋糕角。
    关卡来自 levels.js（tools/gen_levels.py 生成，保证有解，par 是求解器算出的最少步数）。
-   猫和蛋糕现在都是占位的 SVG，之后换成手绘图只需要改 catSVG / cakeSVG。 */
+   猫头是阿琳画的图（assets/cats/cat0-7.webp），蛋糕还是占位的 SVG（cakeSVG）。 */
 (function () {
   'use strict';
   var NT = window.NT, LV = window.NT_LEVELS;
@@ -11,9 +11,10 @@
   var INK = '#54392f', UNDO_COST = 2;
 
   /* ---------- 猫和蛋糕的设定 ---------- */
+  /* 编号对应 assets/cats/catN.webp；越靠后的越稀有（奶团本人最稀有） */
   var CATS = [
-    { n: '奶团', t: 0 }, { n: '橘子', t: 0 }, { n: '灰灰', t: 0 }, { n: '煤球', t: 0 },
-    { n: '三花', t: 1 }, { n: '蓝蓝', t: 1 }, { n: '暹罗', t: 2 }, { n: '金团', t: 3 }
+    { n: '橘猫', t: 0 }, { n: '灰虎斑', t: 0 }, { n: '奶牛猫', t: 0 }, { n: '黑猫', t: 0 },
+    { n: '三花', t: 1 }, { n: '银渐层', t: 1 }, { n: '暹罗', t: 2 }, { n: '奶团', t: 3 }
   ];
   var TIER = ['常见', '少见', '稀有', '传说'];
   /* 名字, 卖价, [面包, 奶油, 顶面, 侧面] */
@@ -49,32 +50,8 @@
     return 0;
   }
 
-  var COAT = ['#fffaf0', '#f0a860', '#b9bcc4', '#57494f', '#fff3e2', '#9db0c6', '#f6e6cf', '#f7d67a'];
-  var EARIN = ['#f4b8b0', '#f4b8b0', '#e6b0b0', '#8a6a76', '#f4b8b0', '#e2a8b0', '#7a5a48', '#f4b8b0'];
-  function catSVG(k) {
-    var c = COAT[k], st = 'stroke="' + INK + '" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"';
-    var s = '<svg viewBox="0 0 64 64" aria-hidden="true">';
-    s += '<ellipse cx="32" cy="56" rx="17" ry="7" fill="' + c + '" ' + st + '/>';
-    s += '<path d="M10 30Q7 10 14 8Q17 8 28 16Z" fill="' + c + '" ' + st + '/><path d="M54 30Q57 10 50 8Q47 8 36 16Z" fill="' + c + '" ' + st + '/>';
-    s += '<path d="M14 24Q13 14 15 13Q17 13 23 17Z" fill="' + EARIN[k] + '"/><path d="M50 24Q51 14 49 13Q47 13 41 17Z" fill="' + EARIN[k] + '"/>';
-    s += '<ellipse cx="32" cy="36" rx="23" ry="19" fill="' + c + '"/>';
-    if (k === 1 || k === 2) { var sc = k === 1 ? '#d8873a' : '#8b8f99'; s += '<path d="M27 19v6M32 18v7M37 19v6" stroke="' + sc + '" stroke-width="2.4" stroke-linecap="round" fill="none"/>'; }
-    if (k === 4) s += '<path d="M16 28Q18 22 27 19Q26 27 16 30Z" fill="#e89a55"/><path d="M40 20Q48 22 50 30Q44 30 40 20Z" fill="#3f3a3f"/>';
-    if (k === 5) s += '<ellipse cx="32" cy="44" rx="9" ry="6" fill="#eef2f7"/>';
-    if (k === 6) s += '<ellipse cx="32" cy="42" rx="11" ry="9" fill="#7a5a48" opacity=".85"/>';
-    s += '<ellipse cx="32" cy="36" rx="23" ry="19" fill="none" ' + st + '/>';
-    var eye = k === 3 ? '#ffd34d' : k === 6 ? '#8fb8e8' : INK;
-    [23, 41].forEach(function (x) {
-      s += '<ellipse cx="' + x + '" cy="37" rx="' + (eye === INK ? 2.6 : 3.4) + '" ry="' + (eye === INK ? 3.4 : 3.8) + '" fill="' + eye + '"/>';
-      if (eye !== INK) s += '<ellipse cx="' + x + '" cy="37" rx="1.3" ry="3" fill="' + INK + '"/>';
-      s += '<circle cx="' + (x + 0.9) + '" cy="35.6" r="1" fill="#fff"/>';
-    });
-    s += '<path d="M29.500 41.500h5l-2.500 3z" fill="#e2897d"/>';
-    s += '<path d="M32 44.500q-3 3-6 0M32 44.500q3 3 6 0" fill="none" stroke="' + INK + '" stroke-width="1.6" stroke-linecap="round"/>';
-    s += '<ellipse cx="16.500" cy="43" rx="4" ry="2.400" fill="#f4a9a0" opacity=".55"/><ellipse cx="47.500" cy="43" rx="4" ry="2.400" fill="#f4a9a0" opacity=".55"/>';
-    if (k === 7) s += '<path d="M22 15l3-8 7 5 7-5 3 8z" fill="#f4b04a" ' + st + '/><circle cx="32" cy="10" r="1.500" fill="#fff"/>';
-    return s + '</svg>';
-  }
+  var CATIMG = CATS.map(function (c, i) { var im = new Image(); im.src = 'assets/cats/cat' + i + '.webp'; return im; }); /* 提前加载 */
+  function catHTML(k) { return '<img src="assets/cats/cat' + k + '.webp" alt="" draggable="false">'; }
 
   function cakeSVG(id) {
     var c = CAKES[id].c, st = 'stroke="' + INK + '" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"';
@@ -163,23 +140,27 @@
       '<h2 id="cqWinT">通关！</h2><div class="cq-stars" id="cqStars"></div><p id="cqWinS"></p><div class="rew" id="cqWinR"></div><div class="cq-wcakes" id="cqWinC"></div>' +
       '<div class="sg-btns"><button id="cqWinMenu" type="button">选关</button><button id="cqWinNext" class="main" type="button">下一关</button></div>' +
     '</div></div>' +
+    '<div class="sg-over" id="cqLose" hidden><div class="sg-card" role="dialog" aria-label="步数用完了">' +
+      '<h2>步数用完啦</h2><p id="cqLoseS"></p>' +
+      '<div class="sg-btns"><button id="cqLoseMenu" type="button">选关</button><button id="cqLoseAgain" class="main" type="button">重来</button></div>' +
+    '</div></div>' +
     '<div class="sg-over" id="cqBook" hidden><div class="sg-card cq-scroll cq-bookcard" role="dialog" aria-label="蛋糕图鉴">' +
       '<h2>蛋糕图鉴</h2><p id="cqBookS"></p><div class="cq-bookgrid" id="cqBookG"></div><p class="cq-note">卖掉只会换小鱼干，图鉴里的蛋糕不会变回剪影。</p>' +
       '<div class="sg-btns"><button id="cqBookSell" type="button">全部卖掉</button><button id="cqBookX" class="main" type="button">关闭</button></div>' +
     '</div></div>';
 
   var el = {
-    play: $('#cqPlay'), tip: $('#cqTip'), field: $('#cqField'), door: $('#cqDoor'), shop: $('#cqShop'), lv: $('#cqLv'), steps: $('#cqSteps'), undo: $('#cqUndo'), got: $('#cqGot'),
+    lose: $('#cqLose'), play: $('#cqPlay'), tip: $('#cqTip'), field: $('#cqField'), door: $('#cqDoor'), shop: $('#cqShop'), lv: $('#cqLv'), steps: $('#cqSteps'), undo: $('#cqUndo'), got: $('#cqGot'),
     menu: $('#cqMenu'), lvs: $('#cqLvs'), snd: $('#cqSnd'), win: $('#cqWin'), book: $('#cqBook')
   };
 
   /* ---------- 一局游戏 ---------- */
   var G = null, lastVar = {}, laneEls = [], TOKEN = 0;
-  var stepsText = function () { return '步数 ' + G.steps + (G.exact ? ' · 最少 ' : ' · 参考 ') + G.par; };
+  var stepsText = function () { return '步数 ' + G.steps + (G.limit ? '/' + G.limit : '') + (G.exact ? ' · 最少 ' : ' · 参考 ') + G.par; };
 
   function makeCat(kind) {
     var d = document.createElement('div'); d.className = 'cq-cat';
-    var inn = document.createElement('div'); inn.className = 'in'; inn.innerHTML = catSVG(kind); d.appendChild(inn);
+    var inn = document.createElement('div'); inn.className = 'in'; inn.innerHTML = catHTML(kind); d.appendChild(inn);
     el.field.appendChild(d);
     return { kind: kind, el: d, inn: inn };
   }
@@ -191,13 +172,14 @@
   function loadVariant(lv, vi) {
     var L = LV[lv], v = L.variants[vi];
     el.field.innerHTML = ''; laneEls = [];
-    G = { lv: lv, vi: vi, cap: L.cap, par: v.par, exact: v.exact !== false, lanes: v.lanes.map(function (l) { return l.map(makeCat); }), sel: -1, steps: 0, hist: [], busy: false, over: false, got: [], token: ++TOKEN };
+    var caps = L.caps ? L.caps.slice() : L.lanes ? new Array(L.lanes).fill(L.cap) : v.lanes.map(function () { return L.cap; });
+    G = { lv: lv, vi: vi, S: L.cap, caps: caps, maxCap: Math.max.apply(null, caps), limit: v.limit || 0, pending: 0, par: v.par, exact: v.exact !== false, lanes: v.lanes.map(function (l) { return l.map(makeCat); }), sel: -1, steps: 0, hist: [], busy: false, over: false, got: [], token: ++TOKEN };
     for (var i = 0; i < G.lanes.length; i++) (function (i) {
       var d = document.createElement('div'); d.className = 'cq-lane'; d.setAttribute('data-i', i);
       d.addEventListener('pointerdown', function (e) { e.preventDefault(); onLane(i); });
       el.field.insertBefore(d, el.field.firstChild); laneEls.push(d);
     })(i);
-    el.menu.hidden = el.win.hidden = el.book.hidden = true; el.play.hidden = false; el.play.classList.remove('idle');
+    el.menu.hidden = el.win.hidden = el.book.hidden = el.lose.hidden = true; el.play.hidden = false; el.play.classList.remove('idle');
     el.lv.textContent = '第 ' + (lv + 1) + ' 关'; el.steps.textContent = stepsText(); el.got.textContent = ''; tip('');
     layout(true); paintBtns();
   }
@@ -206,7 +188,7 @@
   /* 排版：一行放得下就一行，否则分两行；猫的大小按空间来定 */
   function layout(instant) {
     if (!G) return;
-    var W = el.field.clientWidth, H = el.field.clientHeight, n = G.lanes.length, cap = G.cap;
+    var W = el.field.clientWidth, H = el.field.clientHeight, n = G.lanes.length, cap = G.maxCap;
     if (!W || !H) { requestAnimationFrame(function () { layout(instant); }); return; }
     var gap = 8, rowGap = 10, best = null;
     [1, 2, 3].forEach(function (rr) { /* 排一行、两行还是三行：哪种能让猫更大就用哪种 */
@@ -221,15 +203,16 @@
     for (var i = 0; i < n; i++) {
       var r = Math.floor(i / per), c = i - r * per, inRow = r === rows - 1 ? n - per * (rows - 1) : per;
       var rowW = inRow * laneW + (inRow - 1) * gap, x = (W - rowW) / 2 + c * (laneW + gap), y = top0 + r * (laneH + rowGap);
-      G.rects[i] = { x: x, y: y, w: laneW, h: laneH };
-      var d = laneEls[i]; d.style.cssText = 'left:' + x + 'px;top:' + y + 'px;width:' + laneW + 'px;height:' + laneH + 'px';
+      var hh = G.caps[i] * cell + 10, yy = y + laneH - hh; /* 短队画得矮一点，底边对齐 */
+      G.rects[i] = { x: x, y: yy, w: laneW, h: hh };
+      var d = laneEls[i]; d.style.cssText = 'left:' + x + 'px;top:' + yy + 'px;width:' + laneW + 'px;height:' + hh + 'px';
     }
     var fr = el.field.getBoundingClientRect(), dr = el.door.getBoundingClientRect();
     G.door = { x: dr.left + dr.width / 2 - fr.left, y: dr.top + dr.height / 2 - fr.top };
     placeAll(instant);
   }
   /* 猫从队尾（下面）往上排，空位留在队首那一头，像落进去一样：新来的猫放在最上面，别的猫不用动 */
-  function slotPos(i, s) { var r = G.rects[i], d = G.lanes[i].length - 1 - s; return { x: r.x + (r.w - G.cell) / 2, y: r.y + 5 + (G.cap - 1 - d) * G.cell }; }
+  function slotPos(i, s) { var r = G.rects[i], d = G.lanes[i].length - 1 - s; return { x: r.x + (r.w - G.cell) / 2, y: r.y + 5 + (G.caps[i] - 1 - d) * G.cell }; }
   function placeCat(e, i, s) {
     var p = slotPos(i, s), st = e.el.style;
     st.width = st.height = G.cell + 'px'; st.setProperty('--x', p.x + 'px'); st.setProperty('--y', p.y + 'px');
@@ -250,7 +233,7 @@
     var fish = NT.S().fish;
     el.undo.disabled = !G || G.busy || G.over || !G.hist.length || fish < UNDO_COST;
     el.undo.title = G && !G.hist.length ? '还没有能撤销的步数（买走蛋糕之后就不能撤销了）' : fish < UNDO_COST ? '小鱼干不够' : '';
-    el.steps.textContent = G ? stepsText() : '';
+    el.steps.textContent = G ? stepsText() : ''; el.steps.classList.toggle('warn', !!(G && G.limit && G.limit - G.steps <= 3));
   }
   function bounce(e, big) {
     if (!e.inn.animate) return;
@@ -259,7 +242,7 @@
 
   function canPut(a, b) {
     var A = G.lanes[a], B = G.lanes[b];
-    return a !== b && A.length > 0 && B.length < G.cap && (!B.length || B[0].kind === A[0].kind);
+    return a !== b && A.length > 0 && B.length < G.caps[b] && (!B.length || B[0].kind === A[0].kind);
   }
   function hasMove() { if (G.lanes.every(function (l) { return !l.length; })) return true; for (var a = 0; a < G.lanes.length; a++) for (var b = 0; b < G.lanes.length; b++) if (canPut(a, b)) return true; return false; }
   var tipT = 0;
@@ -272,7 +255,7 @@
     if (G.sel < 0) { if (L.length) { G.sel = i; SND.pick(); placeAll(); tip(''); } else { wiggle(i); } return; }
     if (G.sel === i) { G.sel = -1; placeAll(); return; }
     if (!canPut(G.sel, i)) { /* 放不下：说明原因，如果那队有猫，就改选那队的队首 */
-      if (L.length >= G.cap) tip('这队满了', 1600); else if (L.length) tip('只能放进空队，或者放在一样的猫前面', 2000);
+      if (L.length >= G.caps[i]) tip('这队满了', 1600); else if (L.length) tip('只能放进空队，或者放在一样的猫前面', 2000);
       SND.bad(); wiggle(i); if (L.length) { G.sel = i; placeAll(); }
       return;
     }
@@ -288,9 +271,9 @@
     placeAll();
     later(function () { SND.pop(); bounce(e); }, 200);
     var T = G.lanes[b];
-    if (T.length === G.cap && T.every(function (x) { return x.kind === e.kind; })) { G.busy = true; G.hist = []; later(function () { buyGroup(b); }, 330); }
+    if (T.length === G.S && T.every(function (x) { return x.kind === e.kind; })) { G.busy = true; G.pending++; G.hist = []; later(function () { buyGroup(b); }, 330); }
     paintBtns(); tip('');
-    if (!G.busy) later(checkStuck, 380);
+    if (!G.busy) { later(checkStuck, 380); checkEnd(); }
   }
 
   function buyGroup(b) {
@@ -317,7 +300,18 @@
     pop.innerHTML = '<span class="pc">' + cakeSVG(id) + '</span><b>' + CAKES[id].n + (isNew ? ' <i>新！</i>' : '') + '</b>';
     el.field.appendChild(pop); setTimeout(function () { if (pop.parentNode) pop.parentNode.removeChild(pop); }, 1700);
     paintGot(); NT.save(); paintBtns();
-    if (G.lanes.every(function (l) { return !l.length; })) { G.over = true; later(finishLevel, 900); }
+    G.pending--;
+    if (G.pending === 0) { if (G.lanes.every(function (l) { return !l.length; })) { G.over = true; later(finishLevel, 900); } else checkEnd(); }
+  }
+  /* 步数用完了、棋盘还没清空：失败（正在买蛋糕的那一组要等它结算完） */
+  function checkEnd() {
+    if (!G || G.over || G.pending > 0 || !G.limit || G.steps < G.limit) return;
+    if (G.lanes.every(function (l) { return !l.length; })) return;
+    G.over = true; G.sel = -1; placeAll(); paintBtns(); SND.bad(); tip('');
+    later(function () {
+      $('#cqLoseS').textContent = '这一关最多走 ' + G.limit + ' 步（最少 ' + G.par + ' 步）。撤销不会返还步数，先想好再走。';
+      el.lose.hidden = false;
+    }, 800);
   }
   function paintGot() {
     var cnt = {}; G.got.forEach(function (i) { cnt[i] = (cnt[i] || 0) + 1; });
@@ -328,13 +322,16 @@
     if (!G || G.busy || G.over || !G.hist.length) return;
     var S = NT.S(); if (S.fish < UNDO_COST) return;
     NT.addFish(-UNDO_COST);
-    G.lanes = G.hist.pop(); G.steps = Math.max(0, G.steps - 1); G.sel = -1;
+    G.lanes = G.hist.pop(); G.sel = -1; /* 撤销只放回位置，走过的步数不返还 */
     SND.pick(); placeAll(); paintBtns(); tip(''); NT.save();
   }
 
-  function stars(steps, par) { return steps <= Math.ceil(par * 1.3) ? 3 : steps <= Math.ceil(par * 2) ? 2 : 1; }
+  function stars(steps, par, limit) {
+    if (limit) return steps <= Math.ceil(par * 1.12) ? 3 : steps <= Math.ceil((par + limit) / 2) ? 2 : 1;
+    return steps <= Math.ceil(par * 1.3) ? 3 : steps <= Math.ceil(par * 2) ? 2 : 1;
+  }
   function finishLevel() {
-    var st = stars(G.steps, G.par), c = cq(), S = NT.S(), lv = G.lv;
+    var st = stars(G.steps, G.par, G.limit), c = cq(), S = NT.S(), lv = G.lv;
     var first = c.cleared[lv] === 0, fish = 3 + (lv + 1) * 2 + st * 2;
     c.cleared[lv] = Math.max(c.cleared[lv], st);
     NT.addFish(fish); S.mood = NT.clamp(S.mood + 8); S.hunger = NT.clamp(S.hunger - 1); S.energy = NT.clamp(S.energy - 2);
@@ -342,7 +339,7 @@
     var last = lv === LV.length - 1;
     $('#cqWinT').textContent = last ? '打烊啦！全部通关' : '第 ' + (lv + 1) + ' 关通关';
     $('#cqStars').innerHTML = [1, 2, 3].map(function (i) { return '<span class="' + (i <= st ? 'on' : '') + '">★</span>'; }).join('');
-    $('#cqWinS').textContent = '用了 ' + G.steps + ' 步（' + (G.exact ? '最少 ' : '参考 ') + G.par + ' 步）' + (first && !last ? ' · 解锁下一关' : '');
+    $('#cqWinS').textContent = '用了 ' + G.steps + ' 步（' + (G.limit ? '限 ' + G.limit + '，' : '') + (G.exact ? '最少 ' : '参考 ') + G.par + ' 步）' + (first && !last ? ' · 解锁下一关' : '');
     $('#cqWinR').innerHTML = '小鱼干 +' + fish;
     var cnt = {}; G.got.forEach(function (i) { cnt[i] = (cnt[i] || 0) + 1; });
     $('#cqWinC').innerHTML = G.got.length ? '<small>这一局买到的蛋糕角</small><div>' + Object.keys(cnt).map(function (i) { return '<span class="cq-mini big">' + cakeSVG(+i) + '<i>×' + cnt[i] + '</i></span>'; }).join('') + '</div>' : '';
@@ -351,13 +348,15 @@
   }
 
   /* ---------- 选关 / 图鉴 ---------- */
+  function nLanes(L) { return L.caps ? L.caps.length : L.lanes; }
+  function extraTag(L) { var t = []; if (L.caps && Math.min.apply(null, L.caps) < L.cap) t.push('短队'); if (L.variants[0].limit) t.push('限步数'); return t.join(' · '); }
   function paintMenu() {
     var c = cq();
     el.lvs.innerHTML = '';
     LV.forEach(function (L, i) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'cq-lvbtn'; var ok = unlocked(i); b.disabled = !ok;
       var s = c.cleared[i];
-      b.innerHTML = '<span class="nm"><b>' + (i + 1) + '</b>' + L.name + '</span><span class="st">' + (ok ? [1, 2, 3].map(function (k) { return '<i class="' + (k <= s ? 'on' : '') + '">★</i>'; }).join('') : '🔒') + '<small>' + (ok ? L.lanes + ' 队 · 每队 ' + L.cap + ' 只' : '先通上一关') + '</small></span>';
+      b.innerHTML = '<span class="nm"><b>' + (i + 1) + '</b>' + L.name + '</span><span class="st">' + (ok ? [1, 2, 3].map(function (k) { return '<i class="' + (k <= s ? 'on' : '') + '">★</i>'; }).join('') : '🔒') + '<small>' + (ok ? nLanes(L) + ' 队 · 每队 ' + L.cap + ' 只' : '先通上一关') + '</small>' + (ok && extraTag(L) ? '<em>' + extraTag(L) + '</em>' : '') + '</span>';
       b.addEventListener('click', function () { audioInit(); startLevel(i); });
       el.lvs.appendChild(b);
     });
@@ -365,7 +364,7 @@
     var got = c.seen.filter(Boolean).length;
     $('#cqBookBtn').textContent = '蛋糕图鉴 ' + got + '/' + CAKES.length;
   }
-  function openMenu() { tip(''); G && (G.token++); G = null; el.field.innerHTML = ''; el.play.hidden = false; el.play.classList.add('idle'); el.win.hidden = el.book.hidden = true; paintMenu(); el.menu.hidden = false; }
+  function openMenu() { tip(''); G && (G.token++); G = null; el.field.innerHTML = ''; el.play.hidden = false; el.play.classList.add('idle'); el.win.hidden = el.book.hidden = el.lose.hidden = true; paintMenu(); el.menu.hidden = false; }
   function paintBook() {
     var c = cq(), got = c.seen.filter(Boolean).length, dup = 0, worth = 0;
     $('#cqBookS').textContent = '已收集 ' + got + ' / ' + CAKES.length + ' 种 · 小鱼干 ' + NT.S().fish;
@@ -407,6 +406,8 @@
   $('#cqHome').addEventListener('click', leave);
   $('#cqMenuBtn').addEventListener('click', openMenu);
   $('#cqWinMenu').addEventListener('click', openMenu);
+  $('#cqLoseMenu').addEventListener('click', openMenu);
+  $('#cqLoseAgain').addEventListener('click', function () { if (G) { G.token++; loadVariant(G.lv, G.vi); } });
   $('#cqWinNext').addEventListener('click', function () { var lv = G ? G.lv : 0; if (this.getAttribute('data-act') === 'again') startLevel(lv); else startLevel(Math.min(LV.length - 1, lv + 1)); });
   $('#cqRedo').addEventListener('click', function () { if (G && !G.over) { G.token++; loadVariant(G.lv, G.vi); } });
   $('#cqUndo').addEventListener('click', undo);
