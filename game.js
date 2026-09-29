@@ -236,7 +236,11 @@
     for (var i = 0; i < 9; i++) (function (i) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'slot'; b.setAttribute('data-i', i); b.setAttribute('aria-label', '箱子 ' + (i + 1));
       var im = document.createElement('img'); im.alt = ''; im.src = SPR.peekc; im.style.transform = slotImgT(i, 118); b.appendChild(im);
-      b.addEventListener('pointerdown', function (e) { e.preventDefault(); rhTap(i); });
+      b.addEventListener('pointerdown', function (e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault(); rhTap(i); /* accept every finger, including non-primary pointers */
+      });
+      b.addEventListener('click', function (e) { if (e.detail === 0) rhTap(i); }); /* keyboard / assistive activation only */
       slotsEl.appendChild(b); slots.push(b); slotEv.push(null);
     })(i);
   })();
@@ -301,30 +305,46 @@
     if (want !== RHS.rows) { RHS.rows = want; rhLayout(want); rhJudgeSay('箱子变多了！'); }
   }
   function ease(p) { return 1 - (1 - p) * (1 - p); }
-  function rhFrame() {
+  function rhUpdate(t) {
     if (!RHS || RHS.ended) return;
-    var t = clock() - RHS.t0, i, e;
+    var i, e;
     while (RHS.lastBeat + 1 < RHS.beats.length && RHS.beats[RHS.lastBeat + 1].t <= t) onBeat(++RHS.lastBeat);
+    /* Retire old occupants before assigning a new cat to the same box. */
+    for (i = RHS.active.length - 1; i >= 0; i--) {
+      e = RHS.active[i];
+      if (e.done ? t - e.doneT < 0.16 : t <= e.t + e.half) continue;
+      RHS.active.splice(i, 1);
+      if (slotEv[e.slot] === e) {
+        slotEv[e.slot] = null; slots[e.slot].classList.remove('fake', 'ok', 'bad');
+        slots[e.slot].querySelector('img').style.transform = slotImgT(e.slot, 118);
+      }
+      if (!e.done) { rhExpire(e); if (RHS.ended) return; }
+    }
     while (RHS.evIdx < RHS.evs.length && RHS.evs[RHS.evIdx].t - RHS.evs[RHS.evIdx].half <= t) {
-      e = RHS.evs[RHS.evIdx++]; e.done = false; e.y = 118; RHS.active.push(e); slotEv[e.slot] = e;
+      e = RHS.evs[RHS.evIdx++];
+      if (t > e.t + e.half) { rhExpire(e); if (RHS.ended) return; continue; }
+      e.done = false; e.y = 118; RHS.active.push(e); slotEv[e.slot] = e;
       var el = slots[e.slot]; el.classList.remove('ok', 'bad'); el.classList.toggle('fake', e.fake);
       el.style.setProperty('--gray', e.i < ROWS_AT[1] ? 1 : e.i < ROWS_AT[2] ? 0.9 : 0.75);
     }
     for (i = RHS.active.length - 1; i >= 0; i--) {
       e = RHS.active[i];
+      if (slotEv[e.slot] !== e) continue; /* an older return animation cannot hide its successor */
       var img = slots[e.slot].querySelector('img'), y;
       if (!e.done) {
         var p = Math.max(0, Math.min(1, 1 - Math.abs(t - e.t) / e.half)); y = (1 - ease(p)) * 118; e.y = y;
-        if (t > e.t + e.half) { rhExpire(e); RHS.active.splice(i, 1); slotEv[e.slot] = null; slots[e.slot].classList.remove('fake'); img.style.transform = slotImgT(e.slot, 118); if (RHS.ended) return; continue; }
       } else {
         var q = Math.min(1, (t - e.doneT) / 0.16); y = e.y + (118 - e.y) * q;
-        if (q >= 1) { RHS.active.splice(i, 1); slotEv[e.slot] = null; slots[e.slot].classList.remove('fake', 'ok', 'bad'); img.style.transform = slotImgT(e.slot, 118); continue; }
       }
       img.style.transform = slotImgT(e.slot, y);
     }
     var last = RHS.beats[RHS.beats.length - 1];
     if (RHS.evIdx >= RHS.evs.length && !RHS.active.length && t > last.t + last.ivl + 0.5) { rhFinish(false); return; }
-    RHS.raf = requestAnimationFrame(rhFrame);
+  }
+  function rhFrame() {
+    if (!RHS || RHS.ended) return;
+    rhUpdate(clock() - RHS.t0);
+    if (!RHS.ended) RHS.raf = requestAnimationFrame(rhFrame);
   }
   function rhExpire(e) {
     if (e.fake) { RHS.dodged++; return; }
@@ -334,9 +354,12 @@
   function rhTap(idx) {
     if (!RHS || RHS.ended || !RH.active) return;
     var t = clock() - RHS.t0;
-    if (t < RHS.beats[COUNTIN].t - 0.3) return;
+    if (t < RHS.beats[COUNTIN].t - RHS.beats[COUNTIN].ivl * 0.5) return;
+    rhUpdate(t); /* input between animation frames still sees the current cat */
+    if (RHS.ended) return;
     var e = slotEv[idx];
-    if (e && !e.done && Math.abs(t - e.t) <= e.half * 0.9) {
+    if (e && e.done) return; /* a second finger on the same cat is not an empty-box miss */
+    if (e && Math.abs(t - e.t) <= e.half) {
       var dt = Math.abs(t - e.t); e.done = true; e.doneT = t;
       if (e.fake) {
         RHS.combo = 0; RHS.lives--; slots[idx].classList.add('bad'); rhJudgeSay('假的！'); tone(190, clock(), 0.22, 'sawtooth', 0.22, 70);
