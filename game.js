@@ -599,7 +599,17 @@
     win: [{ id: 'plain', name: '普通窗', price: 0 }, { id: 'curtain', name: '粉窗帘', price: 20 }, { id: 'pot', name: '花盆窗', price: 25 }, { id: 'moon', name: '月亮窗', price: 30 }, { id: 'rain', name: '下雨窗', price: 35 }],
     prop: [{ id: 'yarn', name: '毛线球', price: 15 }, { id: 'cushion', name: '小抱枕', price: 20 }, { id: 'plant', name: '绿植', price: 25 }, { id: 'lamp', name: '小台灯', price: 30 }, { id: 'frame', name: '小鱼挂画', price: 35 }, { id: 'lights', name: '星星灯串', price: 50 }]
   };
-  var TABS = [['wall', '墙纸'], ['rug', '地毯'], ['win', '窗户'], ['prop', '摆件']];
+  var DECOR = window.NaituanDecor;
+  CATALOG.wall = CATALOG.wall.concat(DECOR.rooms);
+  CATALOG.prop = CATALOG.prop.concat(DECOR.items);
+  var TABS = [['rooms', '房间']].concat(DECOR.themes.map(function (t) { return [t.id, t.name]; }), [['wall', '经典墙纸'], ['rug', '经典地毯'], ['win', '经典窗户'], ['prop', '经典摆件']]);
+  function shopCategory(tab) { return tab === 'rooms' ? 'wall' : hasItemCategory(tab) ? tab : 'prop'; }
+  function hasItemCategory(tab) { return Object.prototype.hasOwnProperty.call(CATALOG, tab); }
+  function shopItems(tab) {
+    if (tab === 'rooms') return DECOR.rooms;
+    if (hasItemCategory(tab)) return CATALOG[tab].filter(function (it) { return !it.image; });
+    return DECOR.items.filter(function (it) { return it.theme === tab; });
+  }
   var INK = 'fill="none" stroke="#54392f" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"';
   var PROPS = {
     lamp: '<svg viewBox="0 0 40 90" ' + INK + '><circle cx="20" cy="20" r="19" fill="#f4b04a" fill-opacity=".22" stroke="none"/><path d="M9 30 14 6h12l5 24z" fill="#f7d08a"/><path d="M20 30v48"/><path d="M9 86q11-12 22 0z" fill="#e7b48a"/></svg>',
@@ -612,11 +622,22 @@
   var WIN_INNER = '<div class="cloud"></div><div class="moon"></div><div class="rain"></div><div class="wpot"><svg viewBox="0 0 40 30" fill="none" stroke="#54392f" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M12 18v-6M20 18v-9M28 18v-7"/><circle cx="12" cy="9.500" r="3.600" fill="#e2897d"/><circle cx="20" cy="7" r="3.800" fill="#f4b04a"/><circle cx="28" cy="8.600" r="3.600" fill="#8fa3bf"/><path d="M10 17h20l-2 12H12z" fill="#e7b48a"/></svg></div><div class="curtain"></div>';
   var FISH_MINI = '<svg viewBox="0 0 32 32" fill="none" stroke="#54392f" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M3 16c4-7 12-9 18-4l6-4v16l-6-4c-6 5-14 3-18-4z" fill="#8fa3bf"/></svg>';
   var rugEl = $('#rug'), winEl = $('#window'), propsEl = $('#props'), shopEl = $('#shop'), metersEl = $('#meters'), actionsEl = $('#actions'), hintEl = $('#hint'), btnShop = $('#btnShop'), appEl = $('#app');
-  var SH = { open: false, tab: 'wall', sel: null, msg: '' };
+  var SH = { open: false, tab: 'rooms', sel: null, msg: '' };
+  var roomBackdrop = document.createElement('img');
+  roomBackdrop.className = 'room-backdrop'; roomBackdrop.alt = ''; roomBackdrop.draggable = false; roomBackdrop.hidden = true;
+  $('#roomScene').prepend(roomBackdrop);
 
   winEl.innerHTML = WIN_INNER;
   Object.keys(PROPS).forEach(function (id) {
     var d = document.createElement('div'); d.className = 'prop p-' + id; d.setAttribute('data-prop', id); d.innerHTML = PROPS[id]; d.hidden = true; propsEl.appendChild(d);
+  });
+  DECOR.items.forEach(function (it) {
+    var d = document.createElement('div'), img = document.createElement('img');
+    d.className = 'prop decor-prop'; d.setAttribute('data-prop', it.id); d.dataset.placement = it.placement;
+    d.style.setProperty('--item-x', it.x * 100 + '%'); d.style.setProperty('--item-y', it.y * 100 + '%');
+    d.style.setProperty('--item-w', it.w * 100 + '%'); d.style.aspectRatio = it.width + ' / ' + it.height;
+    img.alt = ''; img.draggable = false; img.dataset.src = it.image;
+    d.appendChild(img); d.hidden = true; propsEl.appendChild(d);
   });
 
   function hasItem(cat, id) { return (CATALOG[cat] || []).some(function (i) { return i.id === id; }); }
@@ -633,18 +654,47 @@
     S.shopSeen = d.shopSeen ? 1 : 0;
   }
   function owned(cat, id) { return !!S.own[cat + ':' + id]; }
-  function equipped(cat, id) { return cat === 'prop' ? S.eq.prop.indexOf(id) >= 0 : S.eq[cat] === id; }
+  function equipped(cat, id) {
+    if ((cat === 'rug' || cat === 'win') && findItem('wall', S.eq.wall).image) return false;
+    if ((cat === 'rug' || cat === 'win') && S.eq.prop.some(function (p) { return findItem('prop', p).placement === (cat === 'win' ? 'window' : 'rug'); })) return false;
+    return cat === 'prop' ? S.eq.prop.indexOf(id) >= 0 : S.eq[cat] === id;
+  }
   function itemState(cat, id) { return equipped(cat, id) ? 'eq' : owned(cat, id) ? 'own' : 'buy'; }
 
   function paintDecor() {
     var e = { wall: S.eq.wall, rug: S.eq.rug, win: S.eq.win, prop: S.eq.prop.slice() };
-    if (SH.open && SH.sel) { if (SH.sel.cat === 'prop') { if (e.prop.indexOf(SH.sel.id) < 0) e.prop.push(SH.sel.id); } else e[SH.sel.cat] = SH.sel.id; }
+    if (SH.open && SH.sel) {
+      if (SH.sel.cat === 'prop') { if (e.prop.indexOf(SH.sel.id) < 0) e.prop.push(SH.sel.id); }
+      else {
+        e[SH.sel.cat] = SH.sel.id;
+        if (SH.sel.cat === 'rug' || SH.sel.cat === 'win') {
+          e.wall = 'dots';
+          e.prop = e.prop.filter(function (id) { return findItem('prop', id).placement !== (SH.sel.cat === 'win' ? 'window' : 'rug'); });
+        }
+      }
+    }
+    var wallItem = findItem('wall', e.wall), scenic = !!wallItem.image;
+    roomBackdrop.hidden = !scenic;
+    if (scenic && roomBackdrop.getAttribute('src') !== wallItem.image) roomBackdrop.src = wallItem.image;
+    stage.classList.toggle('has-scene', scenic);
+    winEl.hidden = scenic || e.prop.some(function (id) { return findItem('prop', id).placement === 'window'; });
+    rugEl.hidden = scenic || e.prop.some(function (id) { return findItem('prop', id).placement === 'rug'; });
     stage.setAttribute('data-wall', e.wall); rugEl.setAttribute('data-rug', e.rug); winEl.setAttribute('data-win', e.win);
-    [].forEach.call(propsEl.children, function (el) { el.hidden = e.prop.indexOf(el.getAttribute('data-prop')) < 0; });
+    [].forEach.call(propsEl.children, function (el) {
+      el.hidden = e.prop.indexOf(el.getAttribute('data-prop')) < 0;
+      var img = el.querySelector('img[data-src]');
+      if (!el.hidden && img && !img.getAttribute('src')) img.src = img.dataset.src;
+    });
     if (roomView) roomView.refresh();
   }
   function swatch(cat, id) {
     var d = document.createElement('div'); d.className = 'sw sw-' + cat;
+    var it = findItem(cat, id);
+    if (it.image) {
+      d.className = 'sw sw-art' + (cat === 'wall' ? ' sw-room' : '');
+      var img = document.createElement('img'); img.src = it.image; img.alt = ''; img.loading = 'lazy'; img.draggable = false;
+      d.appendChild(img); return d;
+    }
     if (cat === 'wall') d.setAttribute('data-wall', id);
     else if (cat === 'rug') d.innerHTML = '<div class="rug" data-rug="' + id + '"></div>';
     else if (cat === 'win') d.innerHTML = '<div class="window" data-win="' + id + '">' + WIN_INNER + '</div>';
@@ -659,8 +709,8 @@
     if (st === 'eq') {
       if (s.cat === 'prop') { descEl.textContent = '正摆在房间里'; btn.disabled = false; btn.textContent = '收起来'; }
       else { descEl.textContent = '正在使用'; btn.disabled = true; btn.textContent = '使用中'; }
-    } else if (st === 'own') { descEl.textContent = '已经拥有，可以换上'; btn.disabled = false; btn.textContent = '使用'; }
-    else if (S.fish >= it.price) { descEl.textContent = '买下后马上放进房间'; btn.disabled = false; btn.innerHTML = '买 ' + FISH_MINI + it.price; }
+    } else if (st === 'own') { descEl.textContent = s.cat === 'rug' || s.cat === 'win' ? '使用后回到经典房间' : '已经拥有，可以换上'; btn.disabled = false; btn.textContent = '使用'; }
+    else if (S.fish >= it.price) { descEl.textContent = s.cat === 'rug' || s.cat === 'win' ? '用于经典房间，买下后切换' : s.cat === 'wall' && it.image ? '房间底图，家具可另外选配' : it.image ? '买下后可在「布置」里拖动摆放' : '买下后马上放进房间'; btn.disabled = false; btn.innerHTML = '买 ' + FISH_MINI + it.price; }
     else { descEl.textContent = '小鱼干还差 ' + (it.price - S.fish) + ' 个'; btn.disabled = true; btn.textContent = '不够'; }
   }
   function renderShop() {
@@ -671,14 +721,16 @@
       tabsEl.appendChild(b);
     });
     var box = $('#items'); box.innerHTML = '';
-    CATALOG[SH.tab].forEach(function (it) {
-      var st = itemState(SH.tab, it.id), b = document.createElement('button');
+    var category = shopCategory(SH.tab);
+    shopItems(SH.tab).forEach(function (it) {
+      var st = itemState(category, it.id), b = document.createElement('button');
       b.type = 'button'; b.className = 'item'; b.setAttribute('data-eq', st === 'eq' ? '1' : '0');
-      b.setAttribute('aria-pressed', SH.sel && SH.sel.cat === SH.tab && SH.sel.id === it.id ? 'true' : 'false');
-      b.appendChild(swatch(SH.tab, it.id));
+      b.setAttribute('aria-pressed', SH.sel && SH.sel.cat === category && SH.sel.id === it.id ? 'true' : 'false');
+      b.dataset.itemId = it.id;
+      b.appendChild(swatch(category, it.id));
       var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = it.name; b.appendChild(nm);
       var t = document.createElement('span'); t.className = 'st'; t.innerHTML = st === 'eq' ? '使用中' : st === 'own' ? '已拥有' : FISH_MINI + '<b>' + it.price + '</b>'; b.appendChild(t);
-      b.addEventListener('click', function () { SH.sel = { cat: SH.tab, id: it.id }; SH.msg = ''; renderShop(); var p = $('#items .item[aria-pressed="true"]'); if (p && p.focus) p.focus({ preventScroll: true }); });
+      b.addEventListener('click', function () { SH.sel = { cat: category, id: it.id }; SH.msg = ''; renderShop(); var p = $('#items .item[aria-pressed="true"]'); if (p && p.focus) p.focus({ preventScroll: true }); });
       box.appendChild(b);
     });
     updateBuy(); paintDecor(); renderCoins();
@@ -697,6 +749,10 @@
     } else {
       if (st === 'buy') { if (S.fish < it.price) return; addFish(-it.price); S.own[s.cat + ':' + s.id] = 1; }
       if (s.cat === 'prop') { if (S.eq.prop.indexOf(s.id) < 0) S.eq.prop.push(s.id); } else S.eq[s.cat] = s.id;
+      if (s.cat === 'rug' || s.cat === 'win') {
+        S.eq.wall = 'dots';
+        S.eq.prop = S.eq.prop.filter(function (id) { return findItem('prop', id).placement !== (s.cat === 'win' ? 'window' : 'rug'); });
+      }
       SH.msg = st === 'buy' ? '买到了，已经放进房间' : '换好了';
       celebrate();
     }

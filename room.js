@@ -1,6 +1,7 @@
 (function () {
   'use strict';
   var KEYS = ['win', 'rug', 'prop:yarn', 'prop:cushion', 'prop:plant', 'prop:lamp', 'prop:frame', 'prop:lights'];
+  KEYS = KEYS.concat(window.NaituanDecor.items.map(function (it) { return 'prop:' + it.id; }));
   function limit(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   function cleanLayout(value) {
     var out = {};
@@ -85,7 +86,7 @@
       items.filter(function (it) { return !it.el.hidden; }).forEach(function (it) {
         var option = document.createElement('option'); option.value = it.key; option.textContent = it.name; picker.appendChild(option);
       });
-      if (editing) select(selected && !selected.el.hidden ? selected : items[0]);
+      if (editing) select(selected && !selected.el.hidden ? selected : items.filter(function (it) { return !it.el.hidden; })[0] || null);
       else select(null);
     }
     function stopPointers() {

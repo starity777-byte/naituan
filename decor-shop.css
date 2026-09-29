@@ -1,0 +1,20 @@
+
+/* Four illustrated rooms and independently placed furniture. */
+.room-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.stage.has-scene .floor { display: none; }
+.stage.has-scene .catbox { width: 34%; left: 33%; bottom: 18%; }
+.room-scene .catbox { z-index: 3; }
+.prop.decor-prop { left: var(--item-x); top: var(--item-y); width: var(--item-w); height: auto; transform: translate(-50%, -50%); z-index: 2; }
+.decor-prop img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.prop.decor-prop[data-placement="rug"] { z-index: 1; }
+.prop.decor-prop[data-placement="surface"] { z-index: 2; }
+.room-scene.arranging .decor-prop { z-index: 4; }
+.room-scene.arranging .decor-prop.room-selected { z-index: 6; }
+.sw-art { background: #fff8ed; }
+.sw-art img { position: absolute; inset: 3%; display: block; width: 94%; height: 94%; object-fit: contain; }
+.sw-room img { inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.stage.playing .decor-prop, .stage.stacking .decor-prop, .stage.stacking .room-backdrop, .stage.cqmode .room-backdrop { visibility: hidden; }
+.app.shopping .stage { width: min(100%, 260px, 32svh); align-self: center; margin-inline: auto; }
+.app.shopping .bubble { display: none; }
+.shop .item, .shop .tab, .shop .buybtn { scroll-margin-top: 35svh; }
+

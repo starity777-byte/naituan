@@ -356,7 +356,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .shop { display: flex; flex-direction: column; gap: 10px; }
 .shop-head { display: flex; align-items: center; gap: 10px; }
 .shop-head h2 { margin: 0; margin-right: auto; font-family: var(--font-display); font-weight: 400; font-size: 23px; letter-spacing: .04em; }
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: thin; }
+.tabs .tab { flex: 0 0 auto; white-space: nowrap; padding-inline: 12px; }
 .tab { padding: 6px 0; cursor: pointer; background: var(--panel); border: 2px solid var(--ink); border-radius: 14px; font-family: var(--font-display); font-size: 15px; }
 .tab[aria-selected="true"] { background: var(--ink); color: var(--panel); }
 .items { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
