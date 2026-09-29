@@ -8,6 +8,7 @@
     shy: 'assets/animated/偷笑.webp',
     stretch: 'assets/animated/伸懒腰.webp',
     box: 'assets/animated/纸箱.webp',
+    sleep: 'assets/animated/睡觉.webp',
     peek: 'assets/peek.webp',
     peekc: 'assets/peekc.webp'
   }/*SPR:END*/;
@@ -64,7 +65,7 @@
   /* ---------- pose ---------- */
   function setPose(name, ms) { override = { name: name, until: now() + ms }; render(); }
   function computePose() {
-    if (S.sleeping) return 'box';
+    if (S.sleeping) return 'sleep';
     if (override && now() < override.until) return override.name;
     override = null;
     if (S.hunger < 25 || S.mood < 25) return 'cry';
@@ -142,7 +143,7 @@
   function toggleSleep() {
     if (S.sleeping) { S.sleeping = false; setPose('stretch', 2200); say(S.energy >= 100 ? '睡饱啦！' : '才睡了一会儿……'); render(); save(); return; }
     if (S.energy >= 90) { say('还不困呢，再玩一会儿'); return; }
-    override = null; S.sleeping = true; say('钻进纸箱，晚安……', 3000); render(); save();
+    override = null; S.sleeping = true; say('蜷好身子，晚安……', 3000); render(); save();
   }
 
   /* ---------- rhythm hide-and-seek ---------- */
