@@ -884,7 +884,7 @@
     if (roomView) roomView.finish();
     saveText.value = exportCode(); saveMsg.textContent = '这是这台设备上现在的进度。'; disarm(); saveModal.hidden = false;
   }
-  function closeSave() { saveModal.hidden = true; disarm(); }
+  function closeSave() { saveModal.hidden = true; disarm(); if (roomView) roomView.refresh(); }
   function copySave() {
     var fallback = function () { saveText.focus(); saveText.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} saveMsg.textContent = ok ? '已复制。' : '已经全选了，长按选择「拷贝」就行。'; };
     try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(saveText.value).then(function () { saveMsg.textContent = '已复制。'; }, fallback); else fallback(); } catch (e) { fallback(); }
