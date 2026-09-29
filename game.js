@@ -27,7 +27,7 @@
   }/*SPR:END*/;
   var KEY = 'naituan-house-v1';
   var $ = function (s) { return document.querySelector(s); };
-  var cat = $('#cat'), catimg = $('#catimg'), stage = $('#stage'), bubble = $('#bubble'), zzz = $('#zzz');
+  var cat = $('#cat'), catimg = $('#catimg'), catBox = $('#catbox'), stage = $('#stage'), bubble = $('#bubble'), zzz = $('#zzz');
   var btnFeed = $('#btnFeed'), btnSleep = $('#btnSleep'), btnHide = $('#btnHide'), sleepLabel = $('#sleepLabel');
   var btnStack = $('#btnStack'), btnCake = $('#btnCake'), coinEl = $('#coins');
   var hsEl = $('#hs'), slots = [];
@@ -70,6 +70,21 @@
   function save() { S.t = now(); try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
 
   /* ---------- speech ---------- */
+  function positionBubble() {
+    if (bubble.hidden || !stage.clientWidth || !catBox.offsetWidth) return;
+    var pet = catBox.getBoundingClientRect(), room = stage.getBoundingClientRect();
+    var scale = Math.max(.75, Math.min(1.3, pet.width / catBox.offsetWidth));
+    bubble.style.maxWidth = Math.min(stage.clientWidth * .78, (stage.clientWidth - 24) / scale) + 'px';
+    var width = bubble.offsetWidth * scale, height = bubble.offsetHeight * scale;
+    var headX = pet.left + pet.width / 2 - room.left - stage.clientLeft;
+    var headY = pet.top - room.top - stage.clientTop;
+    if (catBox.classList.contains('room-cat-dragging')) headY -= pet.height * .12;
+    var x = Math.max(12 + width / 2, Math.min(stage.clientWidth - 12 - width / 2, headX));
+    var y = Math.max(12 + height, Math.min(stage.clientHeight - 12, headY - 12 * scale));
+    bubble.style.left = x + 'px'; bubble.style.top = y + 'px';
+    bubble.style.setProperty('--bubble-scale', scale);
+    bubble.style.setProperty('--bubble-tail-x', Math.max(18, Math.min(bubble.offsetWidth - 18, bubble.offsetWidth / 2 + (headX - x) / scale)) + 'px');
+  }
   function say(t, ms) { sayText = t; sayUntil = now() + (ms || 3800); bubble.textContent = t; }
   function idleLine() {
     if (S.sleeping) return '呼……呼……';
@@ -1068,9 +1083,12 @@
     catPosition: function () { return S && S.catPosition; },
     commitCat: function (p) { S.catPosition = p; deferIdle(); save(); },
     pet: pet, petHold: beginRub, endPetHold: endRub, catDragStart: startCatDrag, catDrop: function () { sound('land'); }, interactItem: visitFurniture, onLayout: positionVisit,
+    onCatMove: positionBubble,
     walkStep: walkStep, walkStop: walkStopped
   });
   window.NT.room = roomView;
+  new MutationObserver(positionBubble).observe(bubble, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  new ResizeObserver(positionBubble).observe(bubble);
   var hot = window.claude && window.claude.hot;
   if (hot && hot.ready) hot.ready(start); else start(hot && hot.data ? hot.data : null);
 })();

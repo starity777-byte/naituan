@@ -15,8 +15,8 @@ button:disabled { cursor: default; }
 .home-view .stage .prop[data-prop="attic-cloud-rug"] { width: 56%; }
 .home-view .stage .prop[data-prop="attic-moon-bed"] { width: 30%; }
 .home-view .stage .prop[data-prop="attic-telescope"] { width: 27%; }
-.home-view .bubble { top: auto; bottom: 42.1%; left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: 78%; padding: 8px 16px; text-align: center; font-size: 15px; line-height: 1.4; font-weight: 500; background: var(--house-cream); border: 2px solid var(--house-brown); border-radius: 17px; box-shadow: 0 2px 0 #5b40341c; }
-.home-view .bubble::after { content: ""; position: absolute; top: calc(100% - 5px); bottom: auto; left: calc(50% - 7px); right: auto; width: 12px; height: 12px; transform: rotate(45deg); background: var(--house-cream); border: 0; border-right: 2px solid var(--house-brown); border-bottom: 2px solid var(--house-brown); }
+.home-view .bubble { top: 0; bottom: auto; left: 50%; right: auto; transform: translate(-50%, -100%) scale(var(--bubble-scale, 1)); transform-origin: 50% 100%; pointer-events: none; width: max-content; max-width: 78%; padding: 8px 16px; text-align: center; font-size: 15px; line-height: 1.4; font-weight: 500; background: var(--house-cream); border: 2px solid var(--house-brown); border-radius: 17px; box-shadow: 0 2px 0 #5b40341c; }
+.home-view .bubble::after { content: ""; position: absolute; top: calc(100% - 5px); bottom: auto; left: calc(var(--bubble-tail-x, 50%) - 7px); right: auto; width: 12px; height: 12px; transform: rotate(45deg); background: var(--house-cream); border: 0; border-right: 2px solid var(--house-brown); border-bottom: 2px solid var(--house-brown); }
 .home-view > .meters, .home-view > .actions, .home-view > .shopbtn, .home-view > #btnSave, .home-view > .hint { display: none !important; }
 .home-view .top { position: absolute; top: calc(22px + env(safe-area-inset-top, 0px)); right: 16px; left: 84px; z-index: 20; justify-content: flex-end; pointer-events: none; }
 .top-r { gap: 8px; }

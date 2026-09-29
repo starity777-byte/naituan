@@ -53,6 +53,7 @@
       scene.style.transform = 'translate(' + view.x * scene.clientWidth + 'px,' + view.y * scene.clientHeight + 'px) scale(' + view.scale + ')';
       label.textContent = Math.round(view.scale * 100) + '%';
       zoomOut.disabled = view.scale <= 1; zoomIn.disabled = view.scale >= 3;
+      if (o.onCatMove) o.onCatMove();
     }
     function local(p) {
       var r = stage.getBoundingClientRect();
@@ -118,6 +119,7 @@
         catShadow.style.width = width + 'px'; catShadow.style.height = width * 0.16 + 'px';
       }
       if (persist && o.commitCat) o.commitCat(p);
+      if (o.onCatMove) o.onCatMove();
       return p;
     }
     function restoreCat() {
@@ -274,6 +276,7 @@
       if (g.kind === 'cat' && g.dragging) placeCat(g.center);
       catBox.classList.remove('room-cat-dragging');
       if (catShadow) catShadow.classList.remove('lifted');
+      if (o.onCatMove) o.onCatMove();
     }
     function stopPointers() {
       stopWalk();
@@ -367,6 +370,7 @@
       if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
       beginGesture(null);
       if (!points.size) { stage.classList.remove('room-dragging'); catBox.classList.remove('room-cat-dragging'); if (catShadow) catShadow.classList.remove('lifted'); }
+      if (o.onCatMove) o.onCatMove();
       if (petTap) o.pet(e);
       else if (itemTap && o.interactItem) o.interactItem(itemTap.key);
     }
