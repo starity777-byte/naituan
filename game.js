@@ -9,6 +9,9 @@
     stretch: 'assets/animated/伸懒腰.webp',
     box: 'assets/animated/纸箱.webp',
     sleep: 'assets/animated/睡觉.webp',
+    wave: 'assets/animated/挥手.webp',
+    roll: 'assets/animated/打滚笑.webp',
+    curious: 'assets/animated/好奇.webp',
     peek: 'assets/peek.webp',
     peekc: 'assets/peekc.webp'
   }/*SPR:END*/;
@@ -20,6 +23,7 @@
   var hsEl = $('#hs'), slots = [];
   var meters = { hunger: $('#m-hunger'), mood: $('#m-mood'), energy: $('#m-energy') };
   var S, curPose = '', override = null, sayUntil = 0, sayText = '', lastTap = [], RH = { active: false }, EXT = { active: false }, SG = { active: false, over: false };
+  var nextIdleAt = 0, lastIdlePose = '', hiddenAt = 0;
   var busy = function () { return RH.active || SG.active || EXT.active; };
   function setBusyUI(b) { btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = btnCake.disabled = b; }
 
@@ -59,7 +63,7 @@
     if (S.energy < 20) return '眼睛快睁不开了……';
     if (S.hunger < 50) return '有点饿了呢';
     if (S.mood > 85 && S.hunger > 60) return '今天也是好奶团！';
-    return '点点我，可以摸摸';
+    return '摸摸头，或者挠挠肚子吧';
   }
 
   /* ---------- pose ---------- */
@@ -120,17 +124,35 @@
   function shake() { cat.classList.remove('shake'); void cat.offsetWidth; cat.classList.add('shake'); setTimeout(function () { cat.classList.remove('shake'); }, 420); }
 
   /* ---------- actions ---------- */
+  function deferIdle() { nextIdleAt = now() + 25000 + Math.random() * 20000; }
+  function greet() {
+    deferIdle();
+    if (S.sleeping || busy() || SH.open || !saveModal.hidden || (override && now() < override.until)) return;
+    setPose('wave', 3600); say('你回来啦！给你挥挥爪~', 3600);
+  }
+  function petPart(ev) {
+    if (!ev) return 'head';
+    var r = $('#catbtn').getBoundingClientRect();
+    var x = (ev.clientX - r.left) / r.width, y = (ev.clientY - r.top) / r.height;
+    if (x > 0.73 && y > 0.55) return 'tail';
+    return y > 0.68 ? 'belly' : 'head';
+  }
   function pet(ev) {
     if (busy()) return;
+    deferIdle();
     var r = stage.getBoundingClientRect();
     var x = (ev && ev.clientX != null ? ev.clientX : r.left + r.width / 2) - r.left;
     var y = (ev && ev.clientY != null ? ev.clientY : r.top + r.height / 2) - r.top - 10;
     if (S.sleeping) { S.sleeping = false; setPose('stretch', 2000); say('被戳醒啦……'); render(); save(); return; }
-    var t = now(); lastTap = lastTap.filter(function (v) { return t - v < 4000; }); lastTap.push(t);
+    var part = petPart(ev), t = now();
+    lastTap = part === 'head' ? lastTap.filter(function (v) { return t - v < 4000; }) : [];
+    if (part === 'head') lastTap.push(t);
     heartAt(x, y);
     if (S.hunger < 25) { say('先给我小鱼嘛……', 2600); setPose('cry', 1200); S.mood = clamp(S.mood + 1); }
+    else if (part === 'belly') { S.mood = clamp(S.mood + 3); setPose('roll', 3200); say(pick(['哈哈哈，好痒呀！', '肚皮痒痒，打个滚~']), 3200); }
+    else if (part === 'tail') { S.mood = clamp(S.mood + 3); setPose('curious', 2600); say(pick(['咦，谁碰我的尾巴？', '尾巴发现你啦~']), 2600); }
     else if (lastTap.length >= 6) { lastTap = []; S.mood = clamp(S.mood + 5); setPose('shy', 2600); say(pick(['嘿嘿，不好意思了', '再摸脸要红了'])); }
-    else { S.mood = clamp(S.mood + 3); setPose('happy', 1500); say(pick(['呼噜呼噜~', '好舒服', '再摸摸']), 2200); }
+    else { S.mood = clamp(S.mood + 3); setPose('happy', 2200); say(pick(['摸摸头，呼噜呼噜~', '好舒服，再摸摸头', '喜欢这样摸摸~']), 2200); }
     render(); save();
   }
   function feed() {
@@ -729,7 +751,9 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !saveModal.hidden) closeSave(); });
 
   /* ---------- wiring ---------- */
-  $('#catbtn').addEventListener('pointerdown', function (e) { e.preventDefault(); pet(e); });
+  document.addEventListener('pointerdown', deferIdle);
+  document.addEventListener('keydown', deferIdle);
+  $('#catbtn').addEventListener('pointerdown', function (e) { if (e.button !== 0) return; e.preventDefault(); pet(e); });
   $('#catbtn').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pet(null); } });
   btnFeed.addEventListener('click', feed);
   btnSleep.addEventListener('click', toggleSleep);
@@ -747,8 +771,12 @@
       S.hunger = clamp(S.hunger - (busy() ? 0.5 : 1) / 60);
       S.mood = clamp(S.mood - (busy() ? 0 : 0.5) / 60);
       S.energy = clamp(S.energy - (busy() ? 0.25 : 0.5) / 60);
-      if (!busy() && !override && S.hunger >= 25 && S.mood >= 25 && Math.random() < 0.06) {
-        if (Math.random() < 0.5) { setPose('stretch', 2300); say('伸个懒腰~'); } else { setPose('shy', 2300); say('嘿嘿'); }
+      if (!busy() && !SH.open && saveModal.hidden && !override && S.hunger >= 25 && S.mood >= 25 && now() >= nextIdleAt) {
+        var idle = pick(['box', 'stretch', 'shy'].filter(function (p) { return p !== lastIdlePose; }));
+        lastIdlePose = idle; deferIdle();
+        if (idle === 'box') { setPose('box', 6500); say('这个纸箱归我啦，钻进去玩一会儿~', 6500); }
+        else if (idle === 'stretch') { setPose('stretch', 3000); say('伸个懒腰，陪你慢慢待着~', 3000); }
+        else { setPose('shy', 3000); say('想到好玩的事，偷偷笑一下~', 3000); }
       }
     }
     render();
@@ -757,11 +785,14 @@
 
   function start(hotData) {
     load(hotData);
-    say('回来啦', 2600);
     paintDecor(); if (!S.shopSeen) btnShop.setAttribute('data-new', '1');
+    greet();
     render();
     setInterval(tick, 1000);
-    document.addEventListener('visibilitychange', function () { if (document.hidden) save(); });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { hiddenAt = now(); save(); }
+      else { if (hiddenAt && now() - hiddenAt >= 60000) greet(); hiddenAt = 0; deferIdle(); }
+    });
     window.addEventListener('pagehide', save);
     try { if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(function () { return S; }); } catch (e) {}
   }
