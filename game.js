@@ -20,6 +20,8 @@
     chin: 'assets/animated/chin-scratch.webp',
     nose: 'assets/animated/nose-boop.webp',
     knead: 'assets/animated/knead-bed.webp',
+    walkSide: 'assets/animated/walk-side.webp',
+    walkFront: 'assets/animated/walk-front.webp',
     peek: 'assets/peek.webp',
     peekc: 'assets/peekc.webp'
   }/*SPR:END*/;
@@ -31,7 +33,7 @@
   var hsEl = $('#hs'), slots = [];
   var meters = { hunger: $('#m-hunger'), mood: $('#m-mood'), energy: $('#m-energy') };
   var S, curPose = '', override = null, sayUntil = 0, sayText = '', lastTap = [], RH = { active: false }, EXT = { active: false }, SG = { active: false, over: false };
-  var nextIdleAt = 0, lastIdlePose = '', hiddenAt = 0, rubbing = false, visiting = null, pendingFurniture = null;
+  var nextIdleAt = 0, nextWalkAt = 0, lastIdlePose = '', hiddenAt = 0, rubbing = false, visiting = null, pendingFurniture = null, walkPose = 'walkSide';
   var busy = function () { return RH.active || SG.active || EXT.active; };
   var roomView = null;
   function setBusyUI(b) {
@@ -83,6 +85,7 @@
   function setPose(name, ms) { override = { name: name, until: now() + ms }; render(); }
   function computePose() {
     if (S.sleeping) return 'sleep';
+    if (roomView && roomView.isWalking()) return walkPose;
     if (override && now() < override.until) return override.name;
     override = null;
     if (S.hunger < 25 || S.mood < 25) return 'cry';
@@ -91,10 +94,12 @@
   function applyPose(p) {
     if (visiting && p !== visiting.pose) endVisit();
     if (p === curPose) return;
+    var walkingChange = /^walk/.test(p) || /^walk/.test(curPose);
     curPose = p;
     catimg.src = SPR[p];
     cat.setAttribute('data-pose', p);
-    catimg.classList.remove('pop'); void catimg.offsetWidth; catimg.classList.add('pop');
+    catimg.classList.remove('pop');
+    if (!walkingChange) { void catimg.offsetWidth; catimg.classList.add('pop'); }
   }
 
   /* ---------- render ---------- */
@@ -138,7 +143,7 @@
   function shake() { cat.classList.remove('shake'); void cat.offsetWidth; cat.classList.add('shake'); setTimeout(function () { cat.classList.remove('shake'); }, 420); }
 
   /* ---------- actions ---------- */
-  function deferIdle() { nextIdleAt = now() + 25000 + Math.random() * 20000; }
+  function deferIdle() { nextIdleAt = now() + 25000 + Math.random() * 20000; nextWalkAt = now() + 9000 + Math.random() * 9000; }
   function greet() {
     deferIdle();
     if (S.sleeping || busy() || SH.open || !saveModal.hidden || (override && now() < override.until)) return;
@@ -165,6 +170,7 @@
   function roomAvailable() { return !busy() && !SH.open && saveModal.hidden && !(roomView && roomView.isEditing()); }
   function pet(ev, chosenPart) {
     if (!roomAvailable()) return;
+    roomView.stopWalk();
     deferIdle();
     var r = stage.getBoundingClientRect();
     var x = (ev && ev.clientX != null ? ev.clientX : r.left + r.width / 2) - r.left;
@@ -184,7 +190,7 @@
   }
   function beginRub(ev) {
     if (!roomAvailable() || S.sleeping || S.hunger < 25 || ['head', 'ear', 'nose', 'chin'].indexOf(petPart(ev)) < 0) return false;
-    deferIdle(); lastTap = []; rubbing = true;
+    roomView.stopWalk(); endVisit(); deferIdle(); lastTap = []; rubbing = true;
     setPose('rub', Infinity); say('把脸贴过来……呼噜呼噜~', Infinity);
     return true;
   }
@@ -198,11 +204,10 @@
   function cancelRoomInteraction() { if (roomView) roomView.cancelInteraction(); endRub(true); }
   function endVisit() {
     if (!visiting) return;
-    visiting = null; $('#catbox').style.width = '';
-    if (roomView) roomView.restoreCat();
+    visiting = null;
   }
   function startCatDrag() {
-    // Keep the visible foot point when lifting the cat away from a temporary visit.
+    // Picking up or interrupting a visit keeps the current foot point.
     var p = roomView.getCatPosition();
     endVisit(); override = null; sayUntil = 0; render(); roomView.placeCat(p);
   }
@@ -214,30 +219,74 @@
     if (it.placement === 'window' || /窗|望远镜/.test(it.name)) return 'watch';
     return it.placement === 'rug' || /窝|床|地铺|垫|沙发|吊椅|蒲团/.test(it.name) ? 'knead' : 'sniff';
   }
-  function positionVisit() {
-    if (!visiting) return;
-    var pose = visiting.pose, anchor = pose === 'watch' ? 'watch' : pose === 'knead' ? 'rest' : 'approach';
-    var point = roomView.itemPoint(visiting.key, anchor), geometry = roomView.getItemGeometry(visiting.key);
-    if (!point || !geometry) { endVisit(); return; }
-    // Wall ornaments are inspected from the floor, not by floating beside them.
-    var width = Math.max(0.22, Math.min(0.42, geometry.size.width * 1.15));
-    if (pose === 'sniff') { point.x += width * 0.42; point.y = Math.max(0.76, point.y + 0.025); }
-    $('#catbox').style.width = width * 100 + '%';
-    roomView.placeCat(point, false, { surface: true });
+  function furnitureDestination(key, pose) {
+    var geometry = roomView.getItemGeometry(key);
+    if (!geometry) return null;
+    var anchor = pose === 'watch' ? 'watch' : pose === 'knead' ? 'rest' : 'approach';
+    var point = Object.assign({}, geometry.anchors[anchor]);
+    if (pose === 'watch') point.y = roomView.floorY(point.x) + 0.03;
+    else if (pose === 'sniff') {
+      var from = roomView.getCatPosition(), side = from.x < geometry.center.x ? -1 : 1;
+      point.x += side * (geometry.size.width * 0.35 + 0.045);
+      point.y += 0.025;
+    }
+    return roomView.groundPoint(point);
   }
+  function positionVisit() {
+    if (!visiting || roomView.isWalking()) return;
+    var point = furnitureDestination(visiting.key, visiting.pose);
+    if (!point) { endVisit(); return; }
+    S.catPosition = roomView.placeCat(point, false, { onItem: visiting.pose === 'knead' ? visiting.key : null });
+  }
+  function walkStep(point, direction) {
+    S.catPosition = point;
+    walkPose = direction.y > Math.abs(direction.x) * 1.1 ? 'walkFront' : 'walkSide';
+    if (Math.abs(direction.x) > 0.001) $('#catbox').style.setProperty('--walk-facing', direction.x < 0 ? '-1' : '1');
+    applyPose(walkPose);
+  }
+  function walkStopped() { deferIdle(); render(); }
   function visitFurniture(key) {
     if (!roomAvailable()) return;
     deferIdle();
     if (S.sleeping) { say('先让奶团睡一会儿，醒来再去玩'); return; }
     cancelRoomInteraction(); endVisit();
     if (key === 'room') { setPose('sniff', 5200); say('新房间的味道，我要慢慢熟悉~', 5200); return; }
-    if (!roomView.getItemGeometry(key)) return;
     var pose = furnitureAction(key);
+    var point = furnitureDestination(key, pose);
+    if (!point) return;
     var ms = pose === 'sniff' ? 5200 : pose === 'watch' ? 6400 : 6600;
-    visiting = { pose: pose, key: key };
-    positionVisit();
-    setPose(pose, ms);
-    say(pose === 'watch' ? '窗外有什么呀……陪我看一会儿~' : pose === 'knead' ? '软乎乎，左踩踩、右踩踩~' : '凑近闻闻，这个我还不熟呢~', ms);
+    override = null;
+    say(pose === 'watch' ? '去窗边看看~' : pose === 'knead' ? '走过去，踩踩软软的地方~' : '这就过去瞧瞧~', 12000);
+    if (!roomView.walkTo(point, function (arrived) {
+      if (!roomAvailable() || S.sleeping || !roomView.getItemGeometry(key)) return;
+      visiting = { pose: pose, key: key };
+      roomView.placeCat(arrived, false, { onItem: pose === 'knead' ? key : null });
+      setPose(pose, ms);
+      say(pose === 'watch' ? '窗外有什么呀……陪我看一会儿~' : pose === 'knead' ? '软乎乎，左踩踩、右踩踩~' : '凑近闻闻，这个我还不熟呢~', ms);
+    }, key)) { say('这里有点挤，帮我挪出一点位置吧~'); render(); }
+  }
+  function wander() {
+    deferIdle(); endVisit();
+    if (S.hunger >= 25 && S.mood >= 25 && Math.random() < 0.22) { idleAction(); return; }
+    var furniture = roomView.visibleItems();
+    if (furniture.length && Math.random() < 0.35) { visitFurniture(pick(furniture)); return; }
+    var from = roomView.getCatPosition();
+    for (var attempt = 0; attempt < 6; attempt++) {
+      var x = 0.12 + Math.random() * 0.76, back = roomView.floorY(x);
+      var point = roomView.groundPoint({ x: x, y: back + 0.025 + Math.random() * (0.94 - back) });
+      if (Math.hypot(point.x - from.x, point.y - from.y) < 0.13) continue;
+      override = null;
+      if (roomView.walkTo(point)) { say('在屋里慢慢溜达一下~', 4500); return; }
+    }
+  }
+  function idleAction() {
+    var idle = pick(['box', 'stretch', 'shy', 'paw', 'watch'].filter(function (p) { return p !== lastIdlePose; }));
+    lastIdlePose = idle; deferIdle();
+    if (idle === 'box') { setPose('box', 6500); say('这个纸箱归我啦，钻进去玩一会儿~', 6500); }
+    else if (idle === 'stretch') { setPose('stretch', 3000); say('伸个懒腰，陪你慢慢待着~', 3000); }
+    else if (idle === 'paw') { setPose('paw', 5600); say('把小爪递给你……要牵牵吗？', 5600); }
+    else if (idle === 'watch') { setPose('watch', 6400); say('外面有动静，竖起耳朵看看~', 6400); }
+    else { setPose('shy', 3000); say('想到好玩的事，偷偷笑一下~', 3000); }
   }
   function feed() {
     if (busy()) return;
@@ -931,14 +980,10 @@
       S.hunger = clamp(S.hunger - (busy() ? 0.5 : 1) / 60);
       S.mood = clamp(S.mood - (busy() ? 0 : 0.5) / 60);
       S.energy = clamp(S.energy - (busy() ? 0.25 : 0.5) / 60);
-      if (!busy() && !SH.open && saveModal.hidden && !override && S.hunger >= 25 && S.mood >= 25 && now() >= nextIdleAt) {
-        var idle = pick(['box', 'stretch', 'shy', 'paw', 'watch'].filter(function (p) { return p !== lastIdlePose; }));
-        lastIdlePose = idle; deferIdle();
-        if (idle === 'box') { setPose('box', 6500); say('这个纸箱归我啦，钻进去玩一会儿~', 6500); }
-        else if (idle === 'stretch') { setPose('stretch', 3000); say('伸个懒腰，陪你慢慢待着~', 3000); }
-        else if (idle === 'paw') { setPose('paw', 5600); say('把小爪递给你……要牵牵吗？', 5600); }
-        else if (idle === 'watch') { setPose('watch', 6400); say('外面有动静，竖起耳朵看看~', 6400); }
-        else { setPose('shy', 3000); say('想到好玩的事，偷偷笑一下~', 3000); }
+      var freeToRoam = roomAvailable() && !roomView.isInteracting() && !roomView.isWalking() && !override && !rubbing;
+      if (freeToRoam && S.energy > 10 && now() >= nextWalkAt) { wander(); freeToRoam = false; }
+      if (freeToRoam && S.hunger >= 25 && S.mood >= 25 && now() >= nextIdleAt) {
+        idleAction();
       }
     }
     render();
@@ -967,14 +1012,16 @@
   roomView = window.NaituanRoom.create({
     stage: stage, scene: $('#roomScene'), tools: $('#roomTools'), cat: $('#catbtn'), catBox: $('#catbox'), catShadow: $('#catShadow'), props: propsEl,
     items: [{ key: 'win', name: '窗户', el: winEl }, { key: 'rug', name: '地毯', el: rugEl }].concat(
-      CATALOG.prop.map(function (it) { return { key: 'prop:' + it.id, name: it.name, depthAware: !!it.depthAware, anchors: it.interactionAnchors, el: propsEl.querySelector('[data-prop="' + it.id + '"]') }; })),
+      CATALOG.prop.map(function (it) { return { key: 'prop:' + it.id, name: it.name, depthAware: !!it.depthAware,
+        obstacle: it.placement === 'floor' || /^(cushion|plant|lamp)$/.test(it.id), anchors: it.interactionAnchors, el: propsEl.querySelector('[data-prop="' + it.id + '"]') }; })),
     floorBoundary: function () { var wall = findItem('wall', stage.getAttribute('data-wall')); return wall && wall.floorBoundary || [[0, 0.63], [1, 0.63]]; },
     enabled: function () { return !busy() && !SH.open && saveModal.hidden; },
     layout: function () { return S && S.roomLayout || {}; },
     commit: function (layout) { S.roomLayout = layout; save(); },
     catPosition: function () { return S && S.catPosition; },
     commitCat: function (p) { S.catPosition = p; deferIdle(); save(); },
-    pet: pet, petHold: beginRub, endPetHold: endRub, catDragStart: startCatDrag, interactItem: visitFurniture, onLayout: positionVisit
+    pet: pet, petHold: beginRub, endPetHold: endRub, catDragStart: startCatDrag, interactItem: visitFurniture, onLayout: positionVisit,
+    walkStep: walkStep, walkStop: walkStopped
   });
   window.NT.room = roomView;
   var hot = window.claude && window.claude.hot;

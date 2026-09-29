@@ -26,7 +26,7 @@
     var size = $('roomSize'), sizeLabel = $('roomSizeLabel'), smaller = $('roomSmaller'), bigger = $('roomBigger');
     var flipX = $('roomFlipX'), flipY = $('roomFlipY');
     var view = { scale: 1, x: 0, y: 0 }, points = new Map(), gesture = null;
-    var editing = false, draft = {}, selected = null, moved = false, multi = false, enabled = false;
+    var editing = false, draft = {}, selected = null, moved = false, multi = false, enabled = false, walker = null;
     var items = o.items, byKey = {};
     items.forEach(function (it) {
       byKey[it.key] = it; it.el.dataset.roomItem = it.key;
@@ -109,6 +109,8 @@
       catBox.style.right = 'auto'; catBox.style.bottom = 'auto';
       catBox.style.transform = 'translate(-50%,-100%) scale(' + scale + ',' + scale + ')';
       catBox.dataset.depthScale = scale.toFixed(3);
+      var support = options && options.onItem && getItemGeometry(options.onItem);
+      catBox.style.zIndex = editing ? 3 : 20 + Math.round(Math.max(p.y, support ? support.center.y + support.size.height * 0.45 : 0) * 1000);
       if (catShadow) {
         catShadow.hidden = surface;
         catShadow.style.left = p.x * 100 + '%'; catShadow.style.top = p.y * 100 + '%';
@@ -145,6 +147,37 @@
       var geometry = getItemGeometry(key);
       return geometry && geometry.anchors[anchor || 'approach'] || null;
     }
+    function walkObstacles(except) {
+      var padding = catBox.offsetWidth / scene.clientWidth * 0.09;
+      return items.filter(function (it) { return it.obstacle && it.key !== except && !it.el.hidden; }).map(function (it) {
+        var g = getItemGeometry(it.key);
+        if (!g || g.size.width < 0.09) return null;
+        var bottom = g.center.y + g.size.height * 0.45;
+        if (bottom < floorY(g.center.x) + 0.02) return null;
+        return { left: g.center.x - g.size.width * 0.34 - padding, right: g.center.x + g.size.width * 0.34 + padding,
+          top: bottom - Math.min(0.09, g.size.height * 0.3) - 0.015, bottom: bottom + 0.02 };
+      }).filter(Boolean);
+    }
+    function stopWalk() { if (walker) walker.stop(); }
+    function walkTo(point, arrive, key) {
+      if (!walker) walker = window.NaituanWalk.create({
+        position: getCatPosition, place: placeCat, depthScale: depthScale,
+        aspect: function () { return scene.clientHeight / scene.clientWidth; },
+        enabled: function () { return enabled && o.enabled() && !editing && !points.size && !document.hidden; },
+        route: function (from, to, target) { return window.NaituanWalk.planRoute(from, to, {
+          constrain: boundCat, floorY: floorY, aspect: scene.clientHeight / scene.clientWidth, obstacles: walkObstacles(target)
+        }); },
+        moved: function (p, direction) { if (o.walkStep) o.walkStep(p, direction); },
+        stopped: function (p) {
+          catBox.classList.remove('room-cat-walking');
+          if (o.commitCat) o.commitCat(p);
+          if (o.walkStop) o.walkStop();
+        }
+      });
+      var started = walker.go(point, arrive, key);
+      catBox.classList.toggle('room-cat-walking', started);
+      return started;
+    }
     function itemScale(it, p) {
       var manual = p.scale || 1, scale = manual;
       if (!it.depthAware) return scale;
@@ -178,6 +211,11 @@
     function paintLayout() {
       var layout = editing ? draft : o.layout();
       items.forEach(function (it) { apply(it, layout[it.key]); });
+      items.forEach(function (it) {
+        if (!it.obstacle || it.el.hidden) return;
+        var g = getItemGeometry(it.key);
+        if (g) it.el.style.zIndex = editing ? '' : 10 + Math.round((g.center.y + g.size.height * 0.45) * 1000);
+      });
     }
     function place(it, p) {
       draft[it.key] = bounded(it, Object.assign({ scale: 1, flipX: false, flipY: false }, draft[it.key], p));
@@ -203,10 +241,12 @@
     }
     function editUI() {
       scene.classList.toggle('arranging', editing); editTools.hidden = !editing;
+      catBox.style.zIndex = editing ? 3 : 20 + Math.round(getCatPosition().y * 1000);
       arrange.textContent = editing ? '完成' : '布置'; arrange.setAttribute('aria-pressed', String(editing));
       tip.textContent = editing ? '拖动家具 · 下方调大小和镜像 · 双指缩放房间' : '轻点摸摸，长按脸颊蹭蹭，拖动抱起；双指只缩放房间';
       o.props.setAttribute('aria-hidden', 'false');
       items.forEach(function (it) {
+        if (editing) it.el.style.zIndex = '';
         it.el.tabIndex = it.el.hidden ? -1 : 0;
         it.el.setAttribute('aria-hidden', String(!!it.el.hidden));
         it.el.setAttribute('aria-label', (editing ? '摆放' : '与') + it.name + (editing ? '' : '互动'));
@@ -236,6 +276,7 @@
       if (catShadow) catShadow.classList.remove('lifted');
     }
     function stopPointers() {
+      stopWalk();
       cancelGesture();
       var ids = Array.from(points.keys()); points.clear(); gesture = null; multi = moved = false;
       ids.forEach(function (id) { if (stage.hasPointerCapture(id)) stage.releasePointerCapture(id); });
@@ -280,6 +321,7 @@
     stage.addEventListener('pointerdown', function (e) {
       if (!enabled || !o.enabled() || (e.pointerType === 'mouse' && e.button !== 0)) return;
       e.preventDefault();
+      stopWalk();
       if (!points.size) { moved = false; multi = false; }
       points.set(e.pointerId, { x: e.clientX, y: e.clientY });
       stage.setPointerCapture(e.pointerId); beginGesture(e.target);
@@ -366,7 +408,9 @@
     new ResizeObserver(function () { stopPointers(); drawView(); paintLayout(); restoreCat(); if (o.onLayout) o.onLayout(); }).observe(stage);
     return { refresh: refresh, finish: finish, isEditing: function () { return editing; }, cancelInteraction: stopPointers,
       getCatPosition: getCatPosition, placeCat: placeCat, restoreCat: restoreCat, itemPoint: itemPoint, getItemGeometry: getItemGeometry,
-      floorY: floorY, depthScale: depthScale };
+      floorY: floorY, depthScale: depthScale, groundPoint: boundCat, walkTo: walkTo, stopWalk: stopWalk,
+      isWalking: function () { return !!walker && walker.active(); }, isInteracting: function () { return editing || points.size > 0; },
+      visibleItems: function () { return items.filter(function (it) { return !it.el.hidden; }).map(function (it) { return it.key; }); } };
   }
   window.NaituanRoom = { create: create, cleanLayout: cleanLayout, cleanPoint: cleanPoint };
 })();
