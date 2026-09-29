@@ -53,7 +53,7 @@ function fixture(initialLayout = {}, options = {}) {
   }
   function rect(left, top, width, height) { return { left, top, width, height, right: left + width, bottom: top + height }; }
   const controls = {};
-  ['roomZoomIn', 'roomZoomOut', 'roomZoomLabel', 'roomArrange', 'roomEditTools', 'roomItem', 'roomTip', 'roomResetView', 'roomResetItem', 'roomCancel',
+  ['roomZoomIn', 'roomZoomOut', 'roomZoomLabel', 'roomArrange', 'roomEditTools', 'roomItem', 'roomTip', 'roomResetView', 'roomResetItem', 'roomCancel', 'roomDelete',
     'roomSize', 'roomSizeLabel', 'roomSmaller', 'roomBigger', 'roomFlipX', 'roomFlipY', 'roomLeft', 'roomRight', 'roomUp', 'roomDown']
     .forEach(id => { controls[id] = new Element(id); });
   const stage = new Element('stage'), scene = new Element('scene'), tools = new Element('tools'), props = new Element('props');
@@ -68,7 +68,7 @@ function fixture(initialLayout = {}, options = {}) {
   document.createElement = id => new Element(id); window.NaituanDecor = { items: [] };
   let time = 0, timerId = 0, resize, savedCat = null, savedLayout = initialLayout;
   const timers = new Map();
-  const calls = { taps: 0, holds: 0, ends: [], drags: 0, drops: [], landings: 0, furniture: [], layouts: [], onLayout: 0 };
+  const calls = { taps: 0, holds: 0, ends: [], drags: 0, drops: [], landings: 0, furniture: [], layouts: [], removedKeys: [], onLayout: 0 };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../room.js'), 'utf8'), {
     window, document,
     setTimeout: (fn, ms) => { timers.set(++timerId, { fn, at: time + ms }); return timerId; },
@@ -78,7 +78,9 @@ function fixture(initialLayout = {}, options = {}) {
   const room = window.NaituanRoom.create({
     stage, scene, tools, props, cat, catBox, catShadow, enabled: () => true,
     floorBoundary: options.floorBoundary,
-    layout: () => savedLayout, commit: p => { savedLayout = p; calls.layouts.push(p); },
+    layout: () => savedLayout, commit: (p, removedKeys) => {
+      savedLayout = p; calls.layouts.push(p); calls.removedKeys.push(Array.from(removedKeys || []));
+    },
     catPosition: () => savedCat, commitCat: p => { savedCat = p; calls.drops.push(p); },
     pet: () => calls.taps++, petHold: () => { calls.holds++; return true; },
     endPetHold: cancelled => calls.ends.push(cancelled), catDragStart: () => calls.drags++,
@@ -90,7 +92,7 @@ function fixture(initialLayout = {}, options = {}) {
   });
   room.refresh();
   return {
-    room, calls, cat, catBox, catShadow, rug, win, bed, scene, controls, window, api: window.NaituanRoom,
+    room, calls, cat, catBox, catShadow, rug, win, bed, scene, controls, window, document, api: window.NaituanRoom,
     resize: () => resize(),
     tick(ms) {
       time += ms;
@@ -271,4 +273,53 @@ test('bed depth changes displayed size while preserving manual scale, mirrors an
   f.room.refresh();
   const restored = f.room.getItemGeometry(key);
   close(restored.size.width, far.size.width); point(f.room.itemPoint(key, 'rest'), anchor.x, anchor.y);
+});
+
+test('editing pinch scales and moves the selected item while camera and remaining finger stay still', () => {
+  const f = fixture();
+  for (let n = 0; n < 4; n++) f.controls.roomZoomIn.emit('click');
+  f.controls.roomArrange.emit('click');
+  assert.equal(f.controls.roomZoomLabel.textContent, '100%');
+  assert.equal(f.controls.roomResetItem.disabled, true); assert.equal(f.controls.roomDelete.disabled, true);
+  assert.equal([f.win, f.rug, f.bed].some(el => el.classList.contains('room-selected')), false);
+  const camera = f.scene.style.transform;
+  // Start around the window center; end 35px right, 40px down, at 150% of the finger span.
+  f.pointer('pointerdown', 1, 197, 212, f.win); f.pointer('pointerdown', 2, 297, 212, f.win);
+  f.pointer('pointermove', 1, 207, 252, f.win); f.pointer('pointermove', 2, 357, 252, f.win);
+  const moved = f.room.getItemGeometry('win');
+  point(moved.center, 0.26, 0.275); close(moved.size.width, 0.375); close(moved.size.height, 0.375);
+  assert.equal(f.scene.style.transform, camera); assert.equal(f.controls.roomZoomLabel.textContent, '100%');
+  f.pointer('pointerup', 2, 357, 252, f.win);
+  f.pointer('pointermove', 1, 407, 452, f.cat); f.tick(600); f.pointer('pointerup', 1, 407, 452, f.cat);
+  point(f.room.getItemGeometry('win').center, moved.center.x, moved.center.y);
+  close(f.room.getItemGeometry('win').size.width, moved.size.width);
+  assert.equal(f.scene.style.transform, camera);
+  assert.equal(f.calls.taps, 0); assert.equal(f.calls.holds, 0); assert.equal(f.calls.drags, 0);
+  assert.deepEqual(f.calls.furniture, []);
+  f.controls.roomArrange.emit('click');
+  point(f.calls.layouts[0].win, 0.26, 0.275); close(f.calls.layouts[0].win.scale, 1.5);
+});
+
+test('deletion stays in the editing draft until confirmation and Escape restores the item', () => {
+  const key = 'prop:cushion', original = { [key]: { x: 0.5, y: 0.8, scale: 1.3, flipX: false, flipY: false } };
+  const f = fixture(original);
+  const select = (el, id) => {
+    f.pointer('pointerdown', id, 500, 650, el); f.pointer('pointerup', id, 500, 650, el);
+  };
+  f.controls.roomArrange.emit('click'); select(f.bed, 1);
+  assert.equal(f.controls.roomDelete.disabled, false);
+  f.controls.roomDelete.emit('click');
+  assert.equal(f.bed.hidden, true); assert.equal(f.bed.classList.contains('room-selected'), false);
+  assert.equal(f.controls.roomDelete.disabled, true); assert.equal(f.controls.roomResetItem.disabled, true);
+  assert.equal(f.calls.layouts.length, 0); assert.deepEqual(f.calls.removedKeys, []);
+  point(original[key], 0.5, 0.8); assert.equal(original[key].scale, 1.3);
+  select(f.win, 2);
+  assert.equal(f.controls.roomDelete.disabled, false); assert.equal(f.controls.roomResetItem.disabled, false);
+  f.document.emit('keydown', { key: 'Escape' });
+  assert.equal(f.room.isEditing(), false); assert.equal(f.bed.hidden, false);
+  point(f.room.getItemGeometry(key).center, 0.5, 0.8);
+  assert.equal(f.calls.layouts.length, 0);
+  f.controls.roomArrange.emit('click'); select(f.bed, 3); f.controls.roomDelete.emit('click');
+  f.controls.roomArrange.emit('click');
+  assert.equal(f.calls.layouts.length, 1); assert.deepEqual(f.calls.removedKeys, [[key]]);
 });

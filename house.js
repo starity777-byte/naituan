@@ -30,6 +30,24 @@
     $('houseToast').textContent = message; $('houseToast').hidden = false;
     toastTimer = setTimeout(function () { $('houseToast').hidden = true; }, 4200);
   }
+  function syncFullscreen() {
+    var active = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    var button = $('houseFullscreen');
+    button.hidden = !active && window.matchMedia('(display-mode: fullscreen)').matches;
+    button.querySelector('span').textContent = active ? '退出全屏' : '全屏';
+    button.setAttribute('aria-pressed', String(active));
+  }
+  async function toggleFullscreen() {
+    var root = document.documentElement;
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (document.webkitFullscreenElement) await document.webkitExitFullscreen();
+      else if (root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
+      else if (root.webkitRequestFullscreen) await root.webkitRequestFullscreen();
+      else { notify('这个浏览器暂不支持直接全屏，可以添加到桌面后打开。'); return; }
+      syncFullscreen();
+    } catch (_) { notify('没能进入全屏，请用手机浏览器打开后再点一次「全屏」。'); }
+  }
   function sync() {
     var state = NT.S(), life = state.life;
     $('gamesCoinNum').textContent = state.fish.toLocaleString();
@@ -61,6 +79,7 @@
     if (name === 'shop') $('btnShop').click();
     if (name === 'book') window.NTQ.openBook();
     if (name === 'arrange') { $('roomArrange').click(); $('roomArrange').focus({ preventScroll: true }); }
+    if (name === 'fullscreen') toggleFullscreen();
   }
   $('pawToggle').addEventListener('click', function () { NT.sound('tap'); menu($('pawMenu').hidden); });
   document.querySelectorAll('[data-house-action]').forEach(function (button) {
@@ -116,7 +135,11 @@
     if (page !== 'life') notify(event.detail.message);
   });
   window.addEventListener('naituan:life-change', sync);
+  document.addEventListener('fullscreenchange', syncFullscreen);
+  document.addEventListener('webkitfullscreenchange', syncFullscreen);
+  window.matchMedia('(display-mode: fullscreen)').addEventListener('change', syncFullscreen);
   window.NaituanHouse = { navigate: navigate, notify: notify, currentPage: function () { return page; } };
   setInterval(sync, 1000);
   sync();
+  syncFullscreen();
 })();

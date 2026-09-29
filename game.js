@@ -832,6 +832,7 @@
   function loadDecor(d) {
     S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0;
     S.roomLayout = window.NaituanRoom.cleanLayout(d && d.roomLayout);
+    S.hiddenFixtures = { win: !!(d && d.hiddenFixtures && d.hiddenFixtures.win), rug: !!(d && d.hiddenFixtures && d.hiddenFixtures.rug) };
     S.catPosition = window.NaituanRoom.cleanPoint(d && d.catPosition);
     if (!d) {
       S.own['wall:scene-attic'] = 1;
@@ -850,6 +851,7 @@
   }
   function owned(cat, id) { return !!S.own[cat + ':' + id]; }
   function equipped(cat, id) {
+    if (S.hiddenFixtures[cat]) return false;
     if ((cat === 'rug' || cat === 'win') && findItem('wall', S.eq.wall).image) return false;
     if ((cat === 'rug' || cat === 'win') && S.eq.prop.some(function (p) { return findItem('prop', p).placement === (cat === 'win' ? 'window' : 'rug'); })) return false;
     return cat === 'prop' ? S.eq.prop.indexOf(id) >= 0 : S.eq[cat] === id;
@@ -858,11 +860,13 @@
 
   function paintDecor() {
     var e = { wall: S.eq.wall, rug: S.eq.rug, win: S.eq.win, prop: S.eq.prop.slice() };
+    var hiddenFixtures = Object.assign({}, S.hiddenFixtures);
     if (SH.open && SH.sel) {
       if (SH.sel.cat === 'prop') { if (e.prop.indexOf(SH.sel.id) < 0) e.prop.push(SH.sel.id); }
       else {
         e[SH.sel.cat] = SH.sel.id;
         if (SH.sel.cat === 'rug' || SH.sel.cat === 'win') {
+          hiddenFixtures[SH.sel.cat] = false;
           e.wall = 'dots';
           e.prop = e.prop.filter(function (id) { return findItem('prop', id).placement !== (SH.sel.cat === 'win' ? 'window' : 'rug'); });
         }
@@ -872,8 +876,8 @@
     roomBackdrop.hidden = !scenic;
     if (scenic && roomBackdrop.getAttribute('src') !== wallItem.image) roomBackdrop.src = wallItem.image;
     stage.classList.toggle('has-scene', scenic);
-    winEl.hidden = scenic || e.prop.some(function (id) { return findItem('prop', id).placement === 'window'; });
-    rugEl.hidden = scenic || e.prop.some(function (id) { return findItem('prop', id).placement === 'rug'; });
+    winEl.hidden = hiddenFixtures.win || scenic || e.prop.some(function (id) { return findItem('prop', id).placement === 'window'; });
+    rugEl.hidden = hiddenFixtures.rug || scenic || e.prop.some(function (id) { return findItem('prop', id).placement === 'rug'; });
     stage.setAttribute('data-wall', e.wall); rugEl.setAttribute('data-rug', e.rug); winEl.setAttribute('data-win', e.win);
     [].forEach.call(propsEl.children, function (el) {
       el.hidden = e.prop.indexOf(el.getAttribute('data-prop')) < 0;
@@ -948,6 +952,7 @@
       if (st === 'buy') { if (S.fish < it.price) return; addFish(-it.price); S.own[s.cat + ':' + s.id] = 1; }
       if (s.cat === 'prop') { if (S.eq.prop.indexOf(s.id) < 0) S.eq.prop.push(s.id); } else S.eq[s.cat] = s.id;
       if (s.cat === 'rug' || s.cat === 'win') {
+        S.hiddenFixtures[s.cat] = false;
         S.eq.wall = 'dots';
         S.eq.prop = S.eq.prop.filter(function (id) { return findItem('prop', id).placement !== (s.cat === 'win' ? 'window' : 'rug'); });
       }
@@ -1079,7 +1084,19 @@
     floorBoundary: roomFloorBoundary,
     enabled: roomEnabled,
     layout: function () { return S && S.roomLayout || {}; },
-    commit: function (layout) { S.roomLayout = layout; save(); },
+    commit: function (layout, removed) {
+      S.roomLayout = layout;
+      removed.forEach(function (key) {
+        if (key === 'win' || key === 'rug') S.hiddenFixtures[key] = true;
+        else {
+          var item = findItem('prop', key.slice(5));
+          if (item.placement === 'window') S.hiddenFixtures.win = true;
+          if (item.placement === 'rug') S.hiddenFixtures.rug = true;
+          S.eq.prop = S.eq.prop.filter(function (id) { return 'prop:' + id !== key; });
+        }
+      });
+      save(); paintDecor();
+    },
     catPosition: function () { return S && S.catPosition; },
     commitCat: function (p) { S.catPosition = p; deferIdle(); save(); },
     pet: pet, petHold: beginRub, endPetHold: endRub, catDragStart: startCatDrag, catDrop: function () { sound('land'); }, interactItem: visitFurniture, onLayout: positionVisit,

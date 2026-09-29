@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#f3ebde">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="奶团小屋">
 <title>奶团小屋</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -16,7 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+KuaiLe&display=swap">
 <link rel="stylesheet" href="style.css?v=walk-20260929">
 <link rel="stylesheet" href="decor-shop.css?v=cake-peach-20260929">
-<link rel="stylesheet" href="house.css?v=bubble-20260929">
+<link rel="stylesheet" href="house.css?v=edit-fullscreen-20260929">
 <link rel="stylesheet" href="planner.css?v=house-20260929">
 </head>
 <body>
@@ -38,6 +39,7 @@
   <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 6"/></symbol>
+  <symbol id="i-fullscreen" viewBox="0 0 24 24"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></symbol>
 </svg>
 <div class="app house-app" id="app" data-page="home">
 <main class="home-view" id="homeView" aria-label="奶团的窝">
@@ -55,6 +57,7 @@
     <button type="button" data-house-action="shop"><svg class="ui-icon"><use href="#i-shop"/></svg><span>小铺</span></button>
     <button type="button" data-house-action="book"><svg class="ui-icon"><use href="#i-book"/></svg><span>图鉴</span></button>
     <button type="button" data-house-action="arrange"><svg class="ui-icon"><use href="#i-sofa"/></svg><span>布置</span></button>
+    <button type="button" id="houseFullscreen" data-house-action="fullscreen" aria-pressed="false"><svg class="ui-icon"><use href="#i-fullscreen"/></svg><span>全屏</span></button>
   </nav>
   <div class="quick-stats" id="quickStats" aria-label="照顾奶团">
     <button class="stat-ring hunger-ring" id="quickFeed" type="button" aria-label="喂小鱼"><svg class="ring-dial" viewBox="0 0 40 40" aria-hidden="true"><circle class="ring-track" cx="20" cy="20" r="16"/><circle class="ring-progress" cx="20" cy="20" r="16"/></svg><svg class="ui-icon"><use href="#i-fish"/></svg></button>
@@ -130,7 +133,14 @@
     </div>
   </section>
 
-  <section class="room-tools" id="roomTools" aria-label="窝的视角和布置">
+  <section class="room-tools" id="roomTools" aria-label="家具布置">
+    <div class="room-editor" id="roomEditTools" hidden>
+      <button id="roomResetItem" type="button" title="恢复这件家具的位置、大小和朝向">重置</button>
+      <button id="roomArrange" class="room-arrange" type="button" aria-pressed="false">确定</button>
+      <button id="roomDelete" class="room-delete" type="button" title="将家具收回小铺，保留已购买的家具">删除</button>
+    </div>
+    <p id="roomTip" class="room-tip" role="status">点选家具，再拖动或双指缩放</p>
+    <div hidden>
     <div class="room-tool-row">
       <span class="room-title">窝</span>
       <div class="room-zoom" role="group" aria-label="房间缩放">
@@ -139,12 +149,10 @@
         <button id="roomZoomIn" type="button" aria-label="放大房间">＋</button>
       </div>
       <button id="roomResetView" type="button">回正</button>
-      <button id="roomArrange" class="room-arrange" type="button" aria-pressed="false">布置</button>
     </div>
-    <div class="room-editor" id="roomEditTools" hidden>
+    <div>
       <div class="room-edit-row">
       <select id="roomItem" aria-label="选择要摆放的家具"></select>
-      <button id="roomResetItem" type="button" title="恢复这件家具的位置、大小和朝向">重置单件</button>
       <button id="roomCancel" type="button">取消</button>
       </div>
       <div class="room-size-row" role="group" aria-label="家具大小">
@@ -164,7 +172,7 @@
         <button id="roomFlipY" type="button" aria-pressed="false">上下镜像</button>
       </div>
     </div>
-    <p id="roomTip" class="room-tip" role="status">轻点摸摸，长按脸颊蹭蹭，拖动抱起；双指只缩放房间</p>
+    </div>
   </section>
 
   <section class="meters" id="meters" aria-label="奶团的状态">
@@ -310,13 +318,13 @@
 <script src="levels.js?v=cq15-20260929"></script>
 <script src="decor-catalog.js?v=depth-20260929"></script>
 <script src="walking.js?v=walk-20260929"></script>
-<script src="room.js?v=bubble-20260929"></script>
+<script src="room.js?v=edit-fullscreen-20260929"></script>
 <script src="sound.js?v=sound-20260929"></script>
-<script src="game.js?v=bubble-20260929"></script>
+<script src="game.js?v=edit-fullscreen-20260929"></script>
 <script src="queue.js?v=sound-20260929"></script>
 <script src="life.js?v=sound-20260929"></script>
 <script src="planner-state.js?v=house-20260929"></script>
 <script src="planner.js?v=house-20260929"></script>
-<script src="house.js?v=sound-20260929"></script>
+<script src="house.js?v=edit-fullscreen-20260929"></script>
 </body>
 </html>

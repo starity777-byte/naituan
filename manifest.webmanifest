@@ -4,7 +4,7 @@
   "description": "给奶团喂小鱼、捉迷藏、堆纸箱的养成小游戏",
   "start_url": ".",
   "scope": ".",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#f3ebde",
   "theme_color": "#f3ebde",

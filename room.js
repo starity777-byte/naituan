@@ -26,7 +26,7 @@
     var size = $('roomSize'), sizeLabel = $('roomSizeLabel'), smaller = $('roomSmaller'), bigger = $('roomBigger');
     var flipX = $('roomFlipX'), flipY = $('roomFlipY');
     var view = { scale: 1, x: 0, y: 0 }, points = new Map(), gesture = null;
-    var editing = false, draft = {}, selected = null, moved = false, multi = false, enabled = false, walker = null;
+    var editing = false, draft = {}, removed = [], selected = null, moved = false, multi = false, enabled = false, walker = null;
     var items = o.items, byKey = {};
     items.forEach(function (it) {
       byKey[it.key] = it; it.el.dataset.roomItem = it.key;
@@ -227,6 +227,7 @@
       var p = selected && draft[selected.key] || {}, percent = Math.round((p.scale || 1) * 100);
       size.value = percent; sizeLabel.textContent = percent + '%';
       size.disabled = flipX.disabled = flipY.disabled = $('roomResetItem').disabled = !selected;
+      $('roomDelete').disabled = !selected;
       smaller.disabled = !selected || percent <= 50; bigger.disabled = !selected || percent >= 200;
       flipX.setAttribute('aria-pressed', String(!!p.flipX)); flipY.setAttribute('aria-pressed', String(!!p.flipY));
       ['roomLeft', 'roomRight', 'roomUp', 'roomDown'].forEach(function (id) { $(id).disabled = !selected; });
@@ -239,13 +240,13 @@
       selected = it;
       items.forEach(function (item) { item.el.classList.toggle('room-selected', item === it); });
       if (it) picker.value = it.key;
+      tip.textContent = it ? it.name + ' · 拖动摆放，双指缩放' : '点选家具，再拖动或双指缩放';
       transformUI();
     }
     function editUI() {
       scene.classList.toggle('arranging', editing); editTools.hidden = !editing;
       catBox.style.zIndex = editing ? 3 : 20 + Math.round(getCatPosition().y * 1000);
-      arrange.textContent = editing ? '完成' : '布置'; arrange.setAttribute('aria-pressed', String(editing));
-      tip.textContent = editing ? '拖动家具 · 下方调大小和镜像 · 双指缩放房间' : '轻点摸摸，长按脸颊蹭蹭，拖动抱起；双指只缩放房间';
+      arrange.textContent = editing ? '确定' : '布置'; arrange.setAttribute('aria-pressed', String(editing));
       o.props.setAttribute('aria-hidden', 'false');
       items.forEach(function (it) {
         if (editing) it.el.style.zIndex = '';
@@ -258,7 +259,7 @@
       items.filter(function (it) { return !it.el.hidden; }).forEach(function (it) {
         var option = document.createElement('option'); option.value = it.key; option.textContent = it.name; picker.appendChild(option);
       });
-      if (editing) select(selected && !selected.el.hidden ? selected : items.filter(function (it) { return !it.el.hidden; })[0] || null);
+      if (editing) select(selected && !selected.el.hidden ? selected : null);
       else select(null);
     }
     function endHold(g, cancelled) {
@@ -288,13 +289,17 @@
     function finish(cancel) {
       if (!editing) return;
       stopPointers();
-      if (!cancel) o.commit(cleanLayout(draft));
-      editing = false; editUI(); paintLayout();
+      editing = false;
+      if (cancel) removed.forEach(function (key) { byKey[key].el.hidden = false; });
+      else o.commit(cleanLayout(draft), removed.slice());
+      removed = [];
+      editUI(); paintLayout();
     }
     function refresh() {
       enabled = o.enabled(); tools.hidden = !enabled; stage.classList.toggle('room-ready', enabled);
       if (!enabled) { finish(); stopPointers(); view = { scale: 1, x: 0, y: 0 }; }
       if (!editing) paintLayout();
+      else removed.forEach(function (key) { byKey[key].el.hidden = true; });
       editUI(); drawView(); restoreCat();
       if (o.onLayout) o.onLayout();
     }
@@ -304,13 +309,19 @@
         cancelGesture();
         multi = moved = true;
         var mid = local({ x: (ps[0].x + ps[1].x) / 2, y: (ps[0].y + ps[1].y) / 2 });
-        gesture = { kind: 'pinch', distance: Math.max(1, Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y)), scale: view.scale,
+        var distance = Math.max(1, Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y));
+        if (editing) {
+          gesture = selected ? { kind: 'item-pinch', item: selected, distance: distance, mid: mid,
+            center: center(selected), scale: (draft[selected.key] || {}).scale || 1 } : { kind: 'blocked' };
+          return;
+        }
+        gesture = { kind: 'pinch', distance: distance, scale: view.scale,
           anchor: { x: (mid.x - view.x) / view.scale, y: (mid.y - view.y) / view.scale } };
       } else if (ps.length === 1) {
         var el = target && target.closest('[data-room-item]'), it = !multi && el && byKey[el.dataset.roomItem];
         var pet = !editing && !multi && target && o.cat.contains(target);
         if (it && editing) { select(it); it.el.focus({ preventScroll: true }); }
-        gesture = { kind: pet ? 'cat' : it && editing ? 'item' : 'pan', start: ps[0], x: view.x, y: view.y, item: it,
+        gesture = { kind: pet ? 'cat' : it && editing ? 'item' : editing ? 'blocked' : 'pan', start: ps[0], x: view.x, y: view.y, item: it,
           center: pet ? getCatPosition() : it ? center(it) : null, pet: pet, dragging: false, held: false };
         if (pet && o.petHold) {
           var g = gesture;
@@ -334,7 +345,13 @@
       if (!o.enabled()) { stopPointers(); return; }
       e.preventDefault(); points.set(e.pointerId, { x: e.clientX, y: e.clientY });
       var ps = Array.from(points.values()), g = gesture;
-      if (g.kind === 'pinch') {
+      if (g.kind === 'blocked') return;
+      if (g.kind === 'item-pinch') {
+        var itemMid = local({ x: (ps[0].x + ps[1].x) / 2, y: (ps[0].y + ps[1].y) / 2 });
+        place(g.item, { x: g.center.x + (itemMid.x - g.mid.x) / view.scale, y: g.center.y + (itemMid.y - g.mid.y) / view.scale,
+          scale: limit(g.scale * Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y) / g.distance, 0.5, 2) });
+        transformUI();
+      } else if (g.kind === 'pinch') {
         var mid = local({ x: (ps[0].x + ps[1].x) / 2, y: (ps[0].y + ps[1].y) / 2 });
         view.scale = limit(g.scale * Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y) / g.distance, 1, 3);
         view.x = mid.x - g.anchor.x * view.scale; view.y = mid.y - g.anchor.y * view.scale; drawView();
@@ -380,14 +397,19 @@
     stage.addEventListener('wheel', function (e) {
       if (!enabled || !o.enabled()) return;
       stopPointers();
-      e.preventDefault(); zoom(view.scale * Math.exp(-e.deltaY * 0.002), local({ x: e.clientX, y: e.clientY }));
+      e.preventDefault();
+      if (editing) resizeItem(Number(size.value) * Math.exp(-e.deltaY * 0.002));
+      else zoom(view.scale * Math.exp(-e.deltaY * 0.002), local({ x: e.clientX, y: e.clientY }));
     }, { passive: false });
     zoomIn.addEventListener('click', function () { stopPointers(); zoom(view.scale + 0.25); });
     zoomOut.addEventListener('click', function () { stopPointers(); zoom(view.scale - 0.25); });
     $('roomResetView').addEventListener('click', function () { stopPointers(); view = { scale: 1, x: 0, y: 0 }; drawView(); });
     arrange.addEventListener('click', function () {
       if (editing) finish();
-      else { stopPointers(); draft = cleanLayout(o.layout()); editing = true; editUI(); }
+      else {
+        stopPointers(); view = { scale: 1, x: 0, y: 0 }; drawView();
+        draft = cleanLayout(o.layout()); removed = []; editing = true; editUI();
+      }
     });
     picker.addEventListener('change', function () { select(byKey[picker.value]); });
     size.addEventListener('input', function () { resizeItem(Number(size.value)); });
@@ -407,6 +429,11 @@
       });
     });
     $('roomResetItem').addEventListener('click', function () { if (selected) { delete draft[selected.key]; apply(selected, null); transformUI(); } });
+    $('roomDelete').addEventListener('click', function () {
+      if (!editing || !selected) return;
+      stopPointers(); removed.push(selected.key); selected.el.hidden = true;
+      select(null); editUI(); tip.textContent = '已收回，之后可在小铺重新摆出';
+    });
     $('roomCancel').addEventListener('click', function () { finish(true); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && editing) finish(true); });
     window.addEventListener('blur', stopPointers);

@@ -1,13 +1,14 @@
 /* The four reference screens share one portrait canvas and the existing game. */
 :root { --house-paper: #f2ebdf; --house-cream: #fffaf1; --house-line: #e2d9cd; --house-brown: #5b4034; padding: 0; }
-body { padding: 0; overflow: hidden; background: #e6dccd; color: var(--house-brown); }
+html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; overscroll-behavior: none; }
+body { background: #e6dccd; color: var(--house-brown); }
 button, input, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: default; }
 .icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .ui-icon { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; }
 .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
-.house-app { position: relative; isolation: isolate; display: block; width: 100%; max-width: min(520px, max(390px, 52dvh)); height: 100vh; height: 100dvh; min-height: 0; margin: 0 auto; overflow: hidden; background: var(--house-paper); box-shadow: 0 0 70px #6d52381c; }
+.house-app { position: relative; isolation: isolate; display: block; width: 100%; max-width: none; height: 100vh; height: 100dvh; min-height: 0; margin: 0 auto; overflow: hidden; background: var(--house-paper); box-shadow: 0 0 70px #6d52381c; }
 .home-view { position: absolute; inset: 0; }
 .home-view .stage, .house-app.rhmode .stage { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; min-height: 0; border: 0; border-radius: 0; aspect-ratio: auto; }
 .home-view .room-backdrop { object-fit: cover; object-position: 25% center; }
@@ -27,7 +28,7 @@ button:disabled { cursor: default; }
 .paw-toggle { position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); left: 16px; z-index: 32; display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 1.5px solid #fffaf2; border-radius: 50%; background: #ffe8cbbb; }
 .paw-toggle .ui-icon { width: 25px; height: 25px; }
 .paw-toggle[aria-expanded="true"] { left: 23px; top: calc(21px + env(safe-area-inset-top, 0px)); background: #fffaf1; border-color: #fffaf1; box-shadow: 0 1px 2px #6a504322; }
-.paw-menu { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 12px; z-index: 30; width: 74px; padding: 64px 10px 17px; border: 1.5px solid #fffaf2; border-radius: 40px; background: #fff8e5c9; backdrop-filter: blur(12px); }
+.paw-menu { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 12px; z-index: 30; width: 74px; max-height: calc(100dvh - 28px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto; scrollbar-width: none; padding: 64px 10px 17px; border: 1.5px solid #fffaf2; border-radius: 40px; background: #fff8e5c9; backdrop-filter: blur(12px); }
 .paw-menu::before { content: ""; display: block; height: 1px; margin: 0 10px 9px; background: #9a80743d; }
 .paw-menu button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; width: 100%; min-height: 66px; padding: 8px 0; background: none; border: 0; border-radius: 14px; font-size: 13px; font-weight: 500; }
 .paw-menu button:hover { background: #fffaf19c; }
@@ -58,14 +59,15 @@ button:disabled { cursor: default; }
 .house-app[data-page="life"] .bottom-nav button[aria-current="page"] { background: var(--house-brown); color: #fffaf1; }
 .house-app[data-page="life"] .bottom-nav button[aria-current="page"] .ui-icon { fill: #c5cfab; }
 .house-app[data-page="games"] .bottom-nav { display: none; }
-.home-view .room-tools { display: none; position: absolute; z-index: 22; left: 12px; right: 12px; top: calc(82px + env(safe-area-inset-top, 0px)); max-height: calc(52dvh - 82px); overflow-y: auto; padding: 12px; border: 1px solid #e1d7c8; background: #fffaf1f2; border-radius: 20px; box-shadow: 0 3px 20px #5b403422; }
+.home-view .room-tools { display: none; position: absolute; z-index: 22; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: min(292px, calc(100% - 24px)); transform: translateX(-50%); gap: 6px; padding: 8px 10px; border: 1px solid #fffaf2; background: #fffaf1ed; border-radius: 23px; box-shadow: 0 3px 14px #5b40341a; }
 .home-view:has(.room-scene.arranging) .room-tools { display: flex; }
-.house-app:has(.room-scene.arranging) .bottom-nav, .house-app:has(.room-scene.arranging) .quick-stats { display: none; }
-.home-view .room-tools button, .home-view .room-tools select { border: 1px solid #d0bcab; border-radius: 10px; font-size: 12px; min-height: 34px; }
-.home-view .room-title { font-size: 18px; }
-.home-view .room-zoom output { width: 34px; }
-.home-view .room-zoom button { width: 28px; }
-.home-view .room-tools .room-arrange { background: #5b4034; color: #fffaf1; padding-inline: 15px; }
+.house-app:has(.room-scene.arranging) .bottom-nav, .house-app:has(.room-scene.arranging) .quick-stats,
+.house-app:has(.room-scene.arranging) .top, .house-app:has(.room-scene.arranging) .paw-toggle { display: none; }
+.home-view .room-editor { display: flex; flex-direction: row; gap: 8px; padding: 0; border: 0; background: none; }
+.home-view .room-tools button { flex: 1; border: 1px solid #d0bcab; border-radius: 15px; font-size: 14px; min-height: 44px; padding: 6px 8px; }
+.home-view .room-tools .room-arrange { background: #5b4034; color: #fffaf1; border-color: #5b4034; }
+.home-view .room-tools .room-delete { color: #9d5e4d; }
+.home-view .room-tip { text-align: center; font-size: 11px; line-height: 16px; }
 
 /* Paper pages */
 .paper-view { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(104px + env(safe-area-inset-bottom, 0px)); background: var(--house-paper); }
@@ -219,11 +221,17 @@ button:disabled { cursor: default; }
 .house-toast { position: absolute; z-index: 60; left: 50%; bottom: calc(94px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: max-content; max-width: 88%; padding: 10px 16px; border: 1px solid #e0cdb9; border-radius: 14px; color: var(--house-brown); background: #fffaf1f7; box-shadow: 0 3px 15px #553b2e22; font-size: 13px; text-align: center; }
 .house-app .modal-card { border-color: #d1bda8; background: var(--house-cream); border-radius: 22px; }
 @media (min-width: 600px) {
-  .house-app { border-inline: 1px solid #dbcdbb; }
   .paper-view { padding-inline: 23px; }
   .game-art { height: 174px; }
   .life-heading { min-height: 68px; }
   .checkin-grid > button { min-height: 114px; }
+}
+@media (min-width: 600px) and (hover: hover) and (pointer: fine) {
+  .house-app { max-width: min(520px, max(390px, 52dvh)); border-inline: 1px solid #dbcdbb; }
+}
+:fullscreen .house-app { max-width: none; border: 0; }
+@media (display-mode: fullscreen) {
+  .house-app { max-width: none; border: 0; }
 }
 @media (max-width: 350px) {
   .paper-view { padding-inline: 12px; }
