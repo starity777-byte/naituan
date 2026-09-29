@@ -16,10 +16,10 @@
   var cat = $('#cat'), catimg = $('#catimg'), stage = $('#stage'), bubble = $('#bubble'), zzz = $('#zzz');
   var btnFeed = $('#btnFeed'), btnSleep = $('#btnSleep'), btnHide = $('#btnHide'), sleepLabel = $('#sleepLabel');
   var btnStack = $('#btnStack'), coinEl = $('#coins');
-  var hsEl = $('#hs'), hsScore = $('#hsScore'), hsSay = $('#hsSay'), slots = [].slice.call(document.querySelectorAll('.slot'));
+  var hsEl = $('#hs'), slots = [];
   var meters = { hunger: $('#m-hunger'), mood: $('#m-mood'), energy: $('#m-energy') };
-  var S, curPose = '', override = null, sayUntil = 0, sayText = '', lastTap = [], HS = { active: false, token: 0, last: -1 }, SG = { active: false, over: false };
-  var busy = function () { return HS.active || SG.active; };
+  var S, curPose = '', override = null, sayUntil = 0, sayText = '', lastTap = [], RH = { active: false }, SG = { active: false, over: false };
+  var busy = function () { return RH.active || SG.active; };
   function setBusyUI(b) { btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = b; }
 
   var clamp = function (v) { return Math.max(0, Math.min(100, v)); };
@@ -29,10 +29,9 @@
   /* preload sprites */
   var IMG = {};
   Object.keys(SPR).forEach(function (k) { var im = new Image(); im.src = SPR[k]; IMG[k] = im; });
-  slots.forEach(function (s) { s.querySelector('img').src = SPR.peekc; });
 
   /* ---------- state ---------- */
-  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, t: now() }; }
+  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, mute: false, t: now() }; }
   function load(hotData) {
     var d = null;
     if (hotData && typeof hotData.hunger === 'number') d = hotData;
@@ -40,7 +39,7 @@
     S = fresh(); loadDecor(d);
     if (d && typeof d.hunger === 'number') {
       S.hunger = clamp(d.hunger); S.mood = clamp(d.mood); S.energy = clamp(d.energy);
-      S.sleeping = !!d.sleeping; S.secs = +d.secs || 0; S.fish = Math.max(0, Math.floor(+d.fish || 0)); S.best = Math.max(0, Math.floor(+d.best || 0));
+      S.sleeping = !!d.sleeping; S.secs = +d.secs || 0; S.fish = Math.max(0, Math.floor(+d.fish || 0)); S.best = Math.max(0, Math.floor(+d.best || 0)); S.bestBeat = Math.max(0, Math.floor(+d.bestBeat || 0)); S.mute = !!d.mute;
       var away = Math.min(Math.max((now() - (+d.t || now())) / 1000, 0), 1800);
       if (away > 20) { /* time away: slower decay, never below 20 */
         if (S.sleeping) { S.energy = clamp(S.energy + away * 0.6); S.hunger = Math.max(20, S.hunger - away * 0.03); if (S.energy >= 100) S.sleeping = false; }
@@ -146,54 +145,260 @@
     override = null; S.sleeping = true; say('钻进纸箱，晚安……', 3000); render(); save();
   }
 
-  /* ---------- hide and seek ---------- */
-  var TOTAL = 6;
-  function later(fn, ms, token) { setTimeout(function () { if (HS.active && HS.token === token) fn(); }, ms); }
-  function hsPaint() { hsScore.textContent = '找到 ' + HS.hits + ' / ' + TOTAL; }
-  function hsClear() { slots.forEach(function (s) { s.setAttribute('data-cat', '0'); s.classList.remove('hit'); }); }
-  function hsStart() {
+  /* ---------- rhythm hide-and-seek ---------- */
+  var NB = 80, COUNTIN = 4, BPM0 = 84, BPM1 = 150, ROWS_AT = [0, 20, 44];
+  var slotsEl = $('#slots'), rhScoreEl = $('#rhScore'), rhLivesEl = $('#rhLives'), rhFill = $('#rhFill'), rhJudge = $('#rhJudge');
+  var rhBpmEl = $('#rhBpm'), rhComboEl = $('#rhCombo'), rhIntro = $('#rhIntro'), rhOver = $('#rhOver'), rhSoundBtn = $('#rhSound');
+  var metersEl0 = $('#meters'), actionsEl0 = $('#actions'), hintEl0 = $('#hint'), btnShop0 = $('#btnShop'), btnSave0 = $('#btnSave'), app0 = $('#app');
+  var RHS = null, slotEv = [], useAC = false;
+  var LIFE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C5 15.5 2.5 12 2.5 8.6A5.1 5.1 0 0 1 12 6.4a5.1 5.1 0 0 1 9.5 2.2C21.5 12 19 15.5 12 21z" fill="#e2897d" stroke="#54392f" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+
+  /* --- synth: a tiny drum + bass loop, every tap plays a note --- */
+  var AC = null, master = null, noiseBuf = null;
+  var BASS = [130.81, 110, 87.31, 98];
+  var SCALE = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51, 1567.98];
+  function audioInit() {
+    if (!AC) {
+      try {
+        var C = window.AudioContext || window.webkitAudioContext;
+        if (C) {
+          AC = new C(); master = AC.createGain(); master.gain.value = S.mute ? 0 : 0.55; master.connect(AC.destination);
+          noiseBuf = AC.createBuffer(1, Math.floor(AC.sampleRate * 0.2), AC.sampleRate);
+          var ch = noiseBuf.getChannelData(0); for (var i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+        }
+      } catch (e) { AC = null; }
+    }
+    if (AC && AC.state === 'suspended') { try { AC.resume(); } catch (e) {} }
+  }
+  function setMute(m) { S.mute = !!m; if (master) master.gain.value = S.mute ? 0 : 0.55; rhSoundBtn.textContent = S.mute ? '音效：关' : '音效：开'; save(); }
+  function clock() { return useAC ? AC.currentTime : performance.now() / 1000; }
+  function env(g, t, a, d, v) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+  function tone(freq, t, dur, type, vol, freqEnd) {
+    if (!useAC) return;
+    var o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
+    env(g, t, 0.005, dur, vol); o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.06);
+  }
+  function hat(t, vol) {
+    if (!useAC) return;
+    var s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = noiseBuf; f.type = 'highpass'; f.frequency.value = 7000;
+    env(g, t, 0.002, 0.05, vol); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + 0.1);
+  }
+
+  /* --- timeline: 4 count-in beats, then NB beats that speed up from BPM0 to BPM1 --- */
+  function bpmAt(i) { return BPM0 + (BPM1 - BPM0) * (i / (NB - 1)); }
+  function rowsAt(i) { return i >= ROWS_AT[2] ? 3 : i >= ROWS_AT[1] ? 2 : 1; }
+  function buildBeats() {
+    var beats = [], t = 0, i, ci = 60 / BPM0;
+    for (i = 0; i < COUNTIN; i++) { beats.push({ t: t, ivl: ci }); t += ci; }
+    for (i = 0; i < NB; i++) { var iv = 60 / bpmAt(i); beats.push({ t: t, ivl: iv }); t += iv; }
+    return beats;
+  }
+  function genEvents(beats) {
+    var evs = [], lastReal = -1, prevReal = -1, i, k, tries;
+    for (i = 0; i < NB; i++) {
+      var bt = beats[COUNTIN + i], n = rowsAt(i) * 3, half = bt.ivl * 0.5, used = [];
+      if (i === ROWS_AT[1] - 1 || i === ROWS_AT[2] - 1) continue; /* rest while the grid grows */
+      var fakeOnly = i >= 30 && Math.random() < 0.1;
+      var restP = i < 8 ? 0 : i < 40 ? 0.1 : 0.14;
+      if (!fakeOnly && Math.random() >= restP) {
+        var r; tries = 0; do { r = Math.floor(Math.random() * n); tries++; } while ((r === lastReal || r === prevReal) && tries < 30);
+        prevReal = lastReal; lastReal = r; used.push(r);
+        evs.push({ t: bt.t, half: half, slot: r, fake: false, i: i });
+      }
+      var fp = i < 12 ? 0 : i < 30 ? 0.25 : i < 50 ? 0.4 : 0.5, nf = 0;
+      if (fakeOnly) nf = Math.random() < 0.3 ? 2 : 1; else if (Math.random() < fp) nf = i >= 50 && Math.random() < 0.2 ? 2 : 1;
+      for (k = 0; k < nf; k++) {
+        var f; tries = 0; do { f = Math.floor(Math.random() * n); tries++; } while (used.indexOf(f) >= 0 && tries < 30);
+        if (used.indexOf(f) < 0) { used.push(f); evs.push({ t: bt.t, half: half, slot: f, fake: true, i: i }); }
+      }
+      if (i >= 56 && !fakeOnly && Math.random() < 0.3) { /* an extra cat on the off-beat */
+        var o; tries = 0; do { o = Math.floor(Math.random() * n); tries++; } while ((used.indexOf(o) >= 0 || o === lastReal) && tries < 30);
+        evs.push({ t: bt.t + bt.ivl * 0.5, half: bt.ivl * 0.3, slot: o, fake: false, i: i });
+      }
+    }
+    evs.sort(function (a, b) { return (a.t - a.half) - (b.t - b.half); });
+    var busyUntil = {}, out = [];
+    evs.forEach(function (e) { /* never put two cats in the same box at the same time */
+      var st = e.t - e.half, n = rowsAt(e.i) * 3;
+      if ((busyUntil[e.slot] || -1) > st) {
+        var free = []; for (var q = 0; q < n; q++) if ((busyUntil[q] || -1) <= st) free.push(q);
+        if (!free.length) return; e.slot = pick(free);
+      }
+      busyUntil[e.slot] = e.t + e.half; out.push(e);
+    });
+    return out;
+  }
+
+  /* --- ui helpers --- */
+  function slotImgT(i, y) { return 'translate(-50%, ' + y + '%)' + (i % 3 === 2 ? ' scaleX(-1)' : ''); }
+  (function buildSlots() {
+    for (var i = 0; i < 9; i++) (function (i) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'slot'; b.setAttribute('data-i', i); b.setAttribute('aria-label', '箱子 ' + (i + 1));
+      var im = document.createElement('img'); im.alt = ''; im.src = SPR.peekc; im.style.transform = slotImgT(i, 118); b.appendChild(im);
+      b.addEventListener('pointerdown', function (e) { e.preventDefault(); rhTap(i); });
+      slotsEl.appendChild(b); slots.push(b); slotEv.push(null);
+    })(i);
+  })();
+  function rhLayout(rows) { slotsEl.setAttribute('data-rows', rows); slots.forEach(function (s, i) { s.hidden = i >= rows * 3; }); }
+  function rhClearSlots() { slots.forEach(function (s, i) { s.className = 'slot'; s.querySelector('img').style.transform = slotImgT(i, 118); slotEv[i] = null; }); }
+  function rhJudgeSay(t) { rhJudge.textContent = t; rhJudge.classList.remove('pop'); void rhJudge.offsetWidth; rhJudge.classList.add('pop'); }
+  function rhPaint() {
+    rhScoreEl.textContent = RHS ? RHS.score : 0;
+    rhComboEl.textContent = '连击 ' + (RHS ? RHS.combo : 0);
+    var lv = RHS ? RHS.lives : 5, h = ''; for (var i = 0; i < 5; i++) h += i < lv ? LIFE : LIFE.replace('<svg ', '<svg class="off" ');
+    rhLivesEl.innerHTML = h; rhLivesEl.setAttribute('aria-label', '剩余生命 ' + lv);
+  }
+  function setChrome(hide) {
+    metersEl0.hidden = actionsEl0.hidden = hintEl0.hidden = btnShop0.hidden = btnSave0.hidden = hide;
+    app0.classList.toggle('rhmode', hide);
+  }
+
+  /* --- flow --- */
+  function rhStart() {
     if (S.sleeping) { say('奶团睡着了，先叫醒它'); return; }
-    HS.active = true; HS.token++; HS.hits = 0; HS.round = 0; HS.slot = -1; HS.last = -1;
+    RH.active = true; RHS = null;
     hsEl.hidden = false; stage.classList.add('playing'); $('#catbox').style.visibility = 'hidden'; bubble.hidden = true;
-    setBusyUI(true);
-    hsSay.textContent = '奶团躲起来了，看到就点它'; hsPaint(); hsClear();
-    var tk = HS.token; later(hsNext, 700, tk);
+    setBusyUI(true); setChrome(true); window.scrollTo(0, 0);
+    rhLayout(1); rhClearSlots(); rhFill.style.width = '0'; rhBpmEl.textContent = 'BPM ' + BPM0; rhJudge.textContent = '';
+    rhPaint(); rhOver.hidden = true; rhIntro.hidden = false;
+    $('#rhBest').textContent = S.bestBeat ? '最高分 ' + S.bestBeat : '还没有记录，来一局吧';
+    rhSoundBtn.textContent = S.mute ? '音效：关' : '音效：开';
   }
-  function hsNext() {
-    var tk = HS.token;
-    HS.round++;
-    if (HS.round > TOTAL) { hsEnd(); return; }
-    hsClear(); HS.slot = -1;
-    later(function () {
-      var s; do { s = Math.floor(Math.random() * 3); } while (s === HS.last);
-      HS.last = s; HS.slot = s; slots[s].setAttribute('data-cat', '1');
-      var dur = Math.max(700, 1500 - HS.round * 120);
-      later(function () { if (HS.slot === s) { HS.slot = -1; slots[s].setAttribute('data-cat', '0'); hsSay.textContent = '被它溜走了'; later(hsNext, 500, tk); } }, dur, tk);
-    }, 500 + Math.random() * 700, tk);
+  function rhGo() {
+    audioInit(); rhIntro.hidden = true; rhOver.hidden = true; rhClearSlots(); rhLayout(1); rhFill.style.width = '0'; rhJudgeSay('准备…');
+    RHS = null; rhPaint();
+    setTimeout(function () { if (RH.active) rhBegin(); }, 260); /* let the audio clock start */
   }
-  function hsTap(i) {
-    if (!HS.active) return;
-    var tk = HS.token;
-    if (HS.slot === i) {
-      HS.hits++; HS.slot = -1; hsPaint(); hsSay.textContent = pick(['找到啦！', '抓到了', '被发现了']);
-      slots[i].classList.add('hit');
-      var r = stage.getBoundingClientRect(), b = slots[i].getBoundingClientRect();
-      heartAt(b.left - r.left + b.width / 2, b.top - r.top + 8);
-      later(hsNext, 600, tk);
-    } else if (HS.slot === -1) { hsSay.textContent = '这里没有哦'; }
-    else { hsSay.textContent = '不是这个洞'; }
+  function rhBegin() {
+    useAC = !!(AC && AC.state === 'running' && AC.currentTime > 0.02);
+    var beats = buildBeats(), evs = genEvents(beats);
+    RHS = { beats: beats, evs: evs, evIdx: 0, active: [], t0: clock() + 0.6, score: 0, combo: 0, maxCombo: 0, lives: 5, hits: 0, perfects: 0, realSeen: 0, dodged: 0,
+            nextBeat: 0, lastBeat: -1, rows: 1, ended: false, settled: false, sched: 0, raf: 0 };
+    rhPaint();
+    RHS.sched = setInterval(rhSchedule, 25); rhSchedule();
+    RHS.raf = requestAnimationFrame(rhFrame);
   }
-  function hsEnd() {
-    var hits = HS.hits;
-    HS.active = false; HS.token++;
-    hsEl.hidden = true; stage.classList.remove('playing'); bubble.hidden = false; $('#catbox').style.visibility = '';
-    setBusyUI(false);
-    S.mood = clamp(S.mood + hits * 4); S.hunger = clamp(S.hunger - 6); S.energy = clamp(S.energy - 5); addFish(hits);
-    if (hits >= 4) { setPose('happy', 2600); say('找到 ' + hits + ' 次，小鱼干 +' + hits + '！', 4200); }
-    else if (hits >= 1) { setPose('shy', 2600); say('找到 ' + hits + ' 次，小鱼干 +' + hits, 4200); }
-    else { setPose('sit', 2000); say('一次都没找到，我赢啦', 4200); }
-    render(); save();
+  function rhSchedule() {
+    if (!RHS || RHS.ended) return;
+    var nowT = clock();
+    while (RHS.nextBeat < RHS.beats.length && RHS.t0 + RHS.beats[RHS.nextBeat].t < nowT + 0.15) {
+      var k = RHS.nextBeat++, b = RHS.beats[k], T = RHS.t0 + b.t;
+      if (k < COUNTIN) { tone(k === COUNTIN - 1 ? 1240 : 880, T, 0.08, 'square', 0.1); continue; }
+      var gi = k - COUNTIN;
+      if (gi % 2 === 0) tone(150, T, 0.16, 'sine', 0.85, 45);
+      hat(T + b.ivl / 2, 0.12);
+      if (gi % 4 === 0 || gi % 4 === 2) tone(BASS[Math.floor(gi / 4) % 4], T, b.ivl * 1.7, 'triangle', 0.4);
+      if (gi % 4 === 0) { var root = BASS[Math.floor(gi / 4) % 4] * 4; tone(root, T, b.ivl * 3, 'sine', 0.08); tone(root * 1.5, T, b.ivl * 3, 'sine', 0.06); }
+    }
   }
+  function onBeat(k) {
+    if (k < COUNTIN) { rhJudgeSay(k < COUNTIN - 1 ? String(COUNTIN - 1 - k) : '开始！'); return; }
+    var gi = k - COUNTIN;
+    rhBpmEl.textContent = 'BPM ' + Math.round(bpmAt(gi)); rhBpmEl.classList.remove('beat'); void rhBpmEl.offsetWidth; rhBpmEl.classList.add('beat');
+    rhFill.style.width = Math.round(gi / (NB - 1) * 100) + '%';
+    var want = rowsAt(gi + 1);
+    if (want !== RHS.rows) { RHS.rows = want; rhLayout(want); rhJudgeSay('箱子变多了！'); }
+  }
+  function ease(p) { return 1 - (1 - p) * (1 - p); }
+  function rhFrame() {
+    if (!RHS || RHS.ended) return;
+    var t = clock() - RHS.t0, i, e;
+    while (RHS.lastBeat + 1 < RHS.beats.length && RHS.beats[RHS.lastBeat + 1].t <= t) onBeat(++RHS.lastBeat);
+    while (RHS.evIdx < RHS.evs.length && RHS.evs[RHS.evIdx].t - RHS.evs[RHS.evIdx].half <= t) {
+      e = RHS.evs[RHS.evIdx++]; e.done = false; e.y = 118; RHS.active.push(e); slotEv[e.slot] = e;
+      var el = slots[e.slot]; el.classList.remove('ok', 'bad'); el.classList.toggle('fake', e.fake);
+      el.style.setProperty('--gray', e.i < ROWS_AT[1] ? 1 : e.i < ROWS_AT[2] ? 0.9 : 0.75);
+    }
+    for (i = RHS.active.length - 1; i >= 0; i--) {
+      e = RHS.active[i];
+      var img = slots[e.slot].querySelector('img'), y;
+      if (!e.done) {
+        var p = Math.max(0, Math.min(1, 1 - Math.abs(t - e.t) / e.half)); y = (1 - ease(p)) * 118; e.y = y;
+        if (t > e.t + e.half) { rhExpire(e); RHS.active.splice(i, 1); slotEv[e.slot] = null; slots[e.slot].classList.remove('fake'); img.style.transform = slotImgT(e.slot, 118); if (RHS.ended) return; continue; }
+      } else {
+        var q = Math.min(1, (t - e.doneT) / 0.16); y = e.y + (118 - e.y) * q;
+        if (q >= 1) { RHS.active.splice(i, 1); slotEv[e.slot] = null; slots[e.slot].classList.remove('fake', 'ok', 'bad'); img.style.transform = slotImgT(e.slot, 118); continue; }
+      }
+      img.style.transform = slotImgT(e.slot, y);
+    }
+    var last = RHS.beats[RHS.beats.length - 1];
+    if (RHS.evIdx >= RHS.evs.length && !RHS.active.length && t > last.t + last.ivl + 0.5) { rhFinish(false); return; }
+    RHS.raf = requestAnimationFrame(rhFrame);
+  }
+  function rhExpire(e) {
+    if (e.fake) { RHS.dodged++; return; }
+    RHS.realSeen++; RHS.combo = 0; RHS.lives--; rhJudgeSay('溜走了'); tone(110, clock(), 0.18, 'sine', 0.25, 70); rhPaint();
+    if (RHS.lives <= 0) rhFinish(true);
+  }
+  function rhTap(idx) {
+    if (!RHS || RHS.ended || !RH.active) return;
+    var t = clock() - RHS.t0;
+    if (t < RHS.beats[COUNTIN].t - 0.3) return;
+    var e = slotEv[idx];
+    if (e && !e.done && Math.abs(t - e.t) <= e.half * 0.9) {
+      var dt = Math.abs(t - e.t); e.done = true; e.doneT = t;
+      if (e.fake) {
+        RHS.combo = 0; RHS.lives--; slots[idx].classList.add('bad'); rhJudgeSay('假的！'); tone(190, clock(), 0.22, 'sawtooth', 0.22, 70);
+        rhPaint(); if (RHS.lives <= 0) rhFinish(true);
+      } else {
+        var q = dt <= 0.07 ? 0 : dt <= 0.13 ? 1 : 2, base = [100, 70, 40][q];
+        RHS.realSeen++; RHS.hits++; if (q === 0) RHS.perfects++; RHS.combo++; if (RHS.combo > RHS.maxCombo) RHS.maxCombo = RHS.combo;
+        RHS.score += Math.round(base * (1 + Math.min(RHS.combo, 20) * 0.05));
+        rhJudgeSay(['完美！', '很好', '还行'][q]); slots[idx].classList.remove('bad'); slots[idx].classList.add('ok');
+        var f = SCALE[(RHS.hits * 2 + idx) % 5 + (q === 0 ? 0 : 0)], now0 = clock(); tone(f, now0, 0.28, 'sine', 0.32); tone(f * 2, now0, 0.14, 'triangle', 0.07);
+        if (q < 2) { var r = stage.getBoundingClientRect(), b = slots[idx].getBoundingClientRect(); heartAt(b.left - r.left + b.width / 2, b.top - r.top + 12); }
+        rhPaint();
+      }
+    } else {
+      RHS.score = Math.max(0, RHS.score - 20); RHS.combo = 0; rhJudgeSay('空的'); tone(140, clock(), 0.1, 'sine', 0.15, 100); rhPaint();
+    }
+  }
+  function rhSettle(dead) {
+    if (!RHS || RHS.settled) return RHS && RHS.result;
+    RHS.settled = true;
+    var acc = RHS.realSeen ? RHS.hits / RHS.realSeen : 0;
+    var grade = dead ? 'C' : acc >= 0.95 ? 'S' : acc >= 0.85 ? 'A' : acc >= 0.7 ? 'B' : 'C';
+    var coins = Math.round(RHS.hits * 0.5 + RHS.perfects * 0.5) + { S: 10, A: 6, B: 3, C: 0 }[grade];
+    var record = RHS.score > (S.bestBeat || 0);
+    if (record) S.bestBeat = RHS.score;
+    S.mood = clamp(S.mood + Math.min(25, Math.round(RHS.hits / 3))); S.hunger = clamp(S.hunger - 6); S.energy = clamp(S.energy - 6);
+    addFish(coins); save();
+    return (RHS.result = { grade: grade, coins: coins, record: record, dead: dead, acc: acc });
+  }
+  function rhFinish(dead) {
+    if (!RHS || RHS.ended) return;
+    RHS.ended = true; clearInterval(RHS.sched); cancelAnimationFrame(RHS.raf);
+    var r = rhSettle(dead);
+    rhClearSlots();
+    $('#rhTitle').textContent = dead ? '奶团躲远了……' : '等级 ' + r.grade;
+    $('#rhSub').textContent = '得分 ' + RHS.score + (r.record ? ' · 新纪录！' : ' · 最高 ' + S.bestBeat);
+    $('#rhStats').textContent = '命中 ' + RHS.hits + ' / ' + RHS.realSeen + ' · 完美 ' + RHS.perfects + ' · 最高连击 ' + RHS.maxCombo + ' · 识破假猫 ' + RHS.dodged;
+    $('#rhRew').textContent = '小鱼干 +' + r.coins;
+    setTimeout(function () { if (RH.active && RHS && RHS.ended) rhOver.hidden = false; }, 500);
+  }
+  function rhLeave() {
+    if (RHS && !RHS.ended) { RHS.ended = true; clearInterval(RHS.sched); cancelAnimationFrame(RHS.raf); rhSettle(false); }
+    var r = RHS && RHS.result;
+    RH.active = false; hsEl.hidden = true; rhIntro.hidden = true; rhOver.hidden = true; rhClearSlots();
+    stage.classList.remove('playing'); bubble.hidden = false; $('#catbox').style.visibility = ''; setChrome(false); setBusyUI(false);
+    if (r && RHS.hits > 0) {
+      if (r.grade === 'S' || r.grade === 'A') { setPose('happy', 2600); say('节奏躲猫猫 ' + r.grade + '，小鱼干 +' + r.coins + '！', 4200); }
+      else { setPose('shy', 2600); say('躲猫猫玩完了，小鱼干 +' + r.coins, 4200); }
+    } else { setPose('sit', 2000); say('下次一起玩吧', 3200); }
+    RHS = null; render(); save();
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (!RH.active || !RHS || RHS.ended) return;
+    if (document.hidden) { if (useAC) { try { AC.suspend(); } catch (e) {} } else rhLeave(); }
+    else if (useAC) { try { AC.resume(); } catch (e) {} }
+  });
+  $('#rhGo').addEventListener('click', rhGo);
+  $('#rhAgain').addEventListener('click', rhGo);
+  $('#rhBack').addEventListener('click', rhLeave);
+  $('#rhIntroQuit').addEventListener('click', rhLeave);
+  $('#hsQuit').addEventListener('click', rhLeave);
+  rhSoundBtn.addEventListener('click', function () { setMute(!S.mute); });
 
 
   /* ---------- box stacking ---------- */
@@ -499,9 +704,7 @@
   $('#catbtn').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pet(null); } });
   btnFeed.addEventListener('click', feed);
   btnSleep.addEventListener('click', toggleSleep);
-  btnHide.addEventListener('click', hsStart);
-  $('#hsQuit').addEventListener('click', hsEnd);
-  slots.forEach(function (s, i) { s.addEventListener('pointerdown', function (e) { e.preventDefault(); hsTap(i); }); });
+  btnHide.addEventListener('click', rhStart);
 
   /* ---------- clock ---------- */
   function tick() {

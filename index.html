@@ -57,14 +57,33 @@
 
     <div class="hs" id="hs" hidden>
       <div class="hs-bar">
-        <span class="hs-score" id="hsScore">找到 0 / 6</span>
+        <span class="hs-score" id="rhScore">0</span>
+        <span class="rh-lives" id="rhLives" role="img" aria-label="剩余生命"></span>
         <button class="hs-quit" id="hsQuit" type="button">不玩了</button>
       </div>
-      <div class="hs-say" id="hsSay" role="status" aria-live="polite">奶团躲起来了，看到就点它</div>
-      <div class="slots" id="slots">
-        <button class="slot" type="button" data-i="0" aria-label="左边的洞"><img alt="" src=""></button>
-        <button class="slot" type="button" data-i="1" aria-label="中间的洞"><img alt="" src=""></button>
-        <button class="slot" type="button" data-i="2" aria-label="右边的洞"><img alt="" src=""></button>
+      <div class="rh-prog" aria-hidden="true"><div class="rh-fill" id="rhFill"></div></div>
+      <div class="rh-judge" id="rhJudge" role="status"></div>
+      <div class="slots" id="slots" data-rows="1"></div>
+      <div class="rh-info"><span id="rhBpm">BPM 84</span><span id="rhCombo">连击 0</span></div>
+
+      <div class="sg-over" id="rhIntro" hidden>
+        <div class="sg-card" role="dialog" aria-label="躲猫猫的玩法">
+          <h2>躲猫猫</h2>
+          <p>跟着节拍，在奶团从箱子里探出头的那一拍点它。箱子会越来越多，节奏会越来越快。</p>
+          <p><b>灰灰的纸片假猫</b>是陷阱，别点！点错或者让真猫溜走，都会掉一颗心。</p>
+          <p id="rhBest">最高分 0</p>
+          <div class="sg-btns"><button id="rhSound" type="button">音效：开</button><button id="rhGo" class="main" type="button">开始</button></div>
+          <button class="hs-quit" id="rhIntroQuit" type="button">回房间</button>
+        </div>
+      </div>
+      <div class="sg-over" id="rhOver" hidden>
+        <div class="sg-card" role="dialog" aria-label="本局结果">
+          <h2 id="rhTitle">等级 S</h2>
+          <p id="rhSub"></p>
+          <p id="rhStats"></p>
+          <div class="rew" id="rhRew">小鱼干 +0</div>
+          <div class="sg-btns"><button id="rhBack" type="button">回房间</button><button id="rhAgain" class="main" type="button">再来一次</button></div>
+        </div>
       </div>
     </div>
   </section>
@@ -89,7 +108,7 @@
     <button class="act" id="btnHide" type="button">
       <svg viewBox="0 0 32 32" fill="none" stroke="#54392f" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
         <path d="M6 28V14a10 10 0 0 1 20 0v14z" fill="#e7b48a"/><path d="M16 28V14" stroke-width="1.6"/><circle cx="12" cy="17" r="1.3" fill="#54392f" stroke="none"/></svg>
-      捉迷藏
+      躲猫猫
     </button>
     <button class="act" id="btnStack" type="button">
       <svg viewBox="0 0 32 32" fill="none" stroke="#54392f" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3.5" width="14" height="8" rx="1.5" fill="#e3b98f"/><rect x="5" y="11.5" width="16" height="8" rx="1.5" fill="#dcae82"/><rect x="11" y="19.5" width="16" height="8" rx="1.5" fill="#d4a173"/></svg>
@@ -116,7 +135,7 @@
   </section>
 
   <button class="linkbtn" id="btnSave" type="button">存档：导出 / 导入</button>
-  <p class="hint" id="hint">点奶团摸摸，饿了会哭，困了钻纸箱。玩捉迷藏和堆纸箱赚小鱼干，去小铺换装扮</p>
+  <p class="hint" id="hint">点奶团摸摸，饿了会哭，困了钻纸箱。玩躲猫猫和堆纸箱赚小鱼干，去小铺换装扮</p>
 
   <div class="modal" id="saveModal" hidden role="dialog" aria-modal="true" aria-labelledby="saveTitle">
     <div class="modal-card">
