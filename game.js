@@ -25,7 +25,8 @@
   var S, curPose = '', override = null, sayUntil = 0, sayText = '', lastTap = [], RH = { active: false }, EXT = { active: false }, SG = { active: false, over: false };
   var nextIdleAt = 0, lastIdlePose = '', hiddenAt = 0;
   var busy = function () { return RH.active || SG.active || EXT.active; };
-  function setBusyUI(b) { btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = btnCake.disabled = b; }
+  var roomView = null;
+  function setBusyUI(b) { btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = btnCake.disabled = b; if (roomView) roomView.refresh(); }
 
   var clamp = function (v) { return Math.max(0, Math.min(100, v)); };
   var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
@@ -138,7 +139,7 @@
     return y > 0.68 ? 'belly' : 'head';
   }
   function pet(ev) {
-    if (busy()) return;
+    if (busy() || (roomView && roomView.isEditing())) return;
     deferIdle();
     var r = stage.getBoundingClientRect();
     var x = (ev && ev.clientX != null ? ev.clientX : r.left + r.width / 2) - r.left;
@@ -622,6 +623,7 @@
   function findItem(cat, id) { return CATALOG[cat].filter(function (i) { return i.id === id; })[0]; }
   function loadDecor(d) {
     S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0;
+    S.roomLayout = window.NaituanRoom.cleanLayout(d && d.roomLayout);
     if (!d) return;
     if (d.own && typeof d.own === 'object') Object.keys(d.own).forEach(function (k) { var p = k.split(':'); if (d.own[k] && hasItem(p[0], p[1])) S.own[k] = 1; });
     if (d.eq && typeof d.eq === 'object') {
@@ -639,6 +641,7 @@
     if (SH.open && SH.sel) { if (SH.sel.cat === 'prop') { if (e.prop.indexOf(SH.sel.id) < 0) e.prop.push(SH.sel.id); } else e[SH.sel.cat] = SH.sel.id; }
     stage.setAttribute('data-wall', e.wall); rugEl.setAttribute('data-rug', e.rug); winEl.setAttribute('data-win', e.win);
     [].forEach.call(propsEl.children, function (el) { el.hidden = e.prop.indexOf(el.getAttribute('data-prop')) < 0; });
+    if (roomView) roomView.refresh();
   }
   function swatch(cat, id) {
     var d = document.createElement('div'); d.className = 'sw sw-' + cat;
@@ -729,6 +732,7 @@
   function disarm() { armed = false; saveLoad.textContent = '导入这串码'; }
   function openSave() {
     if (busy()) return;
+    if (roomView) roomView.finish();
     saveText.value = exportCode(); saveMsg.textContent = '这是这台设备上现在的进度。'; disarm(); saveModal.hidden = false;
   }
   function closeSave() { saveModal.hidden = true; disarm(); }
@@ -753,8 +757,8 @@
   /* ---------- wiring ---------- */
   document.addEventListener('pointerdown', deferIdle);
   document.addEventListener('keydown', deferIdle);
-  $('#catbtn').addEventListener('pointerdown', function (e) { if (e.button !== 0) return; e.preventDefault(); pet(e); });
   $('#catbtn').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pet(null); } });
+  $('#catbtn').addEventListener('click', function (e) { if (e.detail === 0) pet(null); });
   btnFeed.addEventListener('click', feed);
   btnSleep.addEventListener('click', toggleSleep);
   btnHide.addEventListener('click', rhStart);
@@ -802,6 +806,15 @@
     stage: stage, ext: EXT, isBusy: busy, setChrome: setChrome, setBusyUI: setBusyUI, hideCat: function (h) { $('#catbox').style.visibility = h ? 'hidden' : ''; bubble.hidden = !!h; stage.classList.toggle('playing', !!h); }
   };
 
+  roomView = window.NaituanRoom.create({
+    stage: stage, scene: $('#roomScene'), tools: $('#roomTools'), cat: $('#catbtn'), props: propsEl,
+    items: [{ key: 'win', name: '窗户', el: winEl }, { key: 'rug', name: '地毯', el: rugEl }].concat(
+      CATALOG.prop.map(function (it) { return { key: 'prop:' + it.id, name: it.name, el: propsEl.querySelector('[data-prop="' + it.id + '"]') }; })),
+    enabled: function () { return !busy() && !SH.open; },
+    layout: function () { return S && S.roomLayout || {}; },
+    commit: function (layout) { S.roomLayout = layout; save(); },
+    pet: pet
+  });
   var hot = window.claude && window.claude.hot;
   if (hot && hot.ready) hot.ready(start); else start(hot && hot.data ? hot.data : null);
 })();

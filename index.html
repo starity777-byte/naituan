@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+KuaiLe&display=swap">
-<link rel="stylesheet" href="style.css?v=cq15-20260929">
+<link rel="stylesheet" href="style.css?v=room-20260929">
 </head>
 <body>
 <div class="app" id="app">
@@ -27,6 +27,7 @@
   </header>
 
   <section class="stage" id="stage" data-wall="dots" aria-label="奶团的房间">
+    <div class="room-scene" id="roomScene">
     <div class="window" id="window" data-win="plain" aria-hidden="true"><div class="cloud"></div></div>
     <div class="floor" aria-hidden="true"></div>
     <div class="rug" id="rug" data-rug="pink" aria-hidden="true"></div>
@@ -39,6 +40,7 @@
       <div class="zzz" id="zzz" hidden aria-hidden="true"><span>Z</span><span>z</span><span>z</span></div>
     </div>
 
+    </div>
     <div class="bubble" id="bubble" role="status" aria-live="polite">点点我，可以摸摸</div>
 
     <div class="sg" id="sg" hidden>
@@ -89,6 +91,25 @@
         </div>
       </div>
     </div>
+  </section>
+
+  <section class="room-tools" id="roomTools" aria-label="窝的视角和布置">
+    <div class="room-tool-row">
+      <span class="room-title">窝</span>
+      <div class="room-zoom" role="group" aria-label="房间缩放">
+        <button id="roomZoomOut" type="button" aria-label="缩小房间">−</button>
+        <output id="roomZoomLabel" aria-label="当前缩放">100%</output>
+        <button id="roomZoomIn" type="button" aria-label="放大房间">＋</button>
+      </div>
+      <button id="roomResetView" type="button">回正</button>
+      <button id="roomArrange" class="room-arrange" type="button" aria-pressed="false">布置</button>
+    </div>
+    <div class="room-edit-row" id="roomEditTools" hidden>
+      <select id="roomItem" aria-label="选择要摆放的家具"></select>
+      <button id="roomResetItem" type="button">放回原位</button>
+      <button id="roomCancel" type="button">取消</button>
+    </div>
+    <p id="roomTip" class="room-tip" role="status">双指缩放，放大后单指移动；轻点奶团互动</p>
   </section>
 
   <section class="meters" id="meters" aria-label="奶团的状态">
@@ -157,8 +178,9 @@
   </div>
 </div>
 
-<script src="levels.js?v=cq15-20260929"></script>
-<script src="game.js?v=interact-20260929"></script>
-<script src="queue.js?v=cq15-20260929"></script>
+<script src="levels.js"></script>
+<script src="room.js?v=room-20260929"></script>
+<script src="game.js?v=room-20260929"></script>
+<script src="queue.js?v=hd-20260929"></script>
 </body>
 </html>

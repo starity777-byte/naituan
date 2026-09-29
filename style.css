@@ -59,6 +59,29 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   user-select: none; -webkit-user-select: none;
 }
 .app.shopping .stage { position: sticky; top: 8px; z-index: 20; }
+.room-scene { position: absolute; inset: 0; background: var(--wall-bg); transform-origin: 0 0; touch-action: none; }
+.stage.room-ready { touch-action: none; cursor: grab; }
+.stage.room-ready .bubble { pointer-events: none; }
+.stage.room-dragging { cursor: grabbing; }
+.room-tools { display: flex; flex-direction: column; gap: 7px; }
+.room-tool-row, .room-edit-row { display: flex; align-items: center; gap: 7px; }
+.room-title { margin-right: auto; font-family: var(--font-display); font-size: 20px; }
+.room-tools button, .room-tools select { min-height: 38px; border: 2px solid var(--ink); border-radius: 12px; background: var(--panel); padding: 5px 10px; font: inherit; color: var(--ink); cursor: pointer; }
+.room-tools button:disabled { opacity: .4; cursor: default; }
+.room-tools .room-arrange { background: #e3ecf6; }
+.room-tools .room-arrange[aria-pressed="true"] { background: #dceadf; }
+.room-zoom { display: flex; align-items: center; gap: 3px; }
+.room-zoom button { width: 38px; padding-inline: 0; font-size: 19px; }
+.room-zoom output { width: 43px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+.room-edit-row select { flex: 1; min-width: 0; width: 0; }
+.room-edit-row button { flex: none; padding-inline: 8px; font-size: 13px; }
+.room-tip { margin: 0; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+.room-scene.arranging .catbox { pointer-events: none; opacity: .6; }
+.room-scene.arranging .props { z-index: 5; }
+.room-scene.arranging [data-room-item] { pointer-events: auto; cursor: move; outline: 2px dashed var(--ink-soft); outline-offset: 3px; z-index: 4; }
+.room-scene.arranging [data-room-item].room-selected { outline: 3px solid var(--fish); z-index: 6; }
+.room-scene.arranging [data-room-item] > * { pointer-events: none; }
+.room-scene.arranging ~ .bubble { visibility: hidden; }
 
 /* wall papers (shared by the room and the shop swatches) */
 [data-wall="dots"] { --wall-bg: radial-gradient(circle at 1px 1px, var(--wall-dot) 1.4px, transparent 1.6px) 0 0 / 22px 22px, var(--wall); }
@@ -214,7 +237,6 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .cq-play.idle .cq-bar, .cq-play.idle .cq-foot { visibility: hidden; }
 .cq-bar { display: flex; align-items: center; gap: 8px; }
 .cq-bar .hs-quit { margin-left: auto; }
-.cq-chip.warn { border-color: var(--alert); color: var(--alert); }
 .cq-chip { font-family: var(--font-display); font-size: 16px; background: var(--panel); border: 2.5px solid var(--ink); border-radius: 14px; padding: 2px 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cq-shop { position: relative; flex: none; height: clamp(62px, 13vh, 92px); }
 .cq-shop svg { width: 100%; height: 100%; display: block; }
@@ -228,7 +250,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .cq-cat { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; --x: 0px; --y: 0px;
   transform: translate(var(--x), var(--y)) translateY(var(--lift, 0px)) scale(var(--s, 1)); transition: transform .32s cubic-bezier(.34, 1.56, .64, 1); will-change: transform; }
 .cq-cat .in { width: 100%; height: 100%; }
-.cq-cat img { width: 100%; height: 100%; display: block; object-fit: contain; -webkit-user-drag: none; }
+.cq-cat svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .cq-cat.sel { --lift: -10px; --s: 1.22; z-index: 3; }
 .cq-cat.sel .in { animation: catwob .5s ease-in-out infinite alternate; }
 @keyframes catwob { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
@@ -260,8 +282,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .cq-lvbtn:disabled { opacity: .5; cursor: default; box-shadow: 0 3px 0 var(--ink-soft); border-color: var(--ink-soft); }
 .cq-lvbtn .nm { display: flex; align-items: baseline; gap: 6px; font-family: var(--font-display); font-size: 15px; line-height: 1.25; white-space: nowrap; }
 .cq-lvbtn .nm b { font-weight: 400; font-size: 19px; }
-.cq-lvbtn .st { display: flex; flex-wrap: wrap; align-items: center; gap: 1px; font-size: 13px; line-height: 1.2; white-space: nowrap; }
-.cq-lvbtn em { flex: 0 0 100%; font-style: normal; font-size: 10.5px; color: var(--alert); line-height: 1.2; }
+.cq-lvbtn .st { display: flex; align-items: center; gap: 1px; font-size: 13px; line-height: 1.2; white-space: nowrap; }
 .cq-lvbtn small { margin-left: auto; padding-left: 4px; font-size: 10.5px; color: var(--ink-soft); }
 .cq-lvbtn .st i, .cq-stars span { font-style: normal; color: #ddd0bd; }
 .cq-lvbtn .st i.on, .cq-stars span.on { color: var(--sun); }
@@ -364,7 +385,6 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .buybtn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
 .buybtn:disabled { opacity: .5; cursor: default; box-shadow: 0 3px 0 var(--ink-soft); border-color: var(--ink-soft); }
 
-@media (max-width: 400px) { .cq-chip { font-size: 14.5px; padding: 2px 8px; } .cq-bar { gap: 6px; } }
 @media (max-width: 340px) { .top h1 { font-size: 24px; } .act { font-size: 13px; } .top .time { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   .cat, .cat img.pop, .cloud, .zzz span, .act.nudge { animation: none !important; }
