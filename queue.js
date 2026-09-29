@@ -337,7 +337,7 @@
     var st = stars(G.steps, G.par), c = cq(), S = NT.S(), lv = G.lv;
     var first = c.cleared[lv] === 0, fish = 3 + (lv + 1) * 2 + st * 2;
     c.cleared[lv] = Math.max(c.cleared[lv], st);
-    NT.addFish(fish); S.mood = NT.clamp(S.mood + 8); S.hunger = NT.clamp(S.hunger - 4); S.energy = NT.clamp(S.energy - 4);
+    NT.addFish(fish); S.mood = NT.clamp(S.mood + 8); S.hunger = NT.clamp(S.hunger - 1); S.energy = NT.clamp(S.energy - 2);
     NT.save(); SND.win();
     var last = lv === LV.length - 1;
     $('#cqWinT').textContent = last ? '打烊啦！全部通关' : '第 ' + (lv + 1) + ' 关通关';
