@@ -223,7 +223,7 @@
     var width = Math.max(0.22, Math.min(0.42, geometry.size.width * 1.15));
     if (pose === 'sniff') { point.x += width * 0.42; point.y = Math.max(0.76, point.y + 0.025); }
     $('#catbox').style.width = width * 100 + '%';
-    roomView.placeCat(point);
+    roomView.placeCat(point, false, { surface: true });
   }
   function visitFurniture(key) {
     if (!roomAvailable()) return;
@@ -965,9 +965,10 @@
   };
 
   roomView = window.NaituanRoom.create({
-    stage: stage, scene: $('#roomScene'), tools: $('#roomTools'), cat: $('#catbtn'), catBox: $('#catbox'), props: propsEl,
+    stage: stage, scene: $('#roomScene'), tools: $('#roomTools'), cat: $('#catbtn'), catBox: $('#catbox'), catShadow: $('#catShadow'), props: propsEl,
     items: [{ key: 'win', name: '窗户', el: winEl }, { key: 'rug', name: '地毯', el: rugEl }].concat(
-      CATALOG.prop.map(function (it) { return { key: 'prop:' + it.id, name: it.name, anchors: it.interactionAnchors, el: propsEl.querySelector('[data-prop="' + it.id + '"]') }; })),
+      CATALOG.prop.map(function (it) { return { key: 'prop:' + it.id, name: it.name, depthAware: !!it.depthAware, anchors: it.interactionAnchors, el: propsEl.querySelector('[data-prop="' + it.id + '"]') }; })),
+    floorBoundary: function () { var wall = findItem('wall', stage.getAttribute('data-wall')); return wall && wall.floorBoundary || [[0, 0.63], [1, 0.63]]; },
     enabled: function () { return !busy() && !SH.open && saveModal.hidden; },
     layout: function () { return S && S.roomLayout || {}; },
     commit: function (layout) { S.roomLayout = layout; save(); },

@@ -30,6 +30,7 @@
   "rooms": [
     {
       "id": "scene-japanese",
+      "floorBoundary": [[0, 0.565], [0.15, 0.50], [0.80, 0.50], [1, 0.615]],
       "name": "日式榻榻米",
       "price": 2999,
       "theme": "japanese",
@@ -37,6 +38,7 @@
     },
     {
       "id": "scene-coastal",
+      "floorBoundary": [[0, 0.604], [0.067, 0.574], [0.978, 0.574], [1, 0.589]],
       "name": "海边小屋",
       "price": 3299,
       "theme": "coastal",
@@ -44,6 +46,7 @@
     },
     {
       "id": "scene-forest",
+      "floorBoundary": [[0, 0.623], [0.15, 0.57], [0.44, 0.51], [0.62, 0.51], [0.92, 0.577], [1, 0.622]],
       "name": "森林树屋",
       "price": 3599,
       "theme": "forest",
@@ -51,6 +54,7 @@
     },
     {
       "id": "scene-attic",
+      "floorBoundary": [[0, 0.72], [0.42, 0.535], [0.92, 0.535], [1, 0.584]],
       "name": "星月阁楼",
       "price": 3999,
       "theme": "attic",
@@ -1256,6 +1260,7 @@
     },
     {
       "id": "peach-cat-bed",
+      "depthAware": true,
       "name": "杏桃软软猫窝",
       "price": 299,
       "theme": "peach",

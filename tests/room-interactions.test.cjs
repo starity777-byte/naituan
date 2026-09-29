@@ -4,14 +4,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function fixture(initialLayout = {}) {
+function fixture(initialLayout = {}, options = {}) {
   class Element {
     constructor(id) {
-      this.id = id; this.style = {}; this.dataset = {}; this.attributes = {}; this.listeners = {};
+      this.id = id; this.style = { setProperty(name, value) { this[name] = value; }, removeProperty(name) { delete this[name]; } };
+      this.dataset = {}; this.attributes = {}; this.listeners = {};
       this.hidden = false; this.children = []; this.captures = new Set(); this.classes = new Set();
       this.classList = {
         add: (...names) => names.forEach(n => this.classes.add(n)),
         remove: (...names) => names.forEach(n => this.classes.delete(n)),
+        contains: name => this.classes.has(name),
         toggle: (name, yes) => yes ? this.classes.add(name) : this.classes.delete(name)
       };
     }
@@ -43,7 +45,7 @@ function fixture(initialLayout = {}) {
       const itemScale = (this.style.transform || '').match(/scale\(([^,]+),([^)]+)\)/);
       if (itemScale) {
         const sx = Math.abs(Number(itemScale[1])), sy = Math.abs(Number(itemScale[2]));
-        left -= width * (sx - 1) / 2; top -= height * (sy - 1) / 2;
+        left -= width * (sx - 1) / 2; top -= height * (sy - 1) * (this === catBox ? 1 : 0.5);
         width *= sx; height *= sy;
       }
       return rect(22 + tx + left * scale, 32 + ty + top * scale, width * scale, height * scale);
@@ -56,9 +58,11 @@ function fixture(initialLayout = {}) {
     .forEach(id => { controls[id] = new Element(id); });
   const stage = new Element('stage'), scene = new Element('scene'), tools = new Element('tools'), props = new Element('props');
   stage.clientLeft = stage.clientTop = 2; scene.clientWidth = 1000; scene.clientHeight = 800;
-  const catBox = new Element('catBox'), cat = new Element('cat'), rug = new Element('rug'), win = new Element('win');
+  const catBox = new Element('catBox'), cat = new Element('cat'), catShadow = new Element('catShadow');
+  const rug = new Element('rug'), win = new Element('win'), bed = new Element('bed');
   catBox.base = [400, 440, 200, 160]; rug.base = [280, 590, 500, 120]; win.base = [100, 80, 250, 200];
-  [catBox, rug, win].forEach(el => { el.offsetWidth = el.base[2]; el.offsetHeight = el.base[3]; });
+  catShadow.base = [450, 591, 100, 18]; bed.base = [540, 600, 240, 100];
+  [catBox, catShadow, rug, win, bed].forEach(el => { el.offsetWidth = el.base[2]; el.offsetHeight = el.base[3]; });
   catBox.appendChild(cat);
   const window = new Element('window'), document = new Element('document');
   document.createElement = id => new Element(id); window.NaituanDecor = { items: [] };
@@ -72,18 +76,20 @@ function fixture(initialLayout = {}) {
     ResizeObserver: class { constructor(fn) { resize = fn; } observe() {} }
   });
   const room = window.NaituanRoom.create({
-    stage, scene, tools, props, cat, catBox, enabled: () => true,
+    stage, scene, tools, props, cat, catBox, catShadow, enabled: () => true,
+    floorBoundary: options.floorBoundary,
     layout: () => savedLayout, commit: p => { savedLayout = p; calls.layouts.push(p); },
     catPosition: () => savedCat, commitCat: p => { savedCat = p; calls.drops.push(p); },
     pet: () => calls.taps++, petHold: () => { calls.holds++; return true; },
     endPetHold: cancelled => calls.ends.push(cancelled), catDragStart: () => calls.drags++,
     interactItem: key => calls.furniture.push(key),
     onLayout: () => calls.onLayout++,
-    items: [{ key: 'rug', name: '地毯', el: rug }, { key: 'win', name: '窗户', el: win, anchors: { watch: { x: 0.2, y: 0.8 } } }]
+    items: [{ key: 'rug', name: '地毯', el: rug }, { key: 'win', name: '窗户', el: win, anchors: { watch: { x: 0.2, y: 0.8 } } },
+      { key: 'prop:cushion', name: '猫窝', el: bed, depthAware: true, anchors: { rest: { x: 0.2, y: 0.7 } } }]
   });
   room.refresh();
   return {
-    room, calls, cat, rug, win, scene, controls, window, api: window.NaituanRoom,
+    room, calls, cat, catBox, catShadow, rug, win, bed, scene, controls, window, api: window.NaituanRoom,
     resize: () => resize(),
     tick(ms) {
       time += ms;
@@ -118,7 +124,9 @@ test('cat drag uses zoom-correct room deltas, persists feet, and survives refres
   point(f.calls.drops[0], 0.6, 0.8); assert.equal(f.calls.taps, 0);
   f.room.placeCat({ x: 0.1, y: 0.2 }); f.room.refresh(); point(f.room.getCatPosition(), 0.6, 0.8);
   f.resize(); point(f.room.getCatPosition(), 0.6, 0.8);
-  point(f.room.placeCat({ x: -5, y: 8 }), 0.1, 1);
+  const edge = f.room.placeCat({ x: -5, y: 8 });
+  close(edge.y, 0.985);
+  assert.ok(f.catBox.getBoundingClientRect().left >= f.scene.getBoundingClientRect().left - 1e-9);
   assert.equal(f.calls.drops.length, 1);
 });
 
@@ -199,4 +207,64 @@ test('furniture scale and mirrored anchors survive editing, save and refresh', (
   f.room.refresh(); f.resize();
   point(f.room.itemPoint('win', 'watch'), 0.36, 0.34);
   assert.equal(f.calls.onLayout, 3);
+});
+
+test('cat gets smaller at the wall and larger in front; surface visits bypass floor depth', () => {
+  const f = fixture({}, { floorBoundary: () => [[0, 0.64], [0.5, 0.58], [1, 0.7]] });
+  point(f.room.placeCat({ x: 0.5, y: 0.1 }), 0.5, 0.588);
+  close(f.catBox.getBoundingClientRect().width, 200 * 0.56);
+  point(f.room.getCatPosition(), 0.5, 0.588);
+  f.room.placeCat({ x: 0.5, y: (0.588 + 0.985) / 2 });
+  close(f.catBox.getBoundingClientRect().width, 200 * 0.8);
+  f.room.placeCat({ x: 0.5, y: 1 }, true);
+  point(f.room.getCatPosition(), 0.5, 0.985);
+  close(f.catBox.getBoundingClientRect().width, 200 * 1.04);
+  point(f.room.placeCat({ x: 0.25, y: 0.1 }), 0.25, 0.618);
+  f.room.placeCat({ x: 0.5, y: 0.3 }, false, { surface: true });
+  point(f.room.getCatPosition(), 0.5, 0.3); close(f.catBox.getBoundingClientRect().width, 200);
+  assert.equal(f.catShadow.hidden, true);
+  f.room.restoreCat(); point(f.room.getCatPosition(), 0.5, 0.985);
+  assert.equal(f.catShadow.hidden, false);
+  assert.equal(f.calls.drops.length, 1);
+});
+
+test('zoomed dragging keeps the shadow at the feet and a second finger rolls both back', () => {
+  const f = fixture();
+  const shadowPoint = () => {
+    const r = f.catShadow.getBoundingClientRect(), s = f.scene.getBoundingClientRect();
+    return { x: (r.left + r.width / 2 - s.left) / s.width, y: (r.top + r.height / 2 - s.top) / s.height };
+  };
+  f.room.placeCat({ x: 0.5, y: 0.75 }, true);
+  for (let n = 0; n < 4; n++) f.controls.roomZoomIn.emit('click');
+  f.pointer('pointerdown', 1, 500, 600); f.pointer('pointermove', 1, 620, 480);
+  point(f.room.getCatPosition(), 0.56, 0.675); point(shadowPoint(), 0.56, 0.675);
+  assert.equal(f.catBox.classList.contains('room-cat-dragging'), true);
+  assert.equal(f.catShadow.classList.contains('lifted'), true);
+  f.pointer('pointerdown', 2, 780, 480);
+  point(f.room.getCatPosition(), 0.5, 0.75); point(shadowPoint(), 0.5, 0.75);
+  assert.equal(f.catBox.classList.contains('room-cat-dragging'), false);
+  assert.equal(f.catShadow.classList.contains('lifted'), false);
+  f.pointer('pointerup', 2, 780, 480); f.pointer('pointerup', 1, 620, 480);
+  assert.equal(f.calls.drops.length, 1); assert.equal(f.calls.taps, 0);
+});
+
+test('bed depth changes displayed size while preserving manual scale, mirrors and interaction anchors', () => {
+  const key = 'prop:cushion';
+  const f = fixture({ [key]: { x: 0.5, y: 0.87, scale: 1.4, flipX: true, flipY: true } });
+  const near = f.room.getItemGeometry(key);
+  point(near.center, 0.5, 0.87);
+  f.controls.roomArrange.emit('click'); f.controls.roomItem.value = key; f.controls.roomItem.emit('change');
+  assert.equal(Number(f.controls.roomSize.value), 140);
+  for (let n = 0; n < 16; n++) f.controls.roomUp.emit('click');
+  const far = f.room.getItemGeometry(key);
+  point(far.center, 0.5, 0.71); assert.ok(far.size.width < near.size.width);
+  const anchor = f.room.itemPoint(key, 'rest');
+  point(anchor, far.center.x + far.size.width * 0.3, far.center.y - far.size.height * 0.2);
+  f.room.placeCat(anchor, false, { surface: true }); point(f.room.getCatPosition(), anchor.x, anchor.y);
+  f.controls.roomArrange.emit('click');
+  const saved = f.calls.layouts[0][key];
+  point(saved, 0.5, 0.71); assert.equal(saved.scale, 1.4); assert.equal(saved.flipX, true); assert.equal(saved.flipY, true);
+  f.room.refresh();
+  const restored = f.room.getItemGeometry(key);
+  close(restored.size.width, far.size.width); point(f.room.itemPoint(key, 'rest'), anchor.x, anchor.y);
 });

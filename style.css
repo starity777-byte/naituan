@@ -157,8 +157,12 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .p-lights circle:nth-of-type(3n) { animation-delay: 1.5s; }
 @keyframes twinkle { 50% { opacity: .35; } }
 
-.catbox { position: absolute; left: 15%; bottom: 22%; width: 70%; aspect-ratio: 503 / 402; }
-.catbtn { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.catbox { position: absolute; left: 15%; bottom: 22%; width: 70%; aspect-ratio: 503 / 402; transform-origin: 50% 100%; }
+.catbtn { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; transition: transform .16s ease-out; }
+.cat-ground-shadow { position: absolute; z-index: 2; pointer-events: none; border-radius: 50%; transform: translate(-50%,-50%); background: radial-gradient(ellipse, #54392f30 0%, #54392f18 36%, transparent 72%); opacity: .4; filter: blur(1px); transition: opacity .16s; }
+.cat-ground-shadow.lifted { opacity: .85; }
+.stage:not(.room-ready) .cat-ground-shadow { display: none; }
+.room-scene.arranging .cat-ground-shadow { opacity: .2; }
 .cat { width: 100%; height: 100%; transform-origin: 50% 99%; }
 .cat img { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
 .cat img { transform-origin: 50% 99%; }
@@ -183,7 +187,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 @keyframes watch-soft { 50% { transform: rotate(-.45deg) scale(1,1.006); } }
 @keyframes knead-soft { 25% { transform: rotate(-.5deg) scale(1.008,.989); } 75% { transform: rotate(.5deg) scale(1.008,.989); } }
 .cat.shake { animation: shake .4s linear; }
-.room-cat-dragging .cat { animation: none; transform: translateY(-2%) rotate(-1.5deg); filter: drop-shadow(0 7px 5px #54392f25); }
+.room-cat-dragging .catbtn { transform: translateY(-12%); cursor: grabbing; }
+.room-cat-dragging .cat { animation: none; transform: rotate(-1.5deg); }
 @keyframes shake { 20% { transform: translateX(-2.5%); } 40% { transform: translateX(2.5%); } 60% { transform: translateX(-1.6%); } 80% { transform: translateX(1.6%); } }
 
 .zzz { position: absolute; left: 60%; top: 10%; pointer-events: none; }

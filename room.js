@@ -19,7 +19,7 @@
     return out;
   }
   function create(o) {
-    var stage = o.stage, scene = o.scene, tools = o.tools, catBox = o.catBox || o.cat.parentElement;
+    var stage = o.stage, scene = o.scene, tools = o.tools, catBox = o.catBox || o.cat.parentElement, catShadow = o.catShadow;
     var $ = function (id) { return tools.querySelector('#' + id); };
     var zoomIn = $('roomZoomIn'), zoomOut = $('roomZoomOut'), label = $('roomZoomLabel');
     var arrange = $('roomArrange'), editTools = $('roomEditTools'), picker = $('roomItem'), tip = $('roomTip');
@@ -68,23 +68,53 @@
       var r = it.el.getBoundingClientRect(), s = scene.getBoundingClientRect();
       return { x: (r.left + r.width / 2 - s.left) / s.width, y: (r.top + r.height / 2 - s.top) / s.height };
     }
+    function floorY(x) {
+      var edge = o.floorBoundary ? o.floorBoundary() : [[0, 0.63], [1, 0.63]];
+      x = limit(x, 0, 1);
+      for (var i = 1; i < edge.length; i++) {
+        if (x <= edge[i][0]) {
+          var a = edge[i - 1], b = edge[i], t = (x - a[0]) / (b[0] - a[0]);
+          return a[1] + (b[1] - a[1]) * t + 0.008;
+        }
+      }
+      return edge[edge.length - 1][1] + 0.008;
+    }
+    function depthScale(p) {
+      var wall = floorY(p.x);
+      return 0.56 + 0.48 * limit((p.y - wall) / (0.985 - wall), 0, 1);
+    }
     // Positions use room coordinates, independent of the camera's pan and zoom.
     // Furniture positions are rectangle centers; the cat position is its feet.
     function getCatPosition() {
       var r = catBox.getBoundingClientRect(), s = scene.getBoundingClientRect();
       return { x: (r.left + r.width / 2 - s.left) / s.width, y: (r.bottom - s.top) / s.height };
     }
-    function boundCat(p) {
-      var hx = Math.min(0.5, catBox.offsetWidth / scene.clientWidth / 2);
-      var height = Math.min(1, catBox.offsetHeight / scene.clientHeight);
-      return { x: limit(p.x, hx, 1 - hx), y: limit(p.y, height, 1) };
+    function boundCat(p, surface) {
+      for (var i = 0; i < 2; i++) {
+        var scale = surface ? 1 : depthScale(p);
+        var hx = Math.min(0.5, catBox.offsetWidth * scale / scene.clientWidth / 2);
+        var height = Math.min(0.985, catBox.offsetHeight * scale / scene.clientHeight);
+        var x = limit(p.x, hx, 1 - hx);
+        p = { x: x, y: limit(p.y, Math.max(height, surface ? 0 : floorY(x)), 0.985) };
+      }
+      return p;
     }
-    function placeCat(p, persist) {
+    function placeCat(p, persist, options) {
       p = cleanPoint(p);
       if (!p) return null;
-      p = boundCat(p);
+      var surface = !!(options && options.surface);
+      p = boundCat(p, surface);
+      var scale = surface ? 1 : depthScale(p);
       catBox.style.left = p.x * 100 + '%'; catBox.style.top = p.y * 100 + '%';
-      catBox.style.right = 'auto'; catBox.style.bottom = 'auto'; catBox.style.transform = 'translate(-50%,-100%)';
+      catBox.style.right = 'auto'; catBox.style.bottom = 'auto';
+      catBox.style.transform = 'translate(-50%,-100%) scale(' + scale + ',' + scale + ')';
+      catBox.dataset.depthScale = scale.toFixed(3);
+      if (catShadow) {
+        catShadow.hidden = surface;
+        catShadow.style.left = p.x * 100 + '%'; catShadow.style.top = p.y * 100 + '%';
+        var width = catBox.offsetWidth * scale * 0.46;
+        catShadow.style.width = width + 'px'; catShadow.style.height = width * 0.16 + 'px';
+      }
       if (persist && o.commitCat) o.commitCat(p);
       return p;
     }
@@ -92,7 +122,7 @@
       var p = cleanPoint(o.catPosition && o.catPosition());
       if (p) return placeCat(p);
       ['left', 'top', 'right', 'bottom', 'transform'].forEach(function (key) { catBox.style[key] = ''; });
-      return getCatPosition();
+      return placeCat(getCatPosition());
     }
     function getItemGeometry(key) {
       var it = byKey[key];
@@ -115,18 +145,34 @@
       var geometry = getItemGeometry(key);
       return geometry && geometry.anchors[anchor || 'approach'] || null;
     }
+    function itemScale(it, p) {
+      var manual = p.scale || 1, scale = manual;
+      if (!it.depthAware) return scale;
+      var halfHeight = it.el.offsetHeight / scene.clientHeight / 2;
+      // Resolve the bed's ground contact, since scaling changes its bottom edge.
+      for (var i = 0; i < 4; i++) scale = manual * depthScale({ x: p.x, y: p.y + halfHeight * scale });
+      return scale;
+    }
     function bounded(it, p) {
-      var scale = p.scale || 1;
+      var scale = itemScale(it, p);
       var hx = Math.min(0.5, it.el.offsetWidth * scale / scene.clientWidth / 2);
       var hy = Math.min(0.5, it.el.offsetHeight * scale / scene.clientHeight / 2);
-      return { x: limit(p.x, hx, 1 - hx), y: limit(p.y, hy, 1 - hy), scale: scale, flipX: !!p.flipX, flipY: !!p.flipY };
+      var x = limit(p.x, hx, 1 - hx);
+      var minY = it.depthAware ? Math.max(hy, floorY(x) - hy) : hy;
+      return { x: x, y: limit(p.y, minY, (it.depthAware ? 0.985 : 1) - hy), scale: p.scale || 1, flipX: !!p.flipX, flipY: !!p.flipY };
     }
     function apply(it, p) {
+      if (!p && it.depthAware && !it.el.hidden) {
+        ['left', 'top', 'right', 'bottom', 'transform'].forEach(function (key) { it.el.style[key] = ''; });
+        p = Object.assign(center(it), { scale: 1 });
+      }
       if (p) {
         p = bounded(it, p);
         it.el.style.left = p.x * 100 + '%'; it.el.style.top = p.y * 100 + '%';
         it.el.style.right = 'auto'; it.el.style.bottom = 'auto';
-        it.el.style.transform = 'translate(-50%,-50%) scale(' + p.scale * (p.flipX ? -1 : 1) + ',' + p.scale * (p.flipY ? -1 : 1) + ')';
+        var scale = itemScale(it, p);
+        it.el.style.transform = 'translate(-50%,-50%) scale(' + scale * (p.flipX ? -1 : 1) + ',' + scale * (p.flipY ? -1 : 1) + ')';
+        it.el.dataset.depthScale = (scale / p.scale).toFixed(3);
       } else ['left', 'top', 'right', 'bottom', 'transform'].forEach(function (key) { it.el.style[key] = ''; });
     }
     function paintLayout() {
@@ -187,6 +233,7 @@
       endHold(g, true);
       if (g.kind === 'cat' && g.dragging) placeCat(g.center);
       catBox.classList.remove('room-cat-dragging');
+      if (catShadow) catShadow.classList.remove('lifted');
     }
     function stopPointers() {
       cancelGesture();
@@ -254,6 +301,7 @@
           endHold(g, true);
           if (!g.dragging) {
             g.dragging = true; catBox.classList.add('room-cat-dragging');
+            if (catShadow) catShadow.classList.add('lifted');
             if (o.catDragStart) o.catDragStart();
           }
           placeCat({ x: g.center.x + dx / scene.clientWidth / view.scale, y: g.center.y + dy / scene.clientHeight / view.scale });
@@ -273,7 +321,7 @@
       points.delete(e.pointerId);
       if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
       beginGesture(null);
-      if (!points.size) { stage.classList.remove('room-dragging'); catBox.classList.remove('room-cat-dragging'); }
+      if (!points.size) { stage.classList.remove('room-dragging'); catBox.classList.remove('room-cat-dragging'); if (catShadow) catShadow.classList.remove('lifted'); }
       if (petTap) o.pet(e);
       else if (itemTap && o.interactItem) o.interactItem(itemTap.key);
     }
@@ -317,7 +365,8 @@
     document.addEventListener('visibilitychange', function () { if (document.hidden) { finish(); stopPointers(); } });
     new ResizeObserver(function () { stopPointers(); drawView(); paintLayout(); restoreCat(); if (o.onLayout) o.onLayout(); }).observe(stage);
     return { refresh: refresh, finish: finish, isEditing: function () { return editing; }, cancelInteraction: stopPointers,
-      getCatPosition: getCatPosition, placeCat: placeCat, restoreCat: restoreCat, itemPoint: itemPoint, getItemGeometry: getItemGeometry };
+      getCatPosition: getCatPosition, placeCat: placeCat, restoreCat: restoreCat, itemPoint: itemPoint, getItemGeometry: getItemGeometry,
+      floorY: floorY, depthScale: depthScale };
   }
   window.NaituanRoom = { create: create, cleanLayout: cleanLayout, cleanPoint: cleanPoint };
 })();
