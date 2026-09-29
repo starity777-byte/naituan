@@ -82,6 +82,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .room-scene.arranging [data-room-item].room-selected { outline: 3px solid var(--fish); z-index: 6; }
 .room-scene.arranging [data-room-item] > * { pointer-events: none; }
 .room-scene.arranging ~ .bubble { visibility: hidden; }
+.room-ready .room-scene:not(.arranging) [data-room-item] { pointer-events: auto; cursor: pointer; }
+.room-ready .room-scene:not(.arranging) [data-room-item] > * { pointer-events: none; }
 
 /* wall papers (shared by the room and the shop swatches) */
 [data-wall="dots"] { --wall-bg: radial-gradient(circle at 1px 1px, var(--wall-dot) 1.4px, transparent 1.6px) 0 0 / 22px 22px, var(--wall); }
@@ -146,8 +148,25 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .cat img.pop { animation: pop .32s ease-out; }
 @keyframes pop { 0% { transform: scale(.9, 1.08); } 60% { transform: scale(1.05, .95); } 100% { transform: none; } }
 
-/* The transparent WebP files contain the pose animation; keep only interaction effects. */
+/* Two-frame gestures: slow, small deformations keep the drawings soft. */
+.cat[data-pose="ear"] { animation: ear-soft 2.4s ease-in-out infinite; }
+.cat[data-pose="rub"] { animation: rub-soft 2.8s ease-in-out infinite; }
+.cat[data-pose="chin"] { animation: chin-soft 2.8s ease-in-out infinite; }
+.cat[data-pose="nose"] { animation: nose-soft 2.2s ease-in-out infinite; }
+.cat[data-pose="paw"] { animation: paw-soft 2.8s ease-in-out infinite; }
+.cat[data-pose="sniff"] { animation: sniff-soft 2.6s ease-in-out infinite; }
+.cat[data-pose="watch"] { animation: watch-soft 3.2s ease-in-out infinite; }
+.cat[data-pose="knead"] { animation: knead-soft 2.2s ease-in-out infinite; }
+@keyframes ear-soft { 30% { transform: rotate(-1deg) scale(1.009,.994); } 70% { transform: rotate(.6deg); } }
+@keyframes rub-soft { 30% { transform: translateX(-1.2%) rotate(-1deg) scale(1.012,.989); } 75% { transform: translateX(.8%) rotate(.7deg); } }
+@keyframes chin-soft { 50% { transform: translateY(-.7%) scale(.995,1.007); } }
+@keyframes nose-soft { 55% { transform: scale(.985,1.005) rotate(.5deg); } }
+@keyframes paw-soft { 50% { transform: rotate(-.6deg) translateY(-.4%); } }
+@keyframes sniff-soft { 45% { transform: rotate(-.8deg) scale(1.009,.99); } }
+@keyframes watch-soft { 50% { transform: rotate(-.45deg) scale(1,1.006); } }
+@keyframes knead-soft { 25% { transform: rotate(-.5deg) scale(1.008,.989); } 75% { transform: rotate(.5deg) scale(1.008,.989); } }
 .cat.shake { animation: shake .4s linear; }
+.room-cat-dragging .cat { animation: none; transform: translateY(-2%) rotate(-1.5deg); filter: drop-shadow(0 7px 5px #54392f25); }
 @keyframes shake { 20% { transform: translateX(-2.5%); } 40% { transform: translateX(2.5%); } 60% { transform: translateX(-1.6%); } 80% { transform: translateX(1.6%); } }
 
 .zzz { position: absolute; left: 60%; top: 10%; pointer-events: none; }
