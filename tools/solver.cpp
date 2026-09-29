@@ -1,4 +1,4 @@
-// 猫猫蛋糕求解器：A* 求最少步数。
+// 猫猫蛋糕求解器：A* 求最少步数。规则：只能动队首，只能放进空队或者同种猫的队首。
 // 输入：cap n 然后 n 行队伍（队首在前，0 表示空位，用空格分隔 cap 个数），最后一行 node_limit
 // 输出：最少步数；超出节点上限输出 -1
 #include <bits/stdc++.h>
@@ -51,6 +51,7 @@ int main(int argc,char**argv){
       for(int b=0;b<N;b++){
         if(a==b) continue;
         int cb=cnt(cur[b]); if(cb>=CAP) continue;
+        if(cb>0 && cur[b][0]!=cur[a][0]) continue; // 只能放在同一种猫的前面，或者放进空队
         // 空队之间的搬动没意义：若 a 只有这一只且 b 为空，跳过
         if(cb==0 && cnt(cur[a])==1) continue;
         State nx=cur; int x=nx[a][0];

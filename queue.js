@@ -1,5 +1,5 @@
 /* 蛋糕店：猫猫排队买蛋糕（排序谜题）
-   规则：每队只能动队首那一只，放到别的队的队首；一队凑齐同一种猫，就进店买到一块蛋糕角。
+   规则：每队只能动队首那一只，只能放进空队，或者放在同一种猫的前面（黑猫只能放在黑猫前面）；一队凑齐同一种猫，就进店买到一块蛋糕角。
    关卡来自 levels.js（tools/gen_levels.py 生成，保证有解，par 是求解器算出的最少步数）。
    猫和蛋糕现在都是占位的 SVG，之后换成手绘图只需要改 catSVG / cakeSVG。 */
 (function () {
@@ -148,12 +148,12 @@
   root.innerHTML =
     '<div class="cq-play" id="cqPlay">' +
       '<div class="cq-bar"><span class="cq-chip" id="cqLv">第 1 关</span><span class="cq-chip" id="cqSteps">步数 0</span><button class="hs-quit" id="cqMenuBtn" type="button">选关</button></div>' +
-      '<div class="cq-shop" id="cqShop">' + SHOP + '<div class="cq-door" id="cqDoor"></div></div>' +
+      '<div class="cq-shop" id="cqShop">' + SHOP + '<div class="cq-door" id="cqDoor"></div><div class="cq-tip" id="cqTip" role="status"></div></div>' +
       '<div class="cq-field" id="cqField"></div>' +
       '<div class="cq-foot"><button class="cq-btn" id="cqUndo" type="button">撤销 ' + FISH + UNDO_COST + '</button><button class="cq-btn" id="cqRedo" type="button">重来</button><span class="cq-got" id="cqGot" aria-live="polite"></span></div>' +
     '</div>' +
     '<div class="sg-over" id="cqMenu" hidden><div class="sg-card cq-scroll" role="dialog" aria-label="蛋糕店">' +
-      '<h2>猫猫蛋糕店</h2><p>点队首的猫，再点另一队，把它放到那队的队首。凑齐一队<b>一样的猫</b>，它们就能进店买蛋糕啦，会分你一块蛋糕角。</p>' +
+      '<h2>猫猫蛋糕店</h2><p>点队首的猫，再点另一队，把它放过去。<b>只能放进空队，或者放在一样的猫前面</b>（黑猫只能放在黑猫前面）。凑齐一队一样的猫，它们就能进店买蛋糕，会分你一块蛋糕角。</p>' +
       '<div class="cq-lvs" id="cqLvs"></div>' +
       '<div class="sg-btns"><button id="cqBookBtn" type="button">蛋糕图鉴</button><button id="cqSnd" type="button">音效：开</button></div>' +
       '<button class="hs-quit" id="cqHome" type="button">回房间</button>' +
@@ -168,7 +168,7 @@
     '</div></div>';
 
   var el = {
-    play: $('#cqPlay'), field: $('#cqField'), door: $('#cqDoor'), shop: $('#cqShop'), lv: $('#cqLv'), steps: $('#cqSteps'), undo: $('#cqUndo'), got: $('#cqGot'),
+    play: $('#cqPlay'), tip: $('#cqTip'), field: $('#cqField'), door: $('#cqDoor'), shop: $('#cqShop'), lv: $('#cqLv'), steps: $('#cqSteps'), undo: $('#cqUndo'), got: $('#cqGot'),
     menu: $('#cqMenu'), lvs: $('#cqLvs'), snd: $('#cqSnd'), win: $('#cqWin'), book: $('#cqBook')
   };
 
@@ -197,7 +197,7 @@
       el.field.insertBefore(d, el.field.firstChild); laneEls.push(d);
     })(i);
     el.menu.hidden = el.win.hidden = el.book.hidden = true; el.play.hidden = false; el.play.classList.remove('idle');
-    el.lv.textContent = '第 ' + (lv + 1) + ' 关'; el.steps.textContent = stepsText(); el.got.textContent = '';
+    el.lv.textContent = '第 ' + (lv + 1) + ' 关'; el.steps.textContent = stepsText(); el.got.textContent = ''; tip('');
     layout(true); paintBtns();
   }
   function later(fn, ms) { var tk = G && G.token; var id = setTimeout(function () { if (G && G.token === tk) fn(); }, ms); return id; }
@@ -227,7 +227,8 @@
     G.door = { x: dr.left + dr.width / 2 - fr.left, y: dr.top + dr.height / 2 - fr.top };
     placeAll(instant);
   }
-  function slotPos(i, s) { var r = G.rects[i]; return { x: r.x + (r.w - G.cell) / 2, y: r.y + 5 + s * G.cell }; }
+  /* 猫从队尾（下面）往上排，空位留在队首那一头，像落进去一样：新来的猫放在最上面，别的猫不用动 */
+  function slotPos(i, s) { var r = G.rects[i], d = G.lanes[i].length - 1 - s; return { x: r.x + (r.w - G.cell) / 2, y: r.y + 5 + (G.cap - 1 - d) * G.cell }; }
   function placeCat(e, i, s) {
     var p = slotPos(i, s), st = e.el.style;
     st.width = st.height = G.cell + 'px'; st.setProperty('--x', p.x + 'px'); st.setProperty('--y', p.y + 'px');
@@ -240,7 +241,7 @@
       if (instant) { void e.el.offsetWidth; e.el.style.transition = ''; }
     }); });
     laneEls.forEach(function (d, i) {
-      d.classList.toggle('can', G.sel >= 0 && G.sel !== i && G.lanes[i].length < G.cap);
+      d.classList.toggle('can', G.sel >= 0 && canPut(G.sel, i));
       d.classList.toggle('from', G.sel === i);
     });
   }
@@ -255,14 +256,23 @@
     e.inn.animate([{ transform: 'scale(1.16,.8)' }, { transform: 'scale(.92,1.12)' }, { transform: 'scale(1.04,.97)' }, { transform: 'scale(1)' }], { duration: big ? 380 : 300, easing: 'ease-out' });
   }
 
+  function canPut(a, b) {
+    var A = G.lanes[a], B = G.lanes[b];
+    return a !== b && A.length > 0 && B.length < G.cap && (!B.length || B[0].kind === A[0].kind);
+  }
+  function hasMove() { for (var a = 0; a < G.lanes.length; a++) for (var b = 0; b < G.lanes.length; b++) if (canPut(a, b)) return true; return false; }
+  var tipT = 0;
+  function tip(t, ms) { el.tip.textContent = t; el.tip.classList.toggle('on', !!t); clearTimeout(tipT); if (t && ms) tipT = setTimeout(function () { el.tip.classList.remove('on'); }, ms); }
+  function checkStuck() { if (G && !G.over && !G.busy && !hasMove()) tip('没有能走的了，撤销一步，或者重来', 0); else if (G && el.tip.textContent.indexOf('没有能走') === 0) tip(''); }
   function onLane(i) {
     if (!G || G.busy || G.over) return;
     audioInit();
     var L = G.lanes[i];
-    if (G.sel < 0) { if (L.length) { G.sel = i; SND.pick(); placeAll(); } else { wiggle(i); } return; }
+    if (G.sel < 0) { if (L.length) { G.sel = i; SND.pick(); placeAll(); tip(''); } else { wiggle(i); } return; }
     if (G.sel === i) { G.sel = -1; placeAll(); return; }
-    if (L.length >= G.cap) { /* 放不下：如果那队有猫，就改选那队的队首 */
-      if (L.length) { wiggle(i); SND.bad(); G.sel = i; placeAll(); }
+    if (!canPut(G.sel, i)) { /* 放不下：说明原因，如果那队有猫，就改选那队的队首 */
+      if (L.length >= G.cap) tip('这队满了', 1600); else if (L.length) tip('只能放进空队，或者放在一样的猫前面', 2000);
+      SND.bad(); wiggle(i); if (L.length) { G.sel = i; placeAll(); }
       return;
     }
     doMove(G.sel, i);
@@ -278,14 +288,15 @@
     later(function () { SND.pop(); bounce(e); }, 200);
     var T = G.lanes[b];
     if (T.length === G.cap && T.every(function (x) { return x.kind === e.kind; })) { G.busy = true; G.hist = []; later(function () { buyGroup(b); }, 330); }
-    paintBtns();
+    paintBtns(); tip('');
+    if (!G.busy) later(checkStuck, 380);
   }
 
   function buyGroup(b) {
     var cats = G.lanes[b].slice(), kind = cats[0].kind; G.lanes[b] = [];
     cats.forEach(function (c, k) { later(function () { bounce(c, true); }, k * 70); });
     SND.pop();
-    later(function () { G.busy = false; paintBtns(); }, 440);
+    later(function () { G.busy = false; paintBtns(); checkStuck(); }, 440);
     later(function () {
       SND.buy();
       cats.forEach(function (c, k) {
@@ -317,7 +328,7 @@
     var S = NT.S(); if (S.fish < UNDO_COST) return;
     NT.addFish(-UNDO_COST);
     G.lanes = G.hist.pop(); G.steps = Math.max(0, G.steps - 1); G.sel = -1;
-    SND.pick(); placeAll(); paintBtns(); NT.save();
+    SND.pick(); placeAll(); paintBtns(); tip(''); NT.save();
   }
 
   function stars(steps, par) { return steps <= Math.ceil(par * 1.25) ? 3 : steps <= Math.ceil(par * 1.75) ? 2 : 1; }
@@ -353,7 +364,7 @@
     var got = c.seen.filter(Boolean).length;
     $('#cqBookBtn').textContent = '蛋糕图鉴 ' + got + '/' + CAKES.length;
   }
-  function openMenu() { G && (G.token++); G = null; el.field.innerHTML = ''; el.play.hidden = false; el.play.classList.add('idle'); el.win.hidden = el.book.hidden = true; paintMenu(); el.menu.hidden = false; }
+  function openMenu() { tip(''); G && (G.token++); G = null; el.field.innerHTML = ''; el.play.hidden = false; el.play.classList.add('idle'); el.win.hidden = el.book.hidden = true; paintMenu(); el.menu.hidden = false; }
   function paintBook() {
     var c = cq(), got = c.seen.filter(Boolean).length, dup = 0, worth = 0;
     $('#cqBookS').textContent = '已收集 ' + got + ' / ' + CAKES.length + ' 种 · 小鱼干 ' + NT.S().fish;

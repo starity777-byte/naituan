@@ -238,6 +238,8 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .cq-pop b { font-family: var(--font-display); font-weight: 400; font-size: 15px; white-space: nowrap; padding: 1px 10px; background: var(--panel); border: 2px solid var(--ink); border-radius: 12px; }
 .cq-pop i { font-style: normal; color: var(--alert); }
 @keyframes cakepop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.4); } 18% { opacity: 1; transform: translate(-50%, -80%) scale(1.15); } 30% { transform: translate(-50%, -80%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
+.cq-tip { position: absolute; left: 50%; bottom: 2px; z-index: 4; width: max-content; transform: translate(-50%, 8px); max-width: calc(100% - 32px); padding: 5px 14px; text-align: center; font-size: 13px; line-height: 1.35; background: var(--panel); border: 2.5px solid var(--ink); border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity .18s, transform .18s; }
+.cq-tip.on { opacity: 1; transform: translate(-50%, 0); }
 .cq-foot { display: flex; align-items: center; gap: 8px; min-height: 40px; }
 .cq-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; cursor: pointer; background: var(--panel); border: 2.5px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 var(--ink);
   font-family: var(--font-display); font-size: 15px; white-space: nowrap; }
