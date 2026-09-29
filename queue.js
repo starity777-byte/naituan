@@ -100,6 +100,7 @@
     var S = NT.S(), c = S.cq;
     if (!c || typeof c !== 'object') c = S.cq = {};
     ['cleared', 'cakes', 'seen'].forEach(function (k) { if (!Array.isArray(c[k])) c[k] = []; });
+    if (c.ver !== 2) { c.ver = 2; c.cleared = []; } /* 关卡换过一版，旧的星星不作数（蛋糕和图鉴保留） */
     var i;
     for (i = 0; i < LV.length; i++) c.cleared[i] = Math.max(0, Math.min(3, Math.floor(+c.cleared[i] || 0)));
     for (i = 0; i < CAKES.length; i++) { c.cakes[i] = Math.max(0, Math.floor(+c.cakes[i] || 0)); c.seen[i] = (c.seen[i] || c.cakes[i] > 0) ? 1 : 0; }
@@ -152,7 +153,7 @@
       '<div class="cq-field" id="cqField"></div>' +
       '<div class="cq-foot"><button class="cq-btn" id="cqUndo" type="button">撤销 ' + FISH + UNDO_COST + '</button><button class="cq-btn" id="cqRedo" type="button">重来</button><span class="cq-got" id="cqGot" aria-live="polite"></span></div>' +
     '</div>' +
-    '<div class="sg-over" id="cqMenu" hidden><div class="sg-card cq-scroll" role="dialog" aria-label="蛋糕店">' +
+    '<div class="sg-over" id="cqMenu" hidden><div class="sg-card cq-scroll cq-menucard" role="dialog" aria-label="蛋糕店">' +
       '<h2>猫猫蛋糕店</h2><p>点队首的猫，再点另一队，把它放过去。<b>只能放进空队，或者放在一样的猫前面</b>（黑猫只能放在黑猫前面）。凑齐一队一样的猫，它们就能进店买蛋糕，会分你一块蛋糕角。</p>' +
       '<div class="cq-lvs" id="cqLvs"></div>' +
       '<div class="sg-btns"><button id="cqBookBtn" type="button">蛋糕图鉴</button><button id="cqSnd" type="button">音效：开</button></div>' +
@@ -174,7 +175,7 @@
 
   /* ---------- 一局游戏 ---------- */
   var G = null, lastVar = {}, laneEls = [], TOKEN = 0;
-  var stepsText = function () { return '步数 ' + G.steps + ' · 最少 ' + G.par; };
+  var stepsText = function () { return '步数 ' + G.steps + (G.exact ? ' · 最少 ' : ' · 参考 ') + G.par; };
 
   function makeCat(kind) {
     var d = document.createElement('div'); d.className = 'cq-cat';
@@ -190,7 +191,7 @@
   function loadVariant(lv, vi) {
     var L = LV[lv], v = L.variants[vi];
     el.field.innerHTML = ''; laneEls = [];
-    G = { lv: lv, vi: vi, cap: L.cap, par: v.par, lanes: v.lanes.map(function (l) { return l.map(makeCat); }), sel: -1, steps: 0, hist: [], busy: false, over: false, got: [], token: ++TOKEN };
+    G = { lv: lv, vi: vi, cap: L.cap, par: v.par, exact: v.exact !== false, lanes: v.lanes.map(function (l) { return l.map(makeCat); }), sel: -1, steps: 0, hist: [], busy: false, over: false, got: [], token: ++TOKEN };
     for (var i = 0; i < G.lanes.length; i++) (function (i) {
       var d = document.createElement('div'); d.className = 'cq-lane'; d.setAttribute('data-i', i);
       d.addEventListener('pointerdown', function (e) { e.preventDefault(); onLane(i); });
@@ -208,13 +209,13 @@
     var W = el.field.clientWidth, H = el.field.clientHeight, n = G.lanes.length, cap = G.cap;
     if (!W || !H) { requestAnimationFrame(function () { layout(instant); }); return; }
     var gap = 8, rowGap = 10, best = null;
-    [1, 2].forEach(function (rr) { /* 一行还是两行：哪种能让猫更大就用哪种 */
+    [1, 2, 3].forEach(function (rr) { /* 排一行、两行还是三行：哪种能让猫更大就用哪种 */
       if (rr > n) return;
       var pp = Math.ceil(n / rr), lw = Math.min(88, (W - gap * (pp - 1)) / pp);
       var cc = Math.max(24, Math.min(lw - 8, Math.floor((H - (rr - 1) * rowGap - rr * 10) / (rr * cap)), 68));
       if (!best || cc > best.cell + 1) best = { rows: rr, per: pp, laneW: lw, cell: cc };
     });
-    var rows = best.rows, per = best.per, laneW = best.laneW, cell = best.cell;
+    var rows = best.rows, per = best.per, cell = best.cell, laneW = Math.min(best.laneW, cell + 18);
     var laneH = cap * cell + 10, total = rows * laneH + (rows - 1) * rowGap, top0 = Math.max(0, Math.min(14, (H - total) / 3));
     G.cell = cell; G.rects = [];
     for (var i = 0; i < n; i++) {
@@ -260,10 +261,10 @@
     var A = G.lanes[a], B = G.lanes[b];
     return a !== b && A.length > 0 && B.length < G.cap && (!B.length || B[0].kind === A[0].kind);
   }
-  function hasMove() { for (var a = 0; a < G.lanes.length; a++) for (var b = 0; b < G.lanes.length; b++) if (canPut(a, b)) return true; return false; }
+  function hasMove() { if (G.lanes.every(function (l) { return !l.length; })) return true; for (var a = 0; a < G.lanes.length; a++) for (var b = 0; b < G.lanes.length; b++) if (canPut(a, b)) return true; return false; }
   var tipT = 0;
   function tip(t, ms) { el.tip.textContent = t; el.tip.classList.toggle('on', !!t); clearTimeout(tipT); if (t && ms) tipT = setTimeout(function () { el.tip.classList.remove('on'); }, ms); }
-  function checkStuck() { if (G && !G.over && !G.busy && !hasMove()) tip('没有能走的了，撤销一步，或者重来', 0); else if (G && el.tip.textContent.indexOf('没有能走') === 0) tip(''); }
+  function checkStuck() { if (G && !G.over && !G.busy && G.lanes.some(function (l) { return l.length; }) && !hasMove()) tip('没有能走的了，撤销一步，或者重来', 0); else if (G && el.tip.textContent.indexOf('没有能走') === 0) tip(''); }
   function onLane(i) {
     if (!G || G.busy || G.over) return;
     audioInit();
@@ -331,7 +332,7 @@
     SND.pick(); placeAll(); paintBtns(); tip(''); NT.save();
   }
 
-  function stars(steps, par) { return steps <= Math.ceil(par * 1.25) ? 3 : steps <= Math.ceil(par * 1.75) ? 2 : 1; }
+  function stars(steps, par) { return steps <= Math.ceil(par * 1.3) ? 3 : steps <= Math.ceil(par * 2) ? 2 : 1; }
   function finishLevel() {
     var st = stars(G.steps, G.par), c = cq(), S = NT.S(), lv = G.lv;
     var first = c.cleared[lv] === 0, fish = 3 + (lv + 1) * 2 + st * 2;
@@ -341,7 +342,7 @@
     var last = lv === LV.length - 1;
     $('#cqWinT').textContent = last ? '打烊啦！全部通关' : '第 ' + (lv + 1) + ' 关通关';
     $('#cqStars').innerHTML = [1, 2, 3].map(function (i) { return '<span class="' + (i <= st ? 'on' : '') + '">★</span>'; }).join('');
-    $('#cqWinS').textContent = '用了 ' + G.steps + ' 步（最少 ' + G.par + ' 步）' + (first && !last ? ' · 解锁下一关' : '');
+    $('#cqWinS').textContent = '用了 ' + G.steps + ' 步（' + (G.exact ? '最少 ' : '参考 ') + G.par + ' 步）' + (first && !last ? ' · 解锁下一关' : '');
     $('#cqWinR').innerHTML = '小鱼干 +' + fish;
     var cnt = {}; G.got.forEach(function (i) { cnt[i] = (cnt[i] || 0) + 1; });
     $('#cqWinC').innerHTML = G.got.length ? '<small>这一局买到的蛋糕角</small><div>' + Object.keys(cnt).map(function (i) { return '<span class="cq-mini big">' + cakeSVG(+i) + '<i>×' + cnt[i] + '</i></span>'; }).join('') + '</div>' : '';
@@ -356,7 +357,7 @@
     LV.forEach(function (L, i) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'cq-lvbtn'; var ok = unlocked(i); b.disabled = !ok;
       var s = c.cleared[i];
-      b.innerHTML = '<b>' + (i + 1) + '</b><span class="nm">' + L.name + '<small>' + (ok ? L.kinds.length + ' 种猫 · 每队 ' + L.cap + ' 只 · ' + L.lanes + ' 队' : '通关上一关解锁') + '</small></span><span class="st">' + (ok ? [1, 2, 3].map(function (k) { return '<i class="' + (k <= s ? 'on' : '') + '">★</i>'; }).join('') : '🔒') + '</span>';
+      b.innerHTML = '<span class="nm"><b>' + (i + 1) + '</b>' + L.name + '</span><span class="st">' + (ok ? [1, 2, 3].map(function (k) { return '<i class="' + (k <= s ? 'on' : '') + '">★</i>'; }).join('') : '🔒') + '<small>' + (ok ? L.lanes + ' 队 · 每队 ' + L.cap + ' 只' : '先通上一关') + '</small></span>';
       b.addEventListener('click', function () { audioInit(); startLevel(i); });
       el.lvs.appendChild(b);
     });
