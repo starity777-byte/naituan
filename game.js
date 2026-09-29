@@ -40,10 +40,10 @@
     if (d && typeof d.hunger === 'number') {
       S.hunger = clamp(d.hunger); S.mood = clamp(d.mood); S.energy = clamp(d.energy);
       S.sleeping = !!d.sleeping; S.secs = +d.secs || 0; S.fish = Math.max(0, Math.floor(+d.fish || 0)); S.best = Math.max(0, Math.floor(+d.best || 0)); S.bestBeat = Math.max(0, Math.floor(+d.bestBeat || 0)); S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
-      var away = Math.min(Math.max((now() - (+d.t || now())) / 1000, 0), 1800);
-      if (away > 20) { /* time away: slower decay, never below 20 */
-        if (S.sleeping) { S.energy = clamp(S.energy + away * 0.6); S.hunger = Math.max(20, S.hunger - away * 0.03); if (S.energy >= 100) S.sleeping = false; }
-        else { S.hunger = Math.max(20, S.hunger - away * 0.08); S.mood = Math.max(20, S.mood - away * 0.05); S.energy = Math.max(20, S.energy - away * 0.04); }
+      var away = Math.min(Math.max((now() - (+d.t || now())) / 1000, 0), 6 * 3600);
+      if (away > 20) { /* gentle hourly decay, capped at six hours; do not raise already-low stats */
+        if (S.sleeping) { S.energy = clamp(S.energy + away * 0.5); S.hunger = Math.min(S.hunger, Math.max(20, S.hunger - away / 3600)); if (S.energy >= 100) S.sleeping = false; }
+        else { S.hunger = Math.min(S.hunger, Math.max(20, S.hunger - away * 2 / 3600)); S.mood = Math.min(S.mood, Math.max(20, S.mood - away / 3600)); S.energy = Math.min(S.energy, Math.max(20, S.energy - away * 0.5 / 3600)); }
       }
     }
   }
@@ -385,7 +385,7 @@
     var coins = Math.round(RHS.hits * 0.5 + RHS.perfects * 0.5) + { S: 10, A: 6, B: 3, C: 0 }[grade];
     var record = RHS.score > (S.bestBeat || 0);
     if (record) S.bestBeat = RHS.score;
-    S.mood = clamp(S.mood + Math.min(25, Math.round(RHS.hits / 3))); S.hunger = clamp(S.hunger - 6); S.energy = clamp(S.energy - 6);
+    S.mood = clamp(S.mood + Math.min(25, Math.round(RHS.hits / 3))); S.hunger = clamp(S.hunger - 2); S.energy = clamp(S.energy - 3);
     addFish(coins); save();
     return (RHS.result = { grade: grade, coins: coins, record: record, dead: dead, acc: acc });
   }
@@ -468,7 +468,7 @@
     var earned = SG.floors + SG.perfects;
     SG.earned = earned; SG.record = SG.floors > S.best;
     if (SG.record) S.best = SG.floors;
-    S.mood = clamp(S.mood + Math.min(20, SG.floors * 2)); S.hunger = clamp(S.hunger - 6); S.energy = clamp(S.energy - 6);
+    S.mood = clamp(S.mood + Math.min(20, SG.floors * 2)); S.hunger = clamp(S.hunger - 2); S.energy = clamp(S.energy - 3);
     addFish(earned); save();
   }
   function sgFinish() {
@@ -734,12 +734,13 @@
     if (document.hidden) return;
     S.secs += 1;
     if (S.sleeping) {
-      S.energy = clamp(S.energy + 2.4); S.hunger = clamp(S.hunger - 0.05);
+      S.energy = clamp(S.energy + 0.5); S.hunger = clamp(S.hunger - 0.25 / 60);
       if (S.energy >= 100) { S.sleeping = false; setPose('stretch', 2400); say('睡饱啦！'); }
     } else {
-      S.hunger = clamp(S.hunger - (busy() ? 0.1 : 0.22));
-      S.mood = clamp(S.mood - (busy() ? 0 : 0.12));
-      S.energy = clamp(S.energy - (busy() ? 0.05 : 0.1));
+      /* Per-minute costs: room 1 / 0.5 / 0.5; games halve hunger and energy. */
+      S.hunger = clamp(S.hunger - (busy() ? 0.5 : 1) / 60);
+      S.mood = clamp(S.mood - (busy() ? 0 : 0.5) / 60);
+      S.energy = clamp(S.energy - (busy() ? 0.25 : 0.5) / 60);
       if (!busy() && !override && S.hunger >= 25 && S.mood >= 25 && Math.random() < 0.06) {
         if (Math.random() < 0.5) { setPose('stretch', 2300); say('伸个懒腰~'); } else { setPose('shy', 2300); say('嘿嘿'); }
       }
