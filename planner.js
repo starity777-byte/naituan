@@ -5,6 +5,13 @@
   var $ = function (id) { return document.getElementById(id); };
   var editingId = null, preparedTask = null, duration = 25, custom = false, mode = '', lastDay;
   var originalTitle = document.title;
+  var ambience = null;
+  var scenes = [
+    { id: 'sunny-desk', name: '午后书桌', position: '71%' },
+    { id: 'rainy-desk', name: '雨夜书桌', position: '27%' },
+    { id: 'sunny-window', name: '晴日窗边', position: '82%' },
+    { id: 'rainy-sofa', name: '雨夜沙发', position: '77%' }
+  ];
   function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (s) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]; }); }
   function icon(name) { return '<svg class="ui-icon" aria-hidden="true"><use href="#i-' + name + '"/></svg>'; }
   function clock(ms) { var seconds = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0'); }
@@ -17,6 +24,55 @@
   function dayLabel(key) { return key === D.dateKey() ? '今天' : key === D.shift(D.dateKey(), 1) ? '明天' : dateLabel(key); }
   function hour(value) { return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }); }
   function state() { return data.planner; }
+  function ambiencePrefs() { return Object.assign({ scene: 'sunny-desk', enabled: false, rain: 30, purr: 35 }, state().ambience); }
+  function saveAmbience(value) { return write(function (p) { p.ambience = Object.assign(ambiencePrefs(), value); }); }
+  function ambienceMarkup() {
+    return '<div class="study-environment" id="studyEnvironment" hidden><div class="study-environment-bar"><button type="button" id="studySceneButton" data-planner-action="scenes" aria-expanded="false" aria-controls="studyScenePanel">' + icon('leaf') + '<span id="studySceneName">午后书桌</span></button><span class="study-bar-divider" aria-hidden="true"></span><button type="button" id="studySoundButton" data-planner-action="sounds" aria-expanded="false" aria-controls="studySoundPanel"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/></svg><span id="studySoundLabel">环境音</span><i id="studySoundLight" aria-hidden="true"></i></button></div>' +
+      '<section class="study-environment-panel" id="studyScenePanel" aria-label="选择自习风景" hidden><div class="study-panel-heading"><h3>换个风景，继续陪你</h3><button class="icon-button" type="button" data-planner-action="close-environment" aria-label="收起风景选择">' + icon('close') + '</button></div><div class="study-scene-options">' + scenes.map(function (s) { return '<button type="button" data-study-scene="' + s.id + '" aria-pressed="false"><img src="assets/study/' + s.id + '.webp" alt="" loading="lazy"><span>' + s.name + '</span>' + icon('check') + '</button>'; }).join('') + '</div></section>' +
+      '<section class="study-environment-panel" id="studySoundPanel" aria-label="自习环境声音" hidden><div class="study-panel-heading"><h3>给安静加一点声音</h3><button class="icon-button" type="button" data-planner-action="close-environment" aria-label="收起声音设置">' + icon('close') + '</button></div><button class="study-sound-switch" id="studySoundToggle" type="button" data-planner-action="sound-toggle" aria-pressed="false">开启环境声音</button>' +
+      '<label class="study-mixer-row" for="studyRain"><span>窗外的雨</span><output id="studyRainValue" for="studyRain">30%</output><input id="studyRain" type="range" min="0" max="100" step="1" value="30" aria-label="雨声音量"></label>' +
+      '<label class="study-mixer-row" for="studyPurr"><span>奶团的呼噜</span><output id="studyPurrValue" for="studyPurr">35%</output><input id="studyPurr" type="range" min="0" max="100" step="1" value="35" aria-label="呼噜声音量"></label>' +
+      '<p class="study-sound-status" id="studySoundStatus" role="status">可以混合着听，调到 0 即可关闭其中一种。</p><button class="text-button" id="studyGlobalSound" type="button" data-planner-action="unmute-house" hidden>开启小屋音效</button></section></div>';
+  }
+  function closeEnvironment() {
+    $('studyScenePanel').hidden = $('studySoundPanel').hidden = true;
+    $('studySceneButton').setAttribute('aria-expanded', 'false');
+    $('studySoundButton').setAttribute('aria-expanded', 'false');
+  }
+  function toggleEnvironment(kind) {
+    var panel = $(kind === 'scenes' ? 'studyScenePanel' : 'studySoundPanel'), open = panel.hidden;
+    closeEnvironment(); panel.hidden = !open;
+    $(kind === 'scenes' ? 'studySceneButton' : 'studySoundButton').setAttribute('aria-expanded', String(open));
+  }
+  function paintAmbience() {
+    if (!started) return;
+    var pref = ambiencePrefs(), scene = scenes.find(function (s) { return s.id === pref.scene; }) || scenes[0];
+    var src = 'assets/study/' + scene.id + '.webp';
+    if ($('studyBackdropImage').getAttribute('src') !== src) $('studyBackdropImage').src = src;
+    $('studyBackdropImage').style.setProperty('--study-focal-x', scene.position);
+    $('studySceneName').textContent = scene.name;
+    document.querySelectorAll('[data-study-scene]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.studyScene === scene.id)); });
+    $('studyRain').value = pref.rain; $('studyPurr').value = pref.purr;
+    $('studyRainValue').textContent = pref.rain + '%'; $('studyPurrValue').textContent = pref.purr + '%';
+    paintAudioStatus();
+  }
+  function paintAudioStatus() {
+    if (!started) return;
+    var pref = ambiencePrefs(), status = ambience ? ambience.status() : {}, muted = window.NT.S().mute;
+    var timer = state().timer, paused = timer && timer.runningSince == null;
+    $('studySoundToggle').textContent = pref.enabled ? status.needsGesture && !muted && !paused ? '轻点恢复声音' : '关闭环境声音' : '开启环境声音';
+    $('studySoundToggle').setAttribute('aria-pressed', String(pref.enabled));
+    $('studySoundLabel').textContent = status.playing ? '声音播放中' : pref.enabled && paused ? '声音已暂停' : '环境音';
+    $('studySoundLight').classList.toggle('is-playing', !!status.playing);
+    $('studyGlobalSound').hidden = !muted;
+    $('studySoundStatus').textContent = muted ? '小屋的音效已关闭，开启后就能听见。' : status.error || (paused && pref.enabled ? '暂停时声音也会歇一歇，继续专注时恢复。' : pref.enabled && Number(pref.rain) + Number(pref.purr) === 0 ? '两种声音都调到了 0，拖动滑块就能听见。' : '可以混合着听，调到 0 即可关闭其中一种。');
+  }
+  function syncAmbience(gesture) {
+    if (!started || !ambience) return;
+    var pref = ambiencePrefs(), timer = state().timer;
+    ambience.setMix(pref);
+    ambience.setPlaying(!!(pref.enabled && timer && timer.runningSince != null && $('plannerStudy').open && !window.NT.S().mute), gesture);
+  }
   function write(fn, message) {
     var saved = L.update(function (next) { next.planner = D.create(next.planner); fn(next.planner, next); }, message);
     if (!saved) refresh();
@@ -73,13 +129,13 @@
     dialogs.innerHTML =
       '<dialog class="house-dialog planner-task-dialog" id="plannerTaskDialog" aria-labelledby="plannerTaskHeading"><button class="dialog-close icon-button" type="button" data-planner-action="close-task" aria-label="关闭待办编辑">' + icon('close') + '</button>' +
       '<span class="planner-eyebrow">一张小小的计划纸</span><h2 id="plannerTaskHeading">添一件想做的事</h2><form id="plannerTaskForm"><label for="plannerTaskTitle">想做什么</label><input id="plannerTaskTitle" type="text" maxlength="120" placeholder="比如：看完书的第 3 章" required autocomplete="off"><label for="plannerTaskDate">放在哪一天</label><input id="plannerTaskDate" type="date" required><p class="planner-form-error" id="plannerTaskError" role="status"></p><button class="primary-button" type="submit">记到日历里</button></form><button class="text-button planner-delete" id="plannerTaskDelete" type="button" data-planner-action="delete">删除这件待办</button></dialog>' +
-      '<dialog class="planner-study" id="plannerStudy" aria-labelledby="studyTitle"><div class="study-shell"><header class="study-header"><button class="text-button" type="button" data-planner-action="close-study">' + icon('back') + '回到生活</button><span>奶团自习室</span><span class="study-quiet">安静陪伴</span></header>' +
+      '<dialog class="planner-study" id="plannerStudy" aria-labelledby="studyTitle"><div class="study-backdrop" id="studyBackdrop" aria-hidden="true" hidden><img id="studyBackdropImage" alt="" draggable="false"></div><div class="study-shell"><header class="study-header"><button class="text-button" type="button" data-planner-action="close-study">' + icon('back') + '回到生活</button><span>奶团自习室</span><span class="study-quiet">安静陪伴</span></header>' +
       '<div class="study-scene" aria-hidden="true"><div class="study-window"><span></span><i></i></div><div class="study-surface"></div><img class="study-books" src="assets/decor/attic/15-books-notebook.webp" alt=""><img class="study-cat" id="studyCat" src="assets/animated/眨眼.webp" alt=""><img class="study-lamp" src="assets/decor/attic/16-table-lamp.webp" alt=""></div>' +
       '<div class="study-content"><span class="study-kicker" id="studyKicker">现在，只管这一件事</span><h2 id="studyTitle">今天想专注做什么？</h2><p class="study-caption" id="studyCaption">奶团找好位置，准备陪你啦。</p>' +
       '<form id="studySetup"><label for="studyTask">带上一件待办 <span>可不选</span></label><select id="studyTask" aria-label="关联待办"></select><label for="studyGoal">这一小段的目标</label><input id="studyGoal" maxlength="120" placeholder="例如：看完书的第 3 章" autocomplete="off"><fieldset class="study-durations"><legend>留多少时间给它？</legend><div class="study-presets"><button type="button" data-minutes="15">15 <small>分钟</small></button><button type="button" data-minutes="25">25 <small>分钟</small></button><button type="button" data-minutes="50">50 <small>分钟</small></button><button type="button" id="studyCustom" data-planner-action="custom">自定义</button></div><label class="study-custom-row" id="studyCustomRow" hidden><input id="studyMinutes" type="number" min="1" max="180" step="1" aria-label="自定义专注分钟数"><span>分钟 · 1–180 分钟</span></label></fieldset><p class="planner-form-error" id="studyError" role="status"></p><button class="primary-button study-primary" type="submit">让奶团陪我开始</button><p class="study-small-note">先专注一小会儿，随时可以暂停。</p></form>' +
       '<section id="studyRunning" hidden><p id="studyRunningGoal" class="study-running-goal"></p><div class="study-clock" id="studyClock"><div><span id="studyPhase">正在专注</span><output id="studyTime" role="timer" aria-live="off">25:00</output><small id="studyElapsed"></small></div></div><p class="study-running-note" id="studyRunningNote"></p><div class="study-running-actions"><button class="primary-button study-primary" id="studyPause" type="button" data-planner-action="pause">暂停一下</button><button class="text-button" id="studyFinish" type="button" data-planner-action="finish">结束并保存</button></div><p class="study-small-note">回到生活页后，计时也会继续。</p></section>' +
       '<section id="studyResult" hidden><div class="study-result-time" id="studyResultTime"></div><p id="studyResultNote"></p><label class="study-complete-task" id="studyCompleteTask"><input type="checkbox" id="studyTaskDone"><span id="studyTaskDoneLabel"></span></label><button class="primary-button study-primary" id="studyRest" type="button" data-planner-action="rest">伸个懒腰，休息 5 分钟</button><button class="secondary-button" type="button" data-planner-action="again">再专注一小会儿</button><button class="text-button study-record-link" type="button" data-planner-action="view-record">去日历看看</button></section>' +
-      '<p class="planner-form-error" id="studySaveError" role="status"></p></div><footer class="study-footer">一点点，也是在往前走。</footer></div></dialog>';
+      '<p class="planner-form-error" id="studySaveError" role="status"></p></div><footer class="study-footer">一点点，也是在往前走。</footer>' + ambienceMarkup() + '</div></dialog>';
     $('app').append(dialogs);
   }
   function refresh() {
@@ -182,6 +238,7 @@
     mode = '';
     renderStudy();
     if (!$('plannerStudy').open) $('plannerStudy').showModal();
+    syncAmbience(true);
   }
   function renderDurations() {
     document.querySelectorAll('[data-minutes]').forEach(function (b) { b.setAttribute('aria-pressed', String(!custom && Number(b.dataset.minutes) === duration)); });
@@ -197,6 +254,10 @@
     if (mode !== nextMode) { mode = nextMode; $('studySaveError').textContent = ''; }
     $('plannerStudy').dataset.mode = nextMode;
     $('plannerStudy').dataset.break = String(!!(timer && timer.kind === 'break'));
+    $('studyBackdrop').hidden = $('studyEnvironment').hidden = nextMode !== 'running';
+    if (nextMode !== 'running') closeEnvironment();
+    paintAmbience();
+    syncAmbience(false);
     if (nextMode === 'setup') {
       $('studyKicker').textContent = '现在，只管这一件事';
       $('studyTitle').textContent = '今天想专注做什么？';
@@ -279,14 +340,23 @@
     if (name === 'study') openStudy();
     if (name === 'close-study') $('plannerStudy').close();
     if (name === 'custom') { custom = true; renderDurations(); $('studyMinutes').focus(); }
+    if (name === 'scenes' || name === 'sounds') toggleEnvironment(name);
+    if (name === 'close-environment') closeEnvironment();
+    if (name === 'sound-toggle') {
+      var soundPref = ambiencePrefs(), soundStatus = ambience && ambience.status();
+      if (!(soundPref.enabled && soundStatus && soundStatus.needsGesture) && !saveAmbience({ enabled: !soundPref.enabled })) return;
+      syncAmbience(true);
+    }
+    if (name === 'unmute-house') { window.NT.setMute(false); syncAmbience(true); }
     if (name === 'pause') {
       if (settle()) return;
       if (!write(function (next) { if (next.timer.runningSince == null) D.resume(next, Date.now()); else D.pause(next, Date.now()); })) $('studySaveError').textContent = '这次变更还没保存，请再试一次。';
+      syncAmbience(true);
     }
     if (name === 'finish') {
       if (!write(function (next, life) { D.finish(next, Date.now()); syncFocus(next, life); }, p.timer && p.timer.kind === 'break' ? '休息结束，按自己的节奏来。' : '这段认真已经记进日历了。')) $('studySaveError').textContent = '记录还没有保存成功，计时保留着，可以再试一次。';
     }
-    if (name === 'rest') write(function (next) { D.start(next, { kind: 'break', title: '伸个懒腰，喝口水' }, Date.now()); });
+    if (name === 'rest') { write(function (next) { D.start(next, { kind: 'break', title: '伸个懒腰，喝口水' }, Date.now()); }); syncAmbience(true); }
     if (name === 'again') {
       var taskId = p.result && p.result.taskId;
       if (write(function (next) { next.result = null; })) prepare(taskId);
@@ -308,7 +378,21 @@
       if (el.dataset.editTask) editTask(el.dataset.editTask);
       if (el.dataset.startTask) openStudy(el.dataset.startTask);
       if (el.dataset.minutes) { duration = Number(el.dataset.minutes); custom = false; $('studyMinutes').value = duration; renderDurations(); }
+      if (el.dataset.studyScene) { if (saveAmbience({ scene: el.dataset.studyScene })) closeEnvironment(); }
     });
+    $('plannerStudy').addEventListener('close', function () { closeEnvironment(); syncAmbience(false); });
+    $('plannerStudy').addEventListener('cancel', function (event) { if (!$('studyScenePanel').hidden || !$('studySoundPanel').hidden) { event.preventDefault(); closeEnvironment(); } });
+    $('plannerStudy').addEventListener('pointerdown', function (event) { if (!event.target.closest('.study-environment')) closeEnvironment(); });
+    ['studyRain', 'studyPurr'].forEach(function (id) {
+      $(id).addEventListener('input', function () {
+        var mix = { rain: Number($('studyRain').value), purr: Number($('studyPurr').value) };
+        $('studyRainValue').textContent = mix.rain + '%'; $('studyPurrValue').textContent = mix.purr + '%';
+        if (ambience) ambience.setMix(mix);
+      });
+      $(id).addEventListener('change', function () { saveAmbience({ rain: Number($('studyRain').value), purr: Number($('studyPurr').value) }); syncAmbience(true); });
+    });
+    window.addEventListener('naituan:sound-change', function () { syncAmbience(false); paintAudioStatus(); });
+    window.addEventListener('pagehide', function () { if (ambience) ambience.destroy(); });
     $('todoList').addEventListener('change', function (event) {
       var id = event.target.dataset.taskCheck, done = event.target.checked;
       if (!id) return;
@@ -330,6 +414,7 @@
       if (!Number.isInteger(value) || value < 1 || value > 180) { $('studyError').textContent = '选一个 1–180 分钟的整数吧。'; return; }
       var options = { minutes: value, taskId: $('studyTask').value || null, title: $('studyGoal').value.trim() || '专注一小会儿' };
       if (!write(function (p) { D.start(p, options, Date.now()); })) $('studyError').textContent = '暂时没保存成功，还没有开始计时，可以再试一次。';
+      syncAmbience(true);
     });
     $('studyTaskDone').addEventListener('change', function () { var done = this.checked; write(function (p) { var task = p.tasks.find(function (t) { return p.result && t.id === p.result.taskId; }); if (task) task.done = done; }); });
     window.addEventListener('naituan:life-change', refresh);
@@ -343,7 +428,9 @@
     data = L.read();
     if (!data.planner || !data.planner.migrated) { if (!L.update(migrate)) return; data = L.read(); }
     selected = L.selectedDate(); month = D.date(selected); lastDay = D.dateKey();
-    markup(); started = true; bind(); refresh(); prepare(); tick();
+    markup(); started = true;
+    if (window.NaituanStudyAmbience) ambience = window.NaituanStudyAmbience.create(paintAudioStatus);
+    bind(); refresh(); prepare(); tick();
     setInterval(tick, 1000);
   }
   window.NaituanPlanner = { init: init, render: refresh, open: openStudy, selectDate: select,
