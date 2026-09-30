@@ -29,7 +29,8 @@ test('loading is silent; a user gesture unlocks audio and all cues produce short
   assert.equal(f.api.unlock(false), true);
   assert.equal(f.calls.starts, 0);
   for (const name of ['tap', 'head', 'ear', 'nose', 'paw', 'belly', 'tail', 'lift', 'land', 'feed', 'sleep', 'wake', 'sniff', 'watch', 'save', 'reward', 'rub', 'chin', 'knead',
-    'boxgo', 'boxland', 'chime', 'chop', 'boxmiss', 'fanfare', 'coin', 'pick', 'nope']) {
+    'boxgo', 'boxland', 'chime', 'chop', 'boxmiss', 'fanfare', 'coin', 'pick', 'nope',
+    'mew', 'mrrp', 'boop', 'squeak', 'chirp', 'twinkle', 'pat', 'trill', 'giggle', 'whine', 'spark']) {
     const before = f.calls.starts;
     assert.equal(f.api.play(name, false), true, name);
     assert.ok(f.calls.starts > before, name);
@@ -91,4 +92,24 @@ test('landing plays two duang hits, and pitch shift and delay reach the voices',
   time += 200; starts.length = 0;
   assert.equal(api.play('boxland', false), true);
   assert.equal(starts.length, 4);
+});
+
+test('every touch spot cycles through several voices and never repeats the previous one back to back', () => {
+  const played = [];
+  let time = 1000;
+  const param = () => ({ value: 0, setValueAtTime(v) { played.push(v); }, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} });
+  class AudioContext {
+    constructor() { this.currentTime = 1; this.state = 'running'; this.destination = {}; }
+    resume() { return Promise.resolve(); }
+    createGain() { return { gain: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {}, disconnect() {} }; }
+    createOscillator() { return { frequency: param(), connect() {}, disconnect() {}, start() {}, stop() {} }; }
+  }
+  const window = { AudioContext };
+  vm.runInNewContext(source, { window, document: { hidden: false, addEventListener() {} }, Date: { now: () => time }, Set, Math });
+  const first = kind => { played.length = 0; time += 200; assert.equal(window.NaituanSound.play(kind, false), true); return played[0]; };
+  for (const kind of ['head', 'ear', 'nose', 'paw', 'belly', 'tail']) {
+    const seen = new Set(); let previous = null;
+    for (let i = 0; i < 40; i++) { const f = first(kind); assert.notEqual(f, previous, kind + ' repeated the same voice'); previous = f; seen.add(f); }
+    assert.ok(seen.size >= 2, kind + ' should have more than one voice');
+  }
 });

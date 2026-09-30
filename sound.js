@@ -29,11 +29,32 @@
     chop: [[3200, 900, .07, 0, .08, 'n'], [330, 170, .09, 0, .05]],
     boxmiss: [[1800, 260, .42, 0, .09, 'n'], [440, 110, .45, 0, .08], [392, 392, .17, .4, .07, 't'], [330, 330, .17, .56, .07, 't'], [262, 262, .4, .72, .07, 't']],
     fanfare: [[523, 523, .14, 0, .08], [659, 659, .14, .11, .08], [784, 784, .14, .22, .08], [1047, 1047, .4, .33, .09], [1319, 1319, .3, .44, .05]],
+    // Extra voices for petting. Each touch spot picks one of several so repeated taps never sound the same.
+    mew: [[520, 880, .11, 0, .09, 't'], [880, 620, .2, .1, .085, 't']],
+    mrrp: [[300, 480, .07, 0, .09, 't'], [480, 420, .09, .07, .08, 't'], [420, 560, .08, .15, .06, 't']],
+    boop: [[880, 1250, .06, 0, .09], [1250, 1250, .07, .05, .05]],
+    squeak: [[1200, 1700, .05, 0, .07], [1700, 1250, .08, .05, .06]],
+    chirp: [[1100, 1500, .05, 0, .06], [1500, 1200, .06, .06, .05], [1250, 1650, .05, .12, .05]],
+    twinkle: [[1046, 1046, .09, 0, .06], [1318, 1318, .09, .07, .06], [1568, 1568, .16, .14, .06]],
+    pat: [[330, 240, .06, 0, .09], [420, 300, .06, .09, .08]],
+    trill: [[700, 900, .05, 0, .06, 't'], [760, 960, .05, .06, .06, 't'], [820, 1020, .05, .12, .06, 't'], [880, 1100, .08, .18, .06, 't']],
+    giggle: [[900, 1100, .06, 0, .07], [1000, 1250, .06, .09, .07], [900, 1100, .06, .18, .07], [1000, 1250, .06, .27, .07], [1100, 1400, .09, .36, .07]],
+    whine: [[600, 420, .25, 0, .07, 't'], [500, 340, .3, .2, .06, 't']],
+    spark: [[1568, 1568, .08, 0, .05], [2093, 2093, .12, .06, .05], [2637, 2637, .2, .12, .04]],
     // Small UI cues.
     coin: [[1319, 1319, .08, 0, .06], [1760, 1760, .24, .06, .06]],
     pick: [[660, 780, .06, 0, .055]],
     nope: [[260, 200, .1, 0, .07, 't'], [220, 170, .14, .09, .07, 't']]
   };
+  // Touch spots with several voices: a different one from the last is picked each time.
+  var pools = { head: ['head', 'mew', 'mrrp'], ear: ['ear', 'chirp', 'twinkle'], nose: ['nose', 'boop', 'squeak'], paw: ['paw', 'pat', 'trill'], belly: ['belly', 'giggle'], tail: ['tail', 'whine'] };
+  var lastVoice = {};
+  function voiceFor(kind) {
+    var pool = pools[kind], pick;
+    if (!pool) return kind;
+    do pick = pool[Math.floor(Math.random() * pool.length)]; while (pool.length > 1 && pick === lastVoice[kind]);
+    return (lastVoice[kind] = pick);
+  }
   function init() {
     if (!context) {
       var Audio = window.AudioContext || window.webkitAudioContext;
@@ -117,7 +138,7 @@
       if (!init()) return false;
       last[kind] = time;
       if (purr) note([115, 105, .95, 0, .11], true, 0, 0);
-      else notes[kind].forEach(function (data) { note(data, false, +shift || 0, +delay || 0); });
+      else notes[voiceFor(kind)].forEach(function (data) { note(data, false, +shift || 0, +delay || 0); });
       return true;
     } catch (e) { return false; }
   }

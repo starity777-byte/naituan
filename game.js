@@ -195,6 +195,7 @@
     clearTimeout(duangTimer);
     duangTimer = setTimeout(function () { els.forEach(function (el) { if (el) el.classList.remove('duang'); }); }, 900);
   }
+  var tapStreak = 0, lastPetAt = 0, PET_LIFT = [0, 0, 2, 4, 5, 7];
   function pet(ev, chosenPart) {
     if (!roomAvailable()) return;
     roomView.stopWalk();
@@ -204,7 +205,9 @@
     var y = (ev && ev.clientY != null ? ev.clientY : r.top + r.height / 2) - r.top - 10;
     if (S.sleeping) { S.sleeping = false; sound('wake'); setPose('stretch', 2000); say('被戳醒啦……'); render(); save(); return; }
     var part = chosenPart || petPart(ev), t = now();
-    sound(S.hunger < 25 ? 'tail' : part);
+    tapStreak = t - lastPetAt < 1400 ? tapStreak + 1 : 1; lastPetAt = t;
+    sound(S.hunger < 25 ? 'tail' : part, PET_LIFT[Math.min(tapStreak, PET_LIFT.length) - 1]); /* quick repeated touches climb in pitch */
+    if (tapStreak === 3 || tapStreak === 6 || tapStreak === 10) sound('spark', 0, .14);
     lastTap = part === 'head' ? lastTap.filter(function (v) { return t - v < 4000; }) : [];
     if (part === 'head') lastTap.push(t);
     heartAt(x, y);
@@ -295,7 +298,7 @@
       setPose(pose, ms);
       if (!quiet) sound(pose);
       say(pose === 'watch' ? '窗外有什么呀……陪我看一会儿~' : pose === 'knead' ? '软乎乎，左踩踩、右踩踩~' : '凑近闻闻，这个我还不熟呢~', ms);
-    }, key)) { say('这里有点挤，帮我挪出一点位置吧~'); render(); }
+    }, key, { onItem: pose === 'knead' })) { say('这里有点挤，帮我挪出一点位置吧~'); render(); }
   }
   function wander() {
     deferIdle(); endVisit();

@@ -156,14 +156,21 @@
         if (!g || g.size.width < 0.09) return null;
         var bottom = g.center.y + g.size.height * 0.45;
         if (bottom < floorY(g.center.x) + 0.02) return null;
-        return { left: g.center.x - g.size.width * 0.34 - padding, right: g.center.x + g.size.width * 0.34 + padding,
-          top: bottom - Math.min(0.09, g.size.height * 0.3) - 0.015, bottom: bottom + 0.02 };
+        // The cat is drawn behind a piece of furniture whenever its feet are above the furniture's base, so it
+        // must not stand anywhere inside the picture: it would be hidden there. Feet just above the top edge
+        // are fine (the body rises away from the furniture), and so is anywhere in front of the base.
+        return { left: g.center.x - g.size.width * 0.4 - padding, right: g.center.x + g.size.width * 0.4 + padding,
+          top: g.center.y - g.size.height * 0.5 + g.size.height * 0.06, bottom: bottom + 0.02 };
       }).filter(Boolean);
     }
     function stopWalk() { if (walker) walker.stop(); }
-    function walkTo(point, arrive, key) {
+    // walkTo(point, arrive, key, {onItem: true}): with onItem the cat is drawn in front of that furniture for the
+    // whole walk, so stepping onto a bed or cushion never slips behind it and pops forward only on arrival.
+    var walkSupport = null;
+    function walkTo(point, arrive, key, walkOptions) {
       if (!walker) walker = window.NaituanWalk.create({
-        position: getCatPosition, place: placeCat, depthScale: depthScale,
+        position: getCatPosition, depthScale: depthScale,
+        place: function (p) { return placeCat(p, false, walkSupport ? { onItem: walkSupport } : undefined); },
         aspect: function () { return scene.clientHeight / scene.clientWidth; },
         enabled: function () { return enabled && o.enabled() && !editing && !points.size && !document.hidden; },
         route: function (from, to, target) { return window.NaituanWalk.planRoute(from, to, {
@@ -172,11 +179,13 @@
         moved: function (p, direction) { if (o.walkStep) o.walkStep(p, direction); },
         stopped: function (p) {
           catBox.classList.remove('room-cat-walking');
+          walkSupport = null;
           if (o.commitCat) o.commitCat(p);
           if (o.walkStop) o.walkStop();
         }
       });
-      var started = walker.go(point, arrive, key);
+      var started = walker.go(point, arrive, key); // go() may stop the previous walk, which clears walkSupport
+      walkSupport = started && walkOptions && walkOptions.onItem && key ? key : null;
       catBox.classList.toggle('room-cat-walking', started);
       return started;
     }
