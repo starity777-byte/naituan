@@ -28,7 +28,8 @@ test('loading is silent; a user gesture unlocks audio and all cues produce short
   assert.equal(f.calls.contexts, 0);
   assert.equal(f.api.unlock(false), true);
   assert.equal(f.calls.starts, 0);
-  for (const name of ['tap', 'head', 'ear', 'nose', 'paw', 'belly', 'tail', 'lift', 'land', 'feed', 'sleep', 'wake', 'sniff', 'watch', 'save', 'reward', 'rub', 'chin', 'knead']) {
+  for (const name of ['tap', 'head', 'ear', 'nose', 'paw', 'belly', 'tail', 'lift', 'land', 'feed', 'sleep', 'wake', 'sniff', 'watch', 'save', 'reward', 'rub', 'chin', 'knead',
+    'boxgo', 'boxland', 'chime', 'chop', 'boxmiss', 'fanfare', 'coin', 'pick', 'nope']) {
     const before = f.calls.starts;
     assert.equal(f.api.play(name, false), true, name);
     assert.ok(f.calls.starts > before, name);
@@ -61,4 +62,33 @@ test('rapid repeated touches are bounded and lack of audio support keeps the app
   const noAudio = fixture(false);
   assert.equal(noAudio.api.play('ear', false), false);
   noAudio.api.stop();
+});
+
+test('landing plays two duang hits, and pitch shift and delay reach the voices', () => {
+  const freqs = [], starts = [];
+  let time = 1000;
+  const param = (log) => ({ value: 0, setValueAtTime(v, at) { if (log) log.push([v, at]); }, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} });
+  class AudioContext {
+    constructor() { this.currentTime = 1; this.state = 'running'; this.destination = {}; }
+    resume() { return Promise.resolve(); }
+    createGain() { return { gain: param(), connect() {}, disconnect() {} }; }
+    createOscillator() { const f = param(freqs); return { frequency: f, connect() {}, disconnect() {}, start(at) { starts.push(at); }, stop() {} }; }
+  }
+  const window = { AudioContext };
+  vm.runInNewContext(source, { window, document: { hidden: false, addEventListener() {} }, Date: { now: () => time }, Set });
+  const api = window.NaituanSound;
+  assert.equal(api.play('land', false, 0, .1), true);
+  // Noise-free engine: only oscillators, four voices (thump + boing, twice), the rebound .27s after the first hit.
+  assert.equal(starts.length, 4);
+  assert.ok(Math.abs(starts[0] - (1 + .015 + .1)) < 1e-9);
+  assert.ok(Math.abs(starts[2] - starts[0] - .27) < 1e-9);
+  // The boing wobbles: many frequency steps, not a single ramp.
+  assert.ok(freqs.length > 40);
+  time += 200; freqs.length = 0;
+  api.play('chime', false, 12);
+  assert.equal(freqs[0][0], 880 * 2);
+  // Noise cues degrade gracefully when buffer sources are missing (tonal voices still play).
+  time += 200; starts.length = 0;
+  assert.equal(api.play('boxland', false), true);
+  assert.equal(starts.length, 4);
 });

@@ -1,7 +1,9 @@
 (function () {
   'use strict';
-  var context = null, output = null, voices = new Set(), last = {};
-  // Frequency, end frequency, duration, delay, volume. Short, soft notes only.
+  var context = null, output = null, noiseBuffer = null, voices = new Set(), last = {};
+  // Frequency, end frequency, duration, delay, volume, voice.
+  // Voice: omitted = sine, 't' = triangle, 'n' = band-passed noise (frequencies are the filter sweep),
+  // 'b' = triangle "boing" whose pitch wobbles like a spring. Short, soft notes only.
   var notes = {
     tap: [[720, 580, .07, 0, .07]],
     head: [[440, 520, .16, 0, .12], [660, 740, .18, .1, .07]],
@@ -11,14 +13,26 @@
     belly: [[440, 660, .11, 0, .09], [560, 840, .11, .12, .09], [660, 990, .14, .24, .07]],
     tail: [[380, 560, .16, 0, .1], [560, 430, .2, .12, .07]],
     lift: [[230, 480, .2, 0, .1]],
-    land: [[145, 65, .17, 0, .18], [360, 180, .09, 0, .04]],
+    // Duang-Duang: a body thump plus a springy boing, then a smaller rebound (matches the .duang squash animation).
+    land: [[210, 62, .26, 0, .2], [430, 250, .2, 0, .07, 'b'], [250, 80, .22, .27, .13], [520, 320, .16, .27, .045, 'b']],
     feed: [[520, 650, .1, 0, .09], [650, 780, .1, .12, .09], [780, 980, .2, .24, .09]],
     sleep: [[520, 440, .28, 0, .065], [390, 330, .35, .2, .065]],
     wake: [[330, 440, .18, 0, .07], [520, 660, .2, .14, .08]],
     sniff: [[260, 360, .1, 0, .06], [320, 400, .12, .16, .05]],
     watch: [[660, 660, .3, 0, .07], [990, 990, .35, .18, .045]],
     save: [[520, 660, .13, 0, .07], [780, 780, .22, .12, .06]],
-    reward: [[523, 523, .2, 0, .09], [659, 659, .2, .12, .09], [784, 784, .3, .24, .08]]
+    reward: [[523, 523, .2, 0, .09], [659, 659, .2, .12, .09], [784, 784, .3, .24, .08]],
+    // Box stacking.
+    boxgo: [[392, 523, .1, 0, .08], [523, 784, .14, .09, .08]],
+    boxland: [[175, 60, .2, 0, .2], [700, 260, .09, 0, .09, 'n'], [320, 200, .2, .01, .05, 'b'], [210, 78, .16, .28, .1], [420, 280, .1, .28, .03, 'b']],
+    chime: [[880, 880, .16, 0, .07], [1319, 1319, .3, .07, .07]],
+    chop: [[3200, 900, .07, 0, .08, 'n'], [330, 170, .09, 0, .05]],
+    boxmiss: [[1800, 260, .42, 0, .09, 'n'], [440, 110, .45, 0, .08], [392, 392, .17, .4, .07, 't'], [330, 330, .17, .56, .07, 't'], [262, 262, .4, .72, .07, 't']],
+    fanfare: [[523, 523, .14, 0, .08], [659, 659, .14, .11, .08], [784, 784, .14, .22, .08], [1047, 1047, .4, .33, .09], [1319, 1319, .3, .44, .05]],
+    // Small UI cues.
+    coin: [[1319, 1319, .08, 0, .06], [1760, 1760, .24, .06, .06]],
+    pick: [[660, 780, .06, 0, .055]],
+    nope: [[260, 200, .1, 0, .07, 't'], [220, 170, .14, .09, .07, 't']]
   };
   function init() {
     if (!context) {
@@ -30,24 +44,59 @@
     if (context.state === 'suspended') context.resume().catch(function () {});
     return true;
   }
-  function note(data, purr) {
-    var t = context.currentTime + .015 + data[3], duration = data[2];
-    var voice = context.createOscillator(), gain = context.createGain();
-    voice.type = purr ? 'triangle' : 'sine';
-    voice.frequency.setValueAtTime(data[0], t);
-    voice.frequency.exponentialRampToValueAtTime(data[1], t + duration);
+  function envelope(gain, t, duration, peak, purr) {
     gain.gain.setValueAtTime(.0001, t);
     if (purr) {
       // A gently pulsing low tone evokes a purr without a continuous sound loop.
       for (var i = 0; i < 22; i++) {
-        gain.gain.linearRampToValueAtTime(data[4], t + i * .04 + .012);
+        gain.gain.linearRampToValueAtTime(peak, t + i * .04 + .012);
         gain.gain.linearRampToValueAtTime(.012, t + i * .04 + .037);
       }
-    } else gain.gain.exponentialRampToValueAtTime(data[4], t + .012);
+    } else gain.gain.exponentialRampToValueAtTime(peak, t + .012);
     gain.gain.exponentialRampToValueAtTime(.0001, t + duration);
-    voice.connect(gain); gain.connect(output); voices.add(voice);
-    voice.onended = function () { voice.disconnect(); gain.disconnect(); voices.delete(voice); };
-    voice.start(t); voice.stop(t + duration + .025);
+  }
+  function play1(source, gain, t, duration) {
+    source.connect(gain); gain.connect(output); voices.add(source);
+    source.onended = function () { source.disconnect(); gain.disconnect(); voices.delete(source); };
+    source.start(t); source.stop(t + duration + .025);
+  }
+  function noise(data, t) {
+    // Needs buffer sources and filters; on a limited engine the tonal notes still play.
+    if (!context.createBufferSource || !context.createBiquadFilter || !context.createBuffer) return;
+    var duration = data[2];
+    if (!noiseBuffer) {
+      noiseBuffer = context.createBuffer(1, Math.floor(context.sampleRate * .4), context.sampleRate);
+      var ch = noiseBuffer.getChannelData(0);
+      for (var i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    }
+    var source = context.createBufferSource(), filter = context.createBiquadFilter(), gain = context.createGain();
+    source.buffer = noiseBuffer; source.loop = true;
+    filter.type = 'bandpass'; filter.Q.value = 1.1;
+    filter.frequency.setValueAtTime(data[0], t);
+    filter.frequency.exponentialRampToValueAtTime(data[1], t + duration);
+    envelope(gain, t, duration, data[4], false);
+    source.connect(filter); filter.connect(gain);
+    gain.connect(output); voices.add(source);
+    source.onended = function () { source.disconnect(); filter.disconnect(); gain.disconnect(); voices.delete(source); };
+    source.start(t); source.stop(t + duration + .025);
+  }
+  function note(data, purr, shift, delay) {
+    var t = context.currentTime + .015 + (delay || 0) + data[3], duration = data[2], kind = data[5];
+    if (kind === 'n') { noise(data, t); return; }
+    var ratio = shift ? Math.pow(2, shift / 12) : 1, from = data[0] * ratio, to = data[1] * ratio;
+    var voice = context.createOscillator(), gain = context.createGain();
+    voice.type = purr || kind === 't' || kind === 'b' ? 'triangle' : 'sine';
+    voice.frequency.setValueAtTime(from, t);
+    if (kind === 'b') {
+      // Slide from -> to while wobbling ~22 Hz, fading out: the "boing" of a spring.
+      var steps = Math.ceil(duration / .008);
+      for (var i = 1; i <= steps; i++) {
+        var p = i / steps;
+        voice.frequency.setValueAtTime(from * Math.pow(to / from, p) * (1 + .09 * Math.sin(6.2832 * 22 * p * duration) * (1 - p)), t + p * duration);
+      }
+    } else voice.frequency.exponentialRampToValueAtTime(to, t + duration);
+    envelope(gain, t, duration, data[4], purr);
+    play1(voice, gain, t, duration);
   }
   function stop() {
     voices.forEach(function (voice) { try { voice.stop(); } catch (e) {} });
@@ -57,7 +106,8 @@
     if (muted || document.hidden) return false;
     try { return init(); } catch (e) { return false; }
   }
-  function play(kind, muted) {
+  // shift: optional semitones to transpose tonal notes (rising combo chimes); delay: optional seconds before the cue.
+  function play(kind, muted, shift, delay) {
     if (muted || document.hidden) return false;
     var purr = kind === 'rub' || kind === 'chin' || kind === 'knead';
     if (!purr && !notes[kind]) return false;
@@ -66,8 +116,8 @@
     try {
       if (!init()) return false;
       last[kind] = time;
-      if (purr) note([115, 105, .95, 0, .11], true);
-      else notes[kind].forEach(function (data) { note(data, false); });
+      if (purr) note([115, 105, .95, 0, .11], true, 0, 0);
+      else notes[kind].forEach(function (data) { note(data, false, +shift || 0, +delay || 0); });
       return true;
     } catch (e) { return false; }
   }

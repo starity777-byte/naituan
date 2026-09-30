@@ -186,7 +186,15 @@
     return !busy() && !SH.open && saveModal.hidden && !$('#homeView').hidden && !document.querySelector('dialog[open]');
   }
   function roomAvailable() { return roomEnabled() && !(roomView && roomView.isEditing()); }
-  function sound(kind) { return window.NaituanSound.play(kind, S.mute); }
+  function sound(kind, shift, delay) { return window.NaituanSound.play(kind, S.mute, shift, delay); }
+  /* Q-bouncy landing: squash, stretch and a smaller rebound on the cat and its shadow, timed with the two "duang" hits. */
+  var duangTimer = 0;
+  function duangCat() {
+    var els = [$('#catbtn'), $('#catShadow')];
+    els.forEach(function (el) { if (el) { el.classList.remove('duang'); void el.offsetWidth; el.classList.add('duang'); } });
+    clearTimeout(duangTimer);
+    duangTimer = setTimeout(function () { els.forEach(function (el) { if (el) el.classList.remove('duang'); }); }, 900);
+  }
   function pet(ev, chosenPart) {
     if (!roomAvailable()) return;
     roomView.stopWalk();
@@ -453,7 +461,8 @@
 
   /* --- flow --- */
   function rhStart() {
-    if (S.sleeping) { say('奶团睡着了，先叫醒它'); return; }
+    if (S.sleeping) { sound('nope'); say('奶团睡着了，先叫醒它'); return; }
+    sound('tap');
     RH.active = true; RHS = null;
     hsEl.hidden = false; stage.classList.add('playing'); $('#catbox').style.visibility = 'hidden'; bubble.hidden = true;
     setBusyUI(true); setChrome(true); window.scrollTo(0, 0);
@@ -618,7 +627,7 @@
 
 
   /* ---------- box stacking ---------- */
-  var BH = 26, TONES = ['#dcae82', '#d4a173', '#e3b98f'];
+  var BH = 26, TONES = ['#dcae82', '#d4a173', '#e3b98f'], PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21];
   var sgEl = $('#sg'), cv = $('#sgCanvas'), cx = cv.getContext('2d'), sgCat = $('#sgCat'), sgScore = $('#sgScore'), sgOver = $('#sgOver'), sgHint = $('#sgHint');
   var COL = { ink: '#54392f', floor: '#ecd8b8' };
   try { var cs = getComputedStyle(document.documentElement); COL.ink = cs.getPropertyValue('--ink').trim() || COL.ink; COL.floor = cs.getPropertyValue('--floor').trim() || COL.floor; } catch (e) {}
@@ -644,13 +653,14 @@
     SG.ground = Math.round(SG.H * 0.86);
     var bw = Math.min(150, Math.round(SG.W * 0.4));
     SG.baseW = bw; SG.tower = [{ x: Math.round((SG.W - bw) / 2), w: bw }];
-    SG.perfects = 0; SG.combo = 0; SG.cam = 0; SG.debris = []; SG.pose = 'sit'; SG.poseUntil = 0; SG.over = false; SG.settled = false; SG.floors = 0;
+    SG.perfects = 0; SG.combo = 0; SG.hit = null; SG.cam = 0; SG.debris = []; SG.pose = 'sit'; SG.poseUntil = 0; SG.over = false; SG.settled = false; SG.floors = 0;
     spawn();
     sgScore.textContent = '0 层'; sgOver.hidden = true; sgHint.hidden = false;
   }
   function sgStart() {
     if (busy()) return;
-    if (S.sleeping) { say('奶团睡着了，先叫醒它'); return; }
+    if (S.sleeping) { sound('nope'); say('奶团睡着了，先叫醒它'); return; }
+    sound('boxgo');
     SG.active = true;
     sgEl.hidden = false; stage.classList.add('stacking'); $('#catbox').style.visibility = 'hidden'; bubble.hidden = true; setBusyUI(true);
     sgReset(); SG.last = performance.now();
@@ -674,6 +684,7 @@
       $('#sgBest').textContent = SG.record && SG.floors > 0 ? '新纪录！' : '最高 ' + S.best + ' 层';
       $('#sgRew').textContent = '小鱼干 +' + SG.earned;
       sgOver.hidden = false;
+      if (SG.record && SG.floors > 0) sound('fanfare'); else if (SG.earned > 0) sound('coin');
     }, 900);
   }
   function sgDrop() {
@@ -683,6 +694,7 @@
     var topY = SG.ground - (m.level + 1) * BH, placed, r = stage.getBoundingClientRect();
     if (overlap <= 0) {
       SG.debris.push({ x: m.x, y: topY, w: m.w, h: BH, vx: dx > 0 ? 70 : -70, vy: 0, rot: 0, vr: dx > 0 ? 2.2 : -2.2, i: m.level });
+      sound('boxmiss');
       SG.m = null; sgFinish(); return;
     }
     if (Math.abs(dx) <= 5) {
@@ -691,11 +703,15 @@
       if (SG.combo >= 3 && placed.w < SG.baseW) { var nw = Math.min(SG.baseW, placed.w + 8); placed.x = Math.max(0, Math.min(SG.W - nw, placed.x - (nw - placed.w) / 2)); placed.w = nw; }
       SG.pose = 'happy'; SG.poseUntil = performance.now() + 700;
       textAt(SG.combo >= 3 ? '连击 ×' + SG.combo : '好准！', SG.W / 2 + 2, SG.H * 0.3);
+      sound('boxland'); sound('chime', PENTA[Math.min(SG.combo, PENTA.length) - 1]); /* the chime climbs a pentatonic scale with the combo */
+      SG.hit = { t: performance.now(), amp: 1.25 };
     } else {
       SG.combo = 0;
       if (dx > 0) { placed = { x: m.x, w: overlap }; SG.debris.push({ x: prev.x + prev.w, y: topY, w: dx, h: BH, vx: 40, vy: 0, rot: 0, vr: 1.6, i: m.level }); }
       else { placed = { x: prev.x, w: overlap }; SG.debris.push({ x: m.x, y: topY, w: -dx, h: BH, vx: -40, vy: 0, rot: 0, vr: -1.6, i: m.level }); }
       SG.pose = 'sit'; SG.poseUntil = 0;
+      sound('boxland'); sound('chop');
+      SG.hit = { t: performance.now(), amp: 1 };
     }
     SG.tower.push(placed);
     sgScore.textContent = (SG.tower.length - 1) + ' 层';
@@ -716,25 +732,37 @@
     sgDraw(t);
     SG.raf = requestAnimationFrame(sgLoop);
   }
+  /* Damped spring, 0 = at rest. Positive squashes, negative stretches; idx 0 is the top box, lower boxes react later and less. */
+  function sgSpring(t, idx) {
+    if (!SG.hit || idx > 4) return 0;
+    var age = (t - SG.hit.t) / 1000 - idx * .045;
+    if (age <= 0 || age > 1.2) return 0;
+    return SG.hit.amp * Math.exp(-5.5 * age) * Math.cos(age * 6.2832 * 3.6) * Math.pow(.5, idx);
+  }
   function sgDraw(t) {
     cx.clearRect(0, 0, SG.W, SG.H);
     cx.save(); cx.translate(0, SG.cam);
     cx.fillStyle = COL.floor; cx.fillRect(0, SG.ground, SG.W, SG.H * 2);
     cx.strokeStyle = COL.ink; cx.lineWidth = 2.5; cx.beginPath(); cx.moveTo(0, SG.ground); cx.lineTo(SG.W, SG.ground); cx.stroke();
-    SG.tower.forEach(function (b, i) { drawBox(b.x, SG.ground - (i + 1) * BH, b.w, BH, i); });
-    var top = SG.tower[SG.tower.length - 1], size = 100, footY = size * 397 / 503, catX, catY;
+    /* A landing box squashes and rebounds like a spring; the ripple fades on the boxes below. */
+    var last = SG.tower.length - 1, stackY = SG.ground;
+    SG.tower.forEach(function (b, i) {
+      var s = sgSpring(t, last - i), h = BH * (1 - .26 * s), dw = b.w * .16 * s;
+      stackY -= h; drawBox(b.x - dw / 2, stackY, b.w + dw, h, i);
+    });
+    var top = SG.tower[last], size = 100, footY = size * 397 / 503, catX, catY, catS = sgSpring(t, 0) * .8;
     if (SG.m) {
-      drawBox(SG.m.x, SG.ground - (SG.m.level + 1) * BH, SG.m.w, BH, SG.m.level);
-      catX = SG.m.x + SG.m.w / 2 - size / 2; catY = SG.ground - (SG.m.level + 1) * BH - footY;
+      drawBox(SG.m.x, stackY - BH, SG.m.w, BH, SG.m.level);
+      catX = SG.m.x + SG.m.w / 2 - size / 2; catY = stackY - BH - footY;
     } else {
-      catX = top.x + top.w / 2 - size / 2; catY = SG.ground - SG.tower.length * BH - footY;
+      catX = top.x + top.w / 2 - size / 2; catY = stackY - footY;
     }
     var pose = SG.pose; if (pose === 'happy' && t > SG.poseUntil) { SG.pose = pose = 'sit'; }
     /* A DOM image keeps animated WebP playing; canvas drawImage only uses its default frame. */
     if (sgCat.getAttribute('data-pose') !== pose) {
       sgCat.src = SPR[pose]; sgCat.setAttribute('data-pose', pose);
     }
-    sgCat.style.transform = 'translate(' + catX + 'px,' + (catY + SG.cam) + 'px)';
+    sgCat.style.transform = 'translate(' + catX + 'px,' + (catY + SG.cam) + 'px) scale(' + (1 + .1 * catS).toFixed(3) + ',' + (1 - .14 * catS).toFixed(3) + ')';
     SG.debris.forEach(function (d) {
       cx.save(); cx.translate(d.x + d.w / 2, d.y + d.h / 2); cx.rotate(d.rot); cx.translate(-d.w / 2, -d.h / 2);
       var sx = cx; drawBoxAt(d);
@@ -756,9 +784,9 @@
   cv.addEventListener('pointerdown', function (e) { e.preventDefault(); sgDrop(); });
   document.addEventListener('keydown', function (e) { if (SG.active && !SG.over && (e.key === ' ' || e.code === 'Space')) { e.preventDefault(); sgDrop(); } });
   btnStack.addEventListener('click', sgStart);
-  $('#sgQuit').addEventListener('click', sgLeave);
-  $('#sgBack').addEventListener('click', sgLeave);
-  $('#sgAgain').addEventListener('click', function () { sgReset(); SG.last = performance.now(); });
+  $('#sgQuit').addEventListener('click', function () { sound('tap'); sgLeave(); });
+  $('#sgBack').addEventListener('click', function () { sound('tap'); sgLeave(); });
+  $('#sgAgain').addEventListener('click', function () { sound('boxgo'); sgReset(); SG.last = performance.now(); });
 
 
   /* ---------- shop ---------- */
@@ -916,7 +944,7 @@
     var tabsEl = $('#tabs'); tabsEl.innerHTML = '';
     TABS.forEach(function (t) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'tab'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', SH.tab === t[0] ? 'true' : 'false'); b.textContent = t[1];
-      b.addEventListener('click', function () { SH.tab = t[0]; SH.sel = null; SH.msg = ''; renderShop(); });
+      b.addEventListener('click', function () { sound('tap'); SH.tab = t[0]; SH.sel = null; SH.msg = ''; renderShop(); });
       tabsEl.appendChild(b);
     });
     var box = $('#items'); box.innerHTML = '';
@@ -929,7 +957,7 @@
       b.appendChild(swatch(category, it.id));
       var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = it.name; b.appendChild(nm);
       var t = document.createElement('span'); t.className = 'st'; t.innerHTML = st === 'eq' ? '使用中' : st === 'own' ? '已拥有' : FISH_MINI + '<b>' + it.price + '</b>'; b.appendChild(t);
-      b.addEventListener('click', function () { SH.sel = { cat: category, id: it.id }; SH.msg = ''; renderShop(); var p = $('#items .item[aria-pressed="true"]'); if (p && p.focus) p.focus({ preventScroll: true }); });
+      b.addEventListener('click', function () { sound('pick'); SH.sel = { cat: category, id: it.id }; SH.msg = ''; renderShop(); var p = $('#items .item[aria-pressed="true"]'); if (p && p.focus) p.focus({ preventScroll: true }); });
       box.appendChild(b);
     });
     updateBuy(); paintDecor(); renderCoins();
@@ -947,7 +975,7 @@
     var it = findItem(s.cat, s.id), st = itemState(s.cat, s.id);
     if (st === 'eq') {
       if (s.cat !== 'prop') return;
-      S.eq.prop = S.eq.prop.filter(function (x) { return x !== s.id; }); SH.msg = '收起来了';
+      S.eq.prop = S.eq.prop.filter(function (x) { return x !== s.id; }); SH.msg = '收起来了'; sound('pick');
     } else {
       if (st === 'buy') { if (S.fish < it.price) return; addFish(-it.price); S.own[s.cat + ':' + s.id] = 1; }
       if (s.cat === 'prop') { if (S.eq.prop.indexOf(s.id) < 0) S.eq.prop.push(s.id); } else S.eq[s.cat] = s.id;
@@ -963,6 +991,7 @@
   }
   function openShop() {
     if (busy()) return;
+    sound('tap');
     cancelRoomInteraction(); endVisit(); pendingFurniture = null;
     SH.open = true; SH.sel = null; SH.msg = ''; S.shopSeen = 1; btnShop.removeAttribute('data-new');
     metersEl.hidden = actionsEl.hidden = hintEl.hidden = btnShop.hidden = true; shopEl.hidden = false; appEl.classList.add('shopping');
@@ -970,6 +999,7 @@
     var top = stage.getBoundingClientRect().top; if (top < 0) window.scrollBy(0, top - 8);
   }
   function closeShop() {
+    sound('tap');
     SH.open = false; SH.sel = null; shopEl.hidden = true;
     metersEl.hidden = actionsEl.hidden = hintEl.hidden = btnShop.hidden = false; appEl.classList.remove('shopping');
     paintDecor(); render();
@@ -993,21 +1023,22 @@
   function disarm() { armed = false; saveLoad.textContent = '导入这串码'; }
   function openSave() {
     if (busy()) return;
+    sound('tap');
     cancelRoomInteraction();
     if (roomView) roomView.finish();
     saveText.value = exportCode(); saveMsg.textContent = '这是这台设备上现在的进度。'; disarm(); saveModal.hidden = false;
   }
-  function closeSave() { saveModal.hidden = true; disarm(); if (roomView) roomView.refresh(); }
+  function closeSave() { sound('tap'); saveModal.hidden = true; disarm(); if (roomView) roomView.refresh(); }
   function copySave() {
     var fallback = function () { saveText.focus(); saveText.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} saveMsg.textContent = ok ? '已复制。' : '已经全选了，长按选择「拷贝」就行。'; };
-    try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(saveText.value).then(function () { saveMsg.textContent = '已复制。'; }, fallback); else fallback(); } catch (e) { fallback(); }
+    try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(saveText.value).then(function () { sound('save'); saveMsg.textContent = '已复制。'; }, fallback); else fallback(); } catch (e) { fallback(); }
   }
   function importSave() {
     var d = parseCode(saveText.value);
-    if (!d) { disarm(); saveMsg.textContent = '这串码不对，请把以 NT1: 开头的整串完整粘贴进来。'; return; }
-    if (!armed) { armed = true; saveLoad.textContent = '再点一次，确认覆盖'; saveMsg.textContent = '会覆盖这台设备现在的进度（小鱼干 ' + S.fish + '，最高 ' + S.best + ' 层）。'; return; }
+    if (!d) { disarm(); sound('nope'); saveMsg.textContent = '这串码不对，请把以 NT1: 开头的整串完整粘贴进来。'; return; }
+    if (!armed) { armed = true; sound('pick'); saveLoad.textContent = '再点一次，确认覆盖'; saveMsg.textContent = '会覆盖这台设备现在的进度（小鱼干 ' + S.fish + '，最高 ' + S.best + ' 层）。'; return; }
     cancelRoomInteraction(); endVisit(); override = null;
-    d.t = now(); load(d); save(); paintDecor(); closeSave(); say('存档导入好了', 3200); render();
+    d.t = now(); load(d); save(); paintDecor(); closeSave(); sound('reward'); say('存档导入好了', 3200); render();
   }
   $('#btnSave').addEventListener('click', openSave);
   $('#saveClose').addEventListener('click', closeSave);
@@ -1099,7 +1130,7 @@
     },
     catPosition: function () { return S && S.catPosition; },
     commitCat: function (p) { S.catPosition = p; deferIdle(); save(); },
-    pet: pet, petHold: beginRub, endPetHold: endRub, catDragStart: startCatDrag, catDrop: function () { sound('land'); }, interactItem: visitFurniture, onLayout: positionVisit,
+    pet: pet, petHold: beginRub, endPetHold: endRub, catDragStart: startCatDrag, catDrop: function () { sound('land', 0, .1); duangCat(); }, interactItem: visitFurniture, onLayout: positionVisit,
     onCatMove: positionBubble,
     walkStep: walkStep, walkStop: walkStopped
   });

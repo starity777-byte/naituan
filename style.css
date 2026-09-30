@@ -192,6 +192,16 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .cat.shake { animation: shake .4s linear; }
 .room-cat-dragging .catbtn { transform: translateY(-12%); cursor: grabbing; }
 .room-cat-dragging .cat { animation: none; transform: rotate(-1.5deg); }
+/* Landing "duang-duang": squash on impact, stretch, a smaller squash (rebound), then settle. Timed with sound.js `land`. */
+.catbtn.duang { transform-origin: 50% 100%; animation: duang-cat .72s .1s ease-in-out; }
+.cat-ground-shadow.duang { animation: duang-shadow .72s .1s ease-in-out; }
+@keyframes duang-cat { 0% { transform: scale(1.16, .8); } 22% { transform: scale(.94, 1.1); } 40% { transform: scale(1.08, .9); } 62% { transform: scale(.985, 1.03); } 100% { transform: none; } }
+@keyframes duang-shadow {
+  0% { transform: translate(-50%, -50%) scale(1.3, 1.4); opacity: .9; }
+  22% { transform: translate(-50%, -50%) scale(.92, .9); }
+  40% { transform: translate(-50%, -50%) scale(1.12, 1.15); }
+  100% { transform: translate(-50%, -50%); }
+}
 @keyframes shake { 20% { transform: translateX(-2.5%); } 40% { transform: translateX(2.5%); } 60% { transform: translateX(-1.6%); } 80% { transform: translateX(1.6%); } }
 
 .zzz { position: absolute; left: 60%; top: 10%; pointer-events: none; }
@@ -258,7 +268,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 /* ---------- box stacking ---------- */
 .sg { position: absolute; inset: 0; z-index: 5; }
 .sg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; cursor: pointer; }
-.sg-cat { position: absolute; left: 0; top: 0; width: 100px; height: auto; aspect-ratio: 503 / 402; pointer-events: none; -webkit-user-drag: none; }
+.sg-cat { transform-origin: 50% 98.8%; position: absolute; left: 0; top: 0; width: 100px; height: auto; aspect-ratio: 503 / 402; pointer-events: none; -webkit-user-drag: none; }
 .sg .hs-bar { position: absolute; left: 12px; right: 12px; top: 12px; z-index: 2; pointer-events: none; }
 .sg .hs-bar > * { pointer-events: auto; }
 .sg-hint { position: absolute; left: 0; right: 0; top: 22%; text-align: center; z-index: 2; pointer-events: none; font-size: 14px; }
@@ -437,7 +447,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 @media (max-width: 400px) { .cq-chip { font-size: 14.5px; padding: 2px 8px; } .cq-bar { gap: 6px; } }
 @media (max-width: 340px) { .top h1 { font-size: 24px; } .act { font-size: 13px; } .top .time { display: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .cat, .cat img.pop, .cloud, .zzz span, .act.nudge { animation: none !important; }
+  .cat, .cat img.pop, .cloud, .zzz span, .act.nudge, .catbtn.duang, .cat-ground-shadow.duang { animation: none !important; }
   .zzz span { opacity: .8; }
   .fx { animation-duration: .01s; }
 }
