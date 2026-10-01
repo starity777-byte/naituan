@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+KuaiLe&display=swap">
 <link rel="stylesheet" href="style.css?v=duang-20260930">
 <link rel="stylesheet" href="decor-shop.css?v=cake-peach-20260929">
-<link rel="stylesheet" href="house.css?v=edit-fullscreen-20260929">
+<link rel="stylesheet" href="house.css?v=volume-20261001">
 <link rel="stylesheet" href="planner.css?v=immersive-20260929">
 </head>
 <body>
@@ -282,7 +282,12 @@
   <h2 id="profileTitle">和奶团的日子</h2><p id="together">已陪伴 0 分钟</p>
   <div class="profile-stats"><span><b id="profileFish">0</b>小鱼干</span><span><b id="profileGems">0</b>成长宝石</span><span><b id="profileFocus">0</b>专注分钟</span></div>
   <p class="profile-help">右上角的小鱼、爱心、月亮，分别可以喂食、摸摸和哄睡。轻点奶团也会有回应哦。</p>
-  <button class="secondary-button" id="profileSound" type="button" aria-pressed="true">音效：开</button>
+  <section class="profile-audio" aria-label="声音设置">
+    <button class="secondary-button" id="profileSound" type="button" aria-pressed="true">音效：开</button>
+    <label class="profile-slider" for="profileVolume"><span>音效音量</span><output id="profileVolumeValue" for="profileVolume">80%</output><input id="profileVolume" type="range" min="0" max="100" step="5" value="80" aria-label="音效音量"></label>
+    <button class="secondary-button" id="profileMusic" type="button" aria-pressed="true">背景音乐：开</button>
+    <label class="profile-slider" for="profileMusicVolume"><span>音乐音量</span><output id="profileMusicVolumeValue" for="profileMusicVolume">60%</output><input id="profileMusicVolume" type="range" min="0" max="100" step="5" value="60" aria-label="背景音乐音量"></label>
+  </section>
   <button class="secondary-button" id="profileSave" type="button">存档 · 导出 / 导入</button>
   <p class="local-note">小屋与生活记录保存在这台设备的浏览器里</p>
 </dialog>
@@ -319,13 +324,14 @@
 <script src="decor-catalog.js?v=depth-20260929"></script>
 <script src="walking.js?v=walk-20260929"></script>
 <script src="room.js?v=pet-20260930"></script>
-<script src="sound.js?v=pet-20260930"></script>
-<script src="game.js?v=pet-20260930"></script>
-<script src="queue.js?v=sound-20260929"></script>
+<script src="sound.js?v=volume-20261001"></script>
+<script src="bgm.js?v=bgm-20261001"></script>
+<script src="game.js?v=volume-20261001"></script>
+<script src="queue.js?v=volume-20261001"></script>
 <script src="life.js?v=sound-20260929"></script>
 <script src="planner-state.js?v=house-20260929"></script>
 <script src="study-ambience.js?v=immersive-20260929"></script>
 <script src="planner.js?v=immersive-20260929"></script>
-<script src="house.js?v=edit-fullscreen-20260929"></script>
+<script src="house.js?v=volume-20261001"></script>
 </body>
 </html>

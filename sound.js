@@ -1,11 +1,20 @@
 (function () {
   'use strict';
   var context = null, output = null, noiseBuffer = null, voices = new Set(), last = {};
+  // Master level. The cues are written as soft notes (peaks .03-.2), so the master stage lifts them:
+  // volume 100 -> x2.6, the default 80 -> x2.08, about 20 -> the old x.5. A limiter keeps stacked voices from clipping.
+  var MAX_GAIN = 2.6, volume = .8;
+  function level() { return volume * MAX_GAIN; }
+  function setVolume(value) {
+    value = Number(value);
+    volume = Math.max(0, Math.min(100, isFinite(value) ? value : 80)) / 100;
+    if (output) output.gain.value = level();
+  }
   // Frequency, end frequency, duration, delay, volume, voice.
   // Voice: omitted = sine, 't' = triangle, 'n' = band-passed noise (frequencies are the filter sweep),
   // 'b' = triangle "boing" whose pitch wobbles like a spring. Short, soft notes only.
   var notes = {
-    tap: [[720, 580, .07, 0, .07]],
+    tap: [[720, 580, .07, 0, .12]],
     head: [[440, 520, .16, 0, .12], [660, 740, .18, .1, .07]],
     ear: [[850, 1150, .09, 0, .08], [1100, 920, .1, .08, .055]],
     nose: [[620, 220, .13, 0, .14]],
@@ -42,8 +51,8 @@
     whine: [[600, 420, .25, 0, .07, 't'], [500, 340, .3, .2, .06, 't']],
     spark: [[1568, 1568, .08, 0, .05], [2093, 2093, .12, .06, .05], [2637, 2637, .2, .12, .04]],
     // Small UI cues.
-    coin: [[1319, 1319, .08, 0, .06], [1760, 1760, .24, .06, .06]],
-    pick: [[660, 780, .06, 0, .055]],
+    coin: [[1319, 1319, .08, 0, .09], [1760, 1760, .24, .06, .09]],
+    pick: [[660, 780, .06, 0, .1]],
     nope: [[260, 200, .1, 0, .07, 't'], [220, 170, .14, .09, .07, 't']]
   };
   // Touch spots with several voices: a different one from the last is picked each time.
@@ -60,7 +69,13 @@
       var Audio = window.AudioContext || window.webkitAudioContext;
       if (!Audio) return false;
       context = new Audio(); output = context.createGain();
-      output.gain.value = .5; output.connect(context.destination);
+      output.gain.value = level();
+      if (context.createDynamicsCompressor) {
+        var limiter = context.createDynamicsCompressor();
+        limiter.threshold.value = -9; limiter.knee.value = 10; limiter.ratio.value = 8;
+        limiter.attack.value = .002; limiter.release.value = .18;
+        output.connect(limiter); limiter.connect(context.destination);
+      } else output.connect(context.destination);
     }
     if (context.state === 'suspended') context.resume().catch(function () {});
     return true;
@@ -129,7 +144,7 @@
   }
   // shift: optional semitones to transpose tonal notes (rising combo chimes); delay: optional seconds before the cue.
   function play(kind, muted, shift, delay) {
-    if (muted || document.hidden) return false;
+    if (muted || document.hidden || volume === 0) return false;
     var purr = kind === 'rub' || kind === 'chin' || kind === 'knead';
     if (!purr && !notes[kind]) return false;
     var time = Date.now();
@@ -143,5 +158,5 @@
     } catch (e) { return false; }
   }
   document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); });
-  window.NaituanSound = { play: play, stop: stop, unlock: unlock };
+  window.NaituanSound = { play: play, stop: stop, unlock: unlock, setVolume: setVolume };
 })();

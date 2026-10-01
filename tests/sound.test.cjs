@@ -7,20 +7,20 @@ const source = fs.readFileSync(path.join(__dirname, '../sound.js'), 'utf8');
 
 function fixture(supported = true) {
   let time = 1000;
-  const calls = { contexts: 0, starts: 0, stops: 0, resumes: 0 }, events = {};
+  const calls = { contexts: 0, starts: 0, stops: 0, resumes: 0 }, events = {}, gains = [];
   const document = { hidden: false, addEventListener: (name, fn) => { events[name] = fn; } };
   const param = () => ({ value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} });
   class AudioContext {
     constructor() { calls.contexts++; this.currentTime = 1; this.state = 'suspended'; this.destination = {}; }
     resume() { calls.resumes++; this.state = 'running'; return Promise.resolve(); }
-    createGain() { return { gain: param(), connect() {}, disconnect() {} }; }
+    createGain() { const node = { gain: param(), connect() {}, disconnect() {} }; gains.push(node); return node; }
     createOscillator() {
       return { frequency: param(), connect() {}, disconnect() {}, start() { calls.starts++; }, stop(at) { if (at == null) calls.stops++; } };
     }
   }
   const window = supported ? { AudioContext } : {};
   vm.runInNewContext(source, { window, document, Date: { now: () => time }, Set });
-  return { api: window.NaituanSound, calls, document, events, advance: ms => { time += ms; } };
+  return { api: window.NaituanSound, calls, gains, document, events, advance: ms => { time += ms; } };
 }
 
 test('loading is silent; a user gesture unlocks audio and all cues produce short voices', () => {
@@ -112,4 +112,25 @@ test('every touch spot cycles through several voices and never repeats the previ
     for (let i = 0; i < 40; i++) { const f = first(kind); assert.notEqual(f, previous, kind + ' repeated the same voice'); previous = f; seen.add(f); }
     assert.ok(seen.size >= 2, kind + ' should have more than one voice');
   }
+});
+
+test('master volume lifts the soft cues, follows the slider, and 0 is silent', () => {
+  const f = fixture();
+  const near = (value, expected) => assert.ok(Math.abs(value - expected) < 1e-9, value + ' vs ' + expected);
+  f.api.setVolume(40); // set before the first gesture: used when audio starts
+  f.api.unlock(false);
+  near(f.gains[0].gain.value, .4 * 2.6);
+  f.api.setVolume(100); near(f.gains[0].gain.value, 2.6);
+  f.api.setVolume(20); near(f.gains[0].gain.value, .52);
+  f.api.setVolume(500); near(f.gains[0].gain.value, 2.6);
+  f.api.setVolume(-5); near(f.gains[0].gain.value, 0);
+  assert.equal(f.api.play('ear', false), false);
+  f.api.setVolume('nope'); near(f.gains[0].gain.value, .8 * 2.6);
+  assert.equal(f.api.play('ear', false), true);
+});
+
+test('the default master level is far louder than the old fixed 0.5', () => {
+  const f = fixture();
+  f.api.unlock(false);
+  assert.ok(f.gains[0].gain.value >= 2, 'default gain ' + f.gains[0].gain.value);
 });

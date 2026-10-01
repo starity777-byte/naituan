@@ -48,6 +48,11 @@
       syncFullscreen();
     } catch (_) { notify('没能进入全屏，请用手机浏览器打开后再点一次「全屏」。'); }
   }
+  // Keep a slider in step with the saved value, but never fight a thumb that is being dragged.
+  function paintSlider(input, output, value) {
+    output.textContent = value + '%';
+    if (document.activeElement !== input) input.value = value;
+  }
   function sync() {
     var state = NT.S(), life = state.life;
     $('gamesCoinNum').textContent = state.fish.toLocaleString();
@@ -70,6 +75,10 @@
       $('profileFocus').textContent = Math.floor(minutes);
       $('profileSound').textContent = state.mute ? '音效：关' : '音效：开';
       $('profileSound').setAttribute('aria-pressed', String(!state.mute));
+      $('profileMusic').textContent = state.bgm ? '背景音乐：开' : '背景音乐：关';
+      $('profileMusic').setAttribute('aria-pressed', String(state.bgm));
+      paintSlider($('profileVolume'), $('profileVolumeValue'), state.vol);
+      paintSlider($('profileMusicVolume'), $('profileMusicVolumeValue'), state.bgmVol);
     }
   }
   function action(name) {
@@ -97,6 +106,13 @@
   $('quickSleep').addEventListener('click', function () { $('btnSleep').click(); sync(); });
   $('gemChip').addEventListener('click', function () { navigate('life'); });
   $('profileSound').addEventListener('click', function () { NT.setMute(!NT.S().mute); NT.sound('ear'); sync(); });
+  $('profileMusic').addEventListener('click', function () { NT.setBgm(!NT.S().bgm); NT.sound('tap'); sync(); });
+  $('profileVolume').addEventListener('input', function (event) { NT.setVolume(event.target.value, false); sync(); });
+  $('profileVolume').addEventListener('change', function (event) { NT.setVolume(event.target.value, true); sync(); });
+  $('profileMusicVolume').addEventListener('input', function (event) { NT.setBgmVolume(event.target.value, false); sync(); });
+  $('profileMusicVolume').addEventListener('change', function (event) { NT.setBgmVolume(event.target.value, true); sync(); });
+  // The music steps aside while a mini-game or the study room brings its own sound.
+  if (window.NaituanBGM) window.NaituanBGM.setGate(function () { var study = $('plannerStudy'); return !NT.isBusy() && !(study && study.open); });
   $('profileSave').addEventListener('click', function () { $('profileDialog').close(); $('btnSave').click(); $('saveText').focus(); });
   document.addEventListener('pointerdown', function (event) {
     if (!$('pawMenu').hidden && !$('pawMenu').contains(event.target) && !$('pawToggle').contains(event.target)) menu(false);

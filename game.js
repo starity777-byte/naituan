@@ -51,7 +51,7 @@
   Object.keys(SPR).forEach(function (k) { var im = new Image(); im.src = SPR[k]; IMG[k] = im; });
 
   /* ---------- state ---------- */
-  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, mute: false, cq: null, t: now() }; }
+  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, mute: false, vol: 80, bgm: true, bgmVol: 60, cq: null, t: now() }; }
   function load(hotData) {
     var d = null;
     if (hotData && typeof hotData.hunger === 'number') d = hotData;
@@ -60,12 +60,14 @@
     if (d && typeof d.hunger === 'number') {
       S.hunger = clamp(d.hunger); S.mood = clamp(d.mood); S.energy = clamp(d.energy);
       S.sleeping = !!d.sleeping; S.secs = +d.secs || 0; S.fish = Math.max(0, Math.floor(+d.fish || 0)); S.best = Math.max(0, Math.floor(+d.best || 0)); S.bestBeat = Math.max(0, Math.floor(+d.bestBeat || 0)); S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
+      if (typeof d.vol === 'number') S.vol = Math.round(clamp(d.vol)); if (typeof d.bgm === 'boolean') S.bgm = d.bgm; if (typeof d.bgmVol === 'number') S.bgmVol = Math.round(clamp(d.bgmVol));
       var away = Math.min(Math.max((now() - (+d.t || now())) / 1000, 0), 6 * 3600);
       if (away > 20) { /* gentle hourly decay, capped at six hours; do not raise already-low stats */
         if (S.sleeping) { S.energy = clamp(S.energy + away * 0.5); S.hunger = Math.min(S.hunger, Math.max(20, S.hunger - away / 3600)); if (S.energy >= 100) S.sleeping = false; }
         else { S.hunger = Math.min(S.hunger, Math.max(20, S.hunger - away * 2 / 3600)); S.mood = Math.min(S.mood, Math.max(20, S.mood - away / 3600)); S.energy = Math.min(S.energy, Math.max(20, S.energy - away * 0.5 / 3600)); }
       }
     }
+    applyAudio();
   }
   function save() { S.t = now(); try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
 
@@ -358,18 +360,36 @@
       try {
         var C = window.AudioContext || window.webkitAudioContext;
         if (C) {
-          AC = new C(); master = AC.createGain(); master.gain.value = S.mute ? 0 : 0.55; master.connect(AC.destination);
+          AC = new C(); master = AC.createGain(); master.gain.value = S.mute ? 0 : 0.55 * miniGain(); master.connect(AC.destination);
           noiseBuf = AC.createBuffer(1, Math.floor(AC.sampleRate * 0.2), AC.sampleRate);
           var ch = noiseBuf.getChannelData(0); for (var i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
         }
       } catch (e) { AC = null; }
     }
     if (AC && AC.state === 'suspended') { try { AC.resume().catch(function () {}); } catch (e) {} }
-    if (master) master.gain.value = S.mute ? 0 : 0.55;
+    if (master) master.gain.value = S.mute ? 0 : 0.55 * miniGain();
+  }
+  /* Sound settings from 我的: SFX volume (S.vol), background music on/off (S.bgm) and its volume (S.bgmVol). */
+  function miniGain() { return S.vol / 100 * 1.5; } /* mini-games keep their own mix; the volume slider scales it (x1.2 at the default 80) */
+  function applyAudio() {
+    window.NaituanSound.setVolume(S.vol);
+    if (window.NaituanBGM) window.NaituanBGM.configure({ enabled: S.bgm, volume: S.bgmVol });
+    if (master) master.gain.value = S.mute ? 0 : 0.55 * miniGain();
+    window.dispatchEvent(new CustomEvent('naituan:sound-change'));
+  }
+  function setVolume(v, final) {
+    S.vol = Math.round(clamp(+v || 0)); applyAudio();
+    if (final) { save(); sound('ear'); }
+  }
+  function setBgm(on) { S.bgm = !!on; applyAudio(); if (window.NaituanBGM) window.NaituanBGM.unlock(); save(); }
+  function setBgmVolume(v, final) {
+    S.bgmVol = Math.round(clamp(+v || 0)); applyAudio();
+    if (window.NaituanBGM) window.NaituanBGM.unlock();
+    if (final) save();
   }
   function setMute(m) {
     S.mute = !!m;
-    if (master) master.gain.value = S.mute ? 0 : 0.55;
+    if (master) master.gain.value = S.mute ? 0 : 0.55 * miniGain();
     if (S.mute) window.NaituanSound.stop();
     rhSoundBtn.textContent = S.mute ? '音效：关' : '音效：开';
     window.dispatchEvent(new CustomEvent('naituan:sound-change'));
@@ -1052,7 +1072,7 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !saveModal.hidden) closeSave(); });
 
   /* ---------- wiring ---------- */
-  function userInteraction() { deferIdle(); window.NaituanSound.unlock(S.mute); }
+  function userInteraction() { deferIdle(); window.NaituanSound.unlock(S.mute); if (window.NaituanBGM) window.NaituanBGM.unlock(); }
   document.addEventListener('pointerdown', userInteraction);
   document.addEventListener('keydown', userInteraction);
   $('#catbtn').addEventListener('keydown', function (e) {
@@ -1105,7 +1125,7 @@
   /* small bridge for the separate mini-games (queue.js) */
   window.NT = {
     sound: sound,
-    setMute: setMute, finishRoom: function () { cancelRoomInteraction(); endVisit(); if (roomView) roomView.finish(); deferIdle(); },
+    setMute: setMute, setVolume: setVolume, setBgm: setBgm, setBgmVolume: setBgmVolume, miniGain: miniGain, finishRoom: function () { cancelRoomInteraction(); endVisit(); if (roomView) roomView.finish(); deferIdle(); },
     S: function () { return S; }, save: save, say: say, addFish: addFish, clamp: clamp, pick: pick, render: render, setPose: setPose, heartAt: heartAt, textAt: textAt,
     stage: stage, ext: EXT, isBusy: busy, setChrome: setChrome, setBusyUI: setBusyUI, hideCat: function (h) { $('#catbox').style.visibility = h ? 'hidden' : ''; bubble.hidden = !!h; stage.classList.toggle('playing', !!h); }
   };

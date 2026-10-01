@@ -78,7 +78,7 @@
       try { var C = window.AudioContext || window.webkitAudioContext; if (C) { AC = new C(); master = AC.createGain(); master.connect(AC.destination); } } catch (e) { AC = null; }
     }
     if (AC && AC.state === 'suspended') { try { AC.resume(); } catch (e) {} }
-    if (master) master.gain.value = NT.S().mute ? 0 : 0.5;
+    if (master) master.gain.value = NT.S().mute ? 0 : 0.5 * NT.miniGain();
   }
   function tone(f0, f1, dur, type, vol, delay) {
     if (!AC || NT.S().mute) return;
@@ -402,7 +402,7 @@
   $('#cqBookX').addEventListener('click', function () { if (bookOnly) { bookOnly = false; leave(); return; } el.book.hidden = true; paintMenu(); el.menu.hidden = false; });
   $('#cqBookSell').addEventListener('click', sellAll);
   el.snd.addEventListener('click', function () { NT.setMute(!NT.S().mute); paintMenu(); });
-  window.addEventListener('naituan:sound-change', function () { if (master) master.gain.value = NT.S().mute ? 0 : 0.5; });
+  window.addEventListener('naituan:sound-change', function () { if (master) master.gain.value = NT.S().mute ? 0 : 0.5 * NT.miniGain(); });
   window.addEventListener('resize', function () { if (G && !root.hidden) layout(true); });
   window.addEventListener('orientationchange', function () { setTimeout(function () { if (G && !root.hidden) layout(true); }, 250); });
   function openCollection() {
