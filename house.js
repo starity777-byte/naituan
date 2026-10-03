@@ -3,7 +3,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var app = $('app'), NT = window.NT, Life = window.NaituanLife;
   var page = 'home', toastTimer = 0;
-  var views = { home: $('homeView'), life: $('lifeView'), games: $('gamesView') };
+  var views = { home: $('homeView'), life: $('lifeView'), games: $('gamesView'), profile: $('profileView') };
   function menu(open, restoreFocus) {
     $('pawMenu').hidden = !open;
     $('pawToggle').setAttribute('aria-expanded', String(open));
@@ -19,7 +19,8 @@
     page = next;
     Object.keys(views).forEach(function (key) { views[key].hidden = key !== next; });
     app.dataset.page = next;
-    $('navHome').removeAttribute('aria-current'); $('navLife').removeAttribute('aria-current');
+    ['navHome', 'navLife', 'navProfile'].forEach(function (id) { $(id).removeAttribute('aria-current'); });
+    if (next === 'profile') $('navProfile').setAttribute('aria-current', 'page');
     if (next === 'home') { $('navHome').setAttribute('aria-current', 'page'); NT.room.refresh(); }
     if (next === 'life') { $('navLife').setAttribute('aria-current', 'page'); Life.render(); }
     sync();
@@ -67,7 +68,7 @@
       button.title = entry[2] + ' ' + amount + '% · ' + entry[3];
       button.setAttribute('aria-label', button.title);
     });
-    if ($('profileDialog').open) {
+    if (page === 'profile') {
       $('profileFish').textContent = state.fish.toLocaleString();
       $('profileGems').textContent = life.gems.toLocaleString();
       var minutes = Object.keys(life.days).reduce(function (sum, key) { return sum + (Number(life.days[key].focusMinutes) || 0); }, 0);
@@ -86,9 +87,8 @@
     }
   }
   function action(name) {
-    if (name === 'home' || name === 'life' || name === 'games') { navigate(name); return; }
+    if (name === 'home' || name === 'life' || name === 'games' || name === 'profile') { navigate(name); return; }
     menu(false);
-    if (name === 'profile') { NT.finishRoom(); $('profileDialog').showModal(); sync(); }
     if (name === 'shop') $('btnShop').click();
     if (name === 'book') window.NTQ.openBook();
     if (name === 'arrange') { $('roomArrange').click(); $('roomArrange').focus({ preventScroll: true }); }
@@ -117,14 +117,14 @@
   $('profileMusicVolume').addEventListener('change', function (event) { NT.setBgmVolume(event.target.value, true); sync(); });
   // The music steps aside while a mini-game or the study room brings its own sound.
   if (window.NaituanBGM) window.NaituanBGM.setGate(function () { var study = $('plannerStudy'); return !NT.isBusy() && !(study && study.open); });
-  $('profileSave').addEventListener('click', function () { $('profileDialog').close(); $('btnSave').click(); $('saveText').focus(); });
+  $('profileSave').addEventListener('click', function () { $('btnSave').click(); });
   document.addEventListener('pointerdown', function (event) {
     if (!$('pawMenu').hidden && !$('pawMenu').contains(event.target) && !$('pawToggle').contains(event.target)) menu(false);
   });
   document.addEventListener('keydown', function (event) {
     if (event.key === 'Escape' && !$('pawMenu').hidden) { menu(false, true); event.preventDefault(); }
     if (!$('saveModal').hidden && event.key === 'Tab') {
-      var nodes = Array.from($('saveModal').querySelectorAll('button:not(:disabled), textarea'));
+      var nodes = Array.from($('saveModal').querySelectorAll('button:not(:disabled), textarea')).filter(function (node) { return node.getClientRects().length; });
       var first = nodes[0], last = nodes[nodes.length - 1];
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }

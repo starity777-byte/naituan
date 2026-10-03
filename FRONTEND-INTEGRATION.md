@@ -1,16 +1,30 @@
-# 奶团生活页接口（2026-09-29）
+# 奶团生活页接口（2026-10-03）
 
 本次主前端施工只修改 index.html、house.css、house.js、life.js，以及 game.js / queue.js 的小范围接口。
 最新分工：日历、自习室、待办专项独立创建或修改 planner-state.js、planner.js、planner.css；主前端不会写这些文件。
-主前端负责在 index.html 引入，顺序为 game.js → queue.js → life.js → planner-state.js → planner.js → house.js。
+当前 index.html 引入顺序为 game.js → queue.js → life.js → photo-store.js → journal-state.js → journal.js → planner-state.js → study-ambience.js → planner.js → backup.js → house.js。
 life.js 只拥有单词与饮食卡片、公共存档 API；待办的渲染与事件也由专项接管。
 专项可以把独立状态放在 life.planner；read/update 完整保留该对象。
 如果暴露 NaituanPlanner.totalFocusMinutes()，我的页面会用它显示累计专注分钟。
 
 ## 生活状态
 
-生活记录直接放在 NT.S().life，随现有 NT1 存档导出 / 导入，无第二份存档。
+生活记录元数据放在 NT.S().life；照片 Blob 放在本机 IndexedDB。完整备份文件同时包含两者及整个小屋状态，旧 NT1 存档码仍可导入。
 请通过 window.NaituanLife 操作，不直接写 localStorage。
+
+## 日常记录与总览
+
+- `life.days[date].entries` 保存 `{id,text,photoId,createdAt,updatedAt,reply}`。文字、照片、图文均各计一条，允许一天多条。
+- `journal-state.js` 统一读取新记录及旧 `day.food`，只统计日常记录；单词、任务、专注仍是当天的独立事实。旧饮食照片在成功写入 IndexedDB 后才移除内联数据。
+- `journal.js` 负责日期时间线、日期相册、编辑与可撤销删除、我的记录总览。`NaituanJournal.dayStats(date)` 给日历提供记录圆点。
+- `photo-store.js` 的 `NaituanPhotos` 负责本机照片压缩、读写、显示和导出。照片不会上传。
+- 我的为独立 `profileView` 页面；保留小屋声音、游戏和专注统计，在底部导航及爪爪菜单中均可进入。
+
+## 完整备份
+
+`backup.js` 导出 `{format:'naituan-house',version:2,createdAt,data,photos}` JSON 文件。`data` 为整个 `NT.S()` 快照，包含 `cq` 小游戏、房间装扮、声音设置及 `life`；`photos` 为引用到的照片及其 dataURL。缺少照片时会报告错误，不生成不完整备份。
+
+恢复先校验文件并将照片写入新 ID，再通过 `NT.restoreState(data)` 提交存档；保存失败恢复原状态并清理临时照片。成功后清理旧照片，触发 `naituan:life-change` 和 `naituan:save-import` 刷新页面。用户选择文件后需点击确认覆盖；旧 NT1 码通过两次点击确认。
 
 - read()：返回生活状态的深拷贝。
 - update(mutator, message?)：复制当前状态，把副本传给 mutator，同步保存。成功返回 true；失败恢复原状态并提示，返回 false。

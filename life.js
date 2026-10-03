@@ -38,6 +38,12 @@
     if (!isPlainObject(item) || typeof item.id !== 'string' || typeof item.text !== 'string' || typeof item.done !== 'boolean') return null;
     return copyTodo(item);
   }
+  function sanitizeEntry(item) {
+    if (!isPlainObject(item) || typeof item.id !== 'string') return null;
+    var text = typeof item.text === 'string' ? item.text : '', photoId = typeof item.photoId === 'string' ? item.photoId : '';
+    if (!text && !photoId) return null;
+    return { id: item.id, text: text, photoId: photoId, createdAt: finiteOr(item.createdAt, 0), updatedAt: finiteOr(item.updatedAt, 0), reply: typeof item.reply === 'string' ? item.reply : '' };
+  }
   function sanitizeDay(raw) {
     if (!isPlainObject(raw)) return null;
     var day = {};
@@ -48,7 +54,10 @@
     if (Object.prototype.hasOwnProperty.call(raw, 'food')) {
       var food = isPlainObject(raw.food) ? raw.food : {};
       day.food = { note: typeof food.note === 'string' ? food.note : '', photo: photoData(food.photo) };
+      if (typeof food.photoId === 'string') day.food.photoId = food.photoId;
+      if (typeof food.createdAt === 'number' && Number.isFinite(food.createdAt)) day.food.createdAt = food.createdAt;
     }
+    if (Array.isArray(raw.entries)) day.entries = raw.entries.map(sanitizeEntry).filter(Boolean);
     return day;
   }
   function sanitizeDays(raw) {

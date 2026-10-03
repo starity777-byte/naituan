@@ -167,9 +167,9 @@
     $('expandedMonth').textContent = expanded ? '给日子留一点期待' : dateLabel(start) + ' — ' + dateLabel(D.shift(start, 6));
     var html = '';
     for (var i = 0; i < length; i++) {
-      var key = D.shift(start, i), d = D.date(key), s = D.stats(p, key);
-      var label = key.replace(/-/g, ' ') + (key === today ? '，今天' : '') + (s.tasks ? '，' + s.tasks + ' 件待办' : '') + (s.ms ? '，专注 ' + timeText(s.ms) : '');
-      html += '<button type="button" data-date="' + key + '" aria-label="' + label + '" aria-pressed="' + (key === selected) + '"' + (key === today ? ' aria-current="date"' : '') + (expanded && d.getMonth() !== m.getMonth() ? ' class="planner-outside"' : '') + '><span>' + d.getDate() + '</span><span class="planner-day-dots" aria-hidden="true">' + (s.tasks ? '<i class="planner-dot task-dot"></i>' : '') + (s.ms ? '<i class="planner-dot focus-dot"></i>' : '') + '</span></button>';
+      var key = D.shift(start, i), d = D.date(key), s = D.stats(p, key), records = window.NaituanJournal ? window.NaituanJournal.dayStats(key).count : 0;
+      var label = key.replace(/-/g, ' ') + (records ? '，' + records + ' 条日常记录' : '') + (key === today ? '，今天' : '') + (s.tasks ? '，' + s.tasks + ' 件待办' : '') + (s.ms ? '，专注 ' + timeText(s.ms) : '');
+      html += '<button type="button" data-date="' + key + '" aria-label="' + label + '" aria-pressed="' + (key === selected) + '"' + (key === today ? ' aria-current="date"' : '') + (expanded && d.getMonth() !== m.getMonth() ? ' class="planner-outside"' : '') + '><span>' + d.getDate() + '</span><span class="planner-day-dots" aria-hidden="true">' + (s.tasks ? '<i class="planner-dot task-dot"></i>' : '') + (s.ms ? '<i class="planner-dot focus-dot"></i>' : '') + (records ? '<i class="planner-dot record-dot"></i>' : '') + '</span></button>';
     }
     $(expanded ? 'calendarGrid' : 'calendarWeek').innerHTML = html;
     var summary = D.stats(p, selected);
@@ -296,11 +296,12 @@
   function tickDisplay() {
     if (!started) return;
     var t = state().timer;
-    if (!t) { document.title = originalTitle; return; }
+    if (!t) { document.title = originalTitle; if ($('journalStudyNote')) $('journalStudyNote').textContent = state().result ? '这一段已收好，点开看看' : '陪你专注一小会儿'; return; }
     var elapsed = D.elapsed(t, Date.now()), remaining = t.plannedMs - elapsed, text = clock(remaining);
     $('focusTime').textContent = text;
     $('studyTime').textContent = text;
     $('studyPhase').textContent = t.runningSince == null ? '已暂停' : t.kind === 'break' ? '休息时间' : '正在专注';
+    if ($('journalStudyNote')) $('journalStudyNote').textContent = $('studyPhase').textContent + ' · ' + text;
     $('studyElapsed').textContent = (t.kind === 'break' ? '已经休息 ' : '已经专注 ') + timeText(elapsed);
     $('studyClock').style.setProperty('--study-progress', (elapsed / t.plannedMs * 100) + '%');
     document.title = text + ' · ' + (t.runningSince == null ? '已暂停' : t.kind === 'break' ? '奶团陪你休息' : '奶团陪你专注');

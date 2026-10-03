@@ -1100,20 +1100,24 @@
     try { var o = JSON.parse(decodeURIComponent(escape(atob(txt.slice(4))))); if (o && o.v === 1 && o.data && typeof o.data.hunger === 'number') return o.data; } catch (e) {}
     return null;
   }
-  function disarm() { armed = false; saveLoad.textContent = '导入这串码'; }
+  function disarm() { if (window.NaituanBackup) { window.NaituanBackup.disarm(); return; } armed = false; saveLoad.textContent = '导入这串码'; }
   function openSave() {
+    if (window.NaituanBackup) { window.NaituanBackup.open(); return; }
     if (busy()) return;
     sound('tap');
     cancelRoomInteraction();
     if (roomView) roomView.finish();
     saveText.value = exportCode(); saveMsg.textContent = '这是这台设备上现在的进度。'; disarm(); saveModal.hidden = false;
   }
-  function closeSave() { sound('tap'); saveModal.hidden = true; disarm(); if (roomView) roomView.refresh(); }
+  function closeSave() {
+    if (window.NaituanBackup) { window.NaituanBackup.close(); return; } sound('tap'); saveModal.hidden = true; disarm(); if (roomView) roomView.refresh(); }
   function copySave() {
+    if (window.NaituanBackup) { window.NaituanBackup.download(); return; }
     var fallback = function () { saveText.focus(); saveText.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} saveMsg.textContent = ok ? '已复制。' : '已经全选了，长按选择「拷贝」就行。'; };
     try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(saveText.value).then(function () { sound('save'); saveMsg.textContent = '已复制。'; }, fallback); else fallback(); } catch (e) { fallback(); }
   }
   function importSave() {
+    if (window.NaituanBackup) { window.NaituanBackup.importLegacy(saveText.value); return; }
     var d = parseCode(saveText.value);
     if (!d) { disarm(); sound('nope'); saveMsg.textContent = '这串码不对，请把以 NT1: 开头的整串完整粘贴进来。'; return; }
     if (!armed) { armed = true; sound('pick'); saveLoad.textContent = '再点一次，确认覆盖'; saveMsg.textContent = '会覆盖这台设备现在的进度（小鱼干 ' + S.fish + '，最高 ' + S.best + ' 层）。'; return; }
@@ -1197,6 +1201,18 @@
   }
   /* small bridge for the separate mini-games (queue.js) */
   window.NT = {
+    exportState: function () { return JSON.parse(JSON.stringify(S)); },
+    restoreState: function (data) {
+      if (busy()) return false;
+      var previous = S;
+      cancelRoomInteraction(); endVisit(); override = null;
+      try {
+        var incoming = JSON.parse(JSON.stringify(data)); incoming.t = now(); load(incoming);
+        if (window.NaituanLife) window.NaituanLife.read();
+        if (!save()) throw new Error('Storage unavailable');
+      } catch (_) { S = previous; applyAudio(); paintDecor(); render(); return false; }
+      paintDecor(); render(); return true;
+    },
     sound: sound,
     setMute: setMute, setVolume: setVolume, setBgm: setBgm, setBgmVolume: setBgmVolume, miniGain: miniGain, finishRoom: function () { cancelRoomInteraction(); endVisit(); if (roomView) roomView.finish(); deferIdle(); },
     S: function () { return S; }, save: save, say: say, addFish: addFish, clamp: clamp, pick: pick, render: render, setPose: setPose, heartAt: heartAt, textAt: textAt,

@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="decor-shop.css?v=cake-peach-20260929">
 <link rel="stylesheet" href="house.css?v=volume-20261001">
 <link rel="stylesheet" href="planner.css?v=immersive-20260929">
+<link rel="stylesheet" href="journal.css?v=journal-20261003">
 </head>
 <body>
 <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -231,7 +232,13 @@
 
 <main class="life-view paper-view" id="lifeView" aria-labelledby="lifeTitle" hidden>
   <header class="life-heading"><h1 id="lifeTitle">生活</h1><time id="lifeDate"></time></header>
-  <section class="paper-card calendar-card" aria-label="生活日历">
+  <div class="journal-tools">
+    <button id="journalStudyOpen" type="button"><svg class="ui-icon"><use href="#i-book"/></svg><span>奶团自习室<small id="journalStudyNote">陪你专注一小会儿</small></span></button>
+    <button id="journalPlansOpen" type="button" aria-expanded="false" aria-controls="journalPlans"><svg class="ui-icon"><use href="#i-check"/></svg><span>今日小计划<small id="journalPlanCount">慢慢来就好</small></span></button>
+  </div>
+  <div class="journal-daybar"><div><h2 id="journalDayTitle">今天</h2><time id="journalDate"></time></div><button id="journalCalendarOpen" type="button" aria-expanded="false" aria-controls="journalCalendar">翻翻日历 <svg class="ui-icon"><use href="#i-book"/></svg></button></div>
+  <p id="journalDayReview" class="journal-review">留一点空白也很好。</p>
+  <section class="paper-card calendar-card journal-calendar-card" id="journalCalendar" hidden aria-label="生活日历">
     <div class="section-line"><span id="calendarMonth">9月</span><button class="text-button" id="calendarToggle" type="button" aria-expanded="false" aria-controls="calendarExpanded">展开日历 <span aria-hidden="true">›</span></button></div>
     <div class="week-labels" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
     <div class="calendar-days" id="calendarWeek"></div>
@@ -241,22 +248,26 @@
     </div>
     <button class="text-button back-today" id="calendarToday" type="button" hidden>回到今天</button>
   </section>
-  <section class="paper-card checkin-card" aria-labelledby="checkinTitle">
+  <section class="paper-card checkin-card" hidden aria-labelledby="checkinTitle">
     <h2 id="checkinTitle">今日打卡</h2>
     <div class="checkin-grid">
       <button class="word-checkin" id="wordCheckin" type="button"><img src="assets/shy.webp" alt="" draggable="false"><span><b>单词</b><small id="wordStatus">学一点，进步一点</small></span></button>
       <button class="food-checkin" id="foodCheckin" type="button"><img id="foodThumbnail" alt="" hidden><span class="food-caption"><svg class="ui-icon"><use href="#i-camera"/></svg><b>饮食</b><small id="foodStatus">拍下今天吃了什么</small></span></button>
     </div>
   </section>
-  <section class="paper-card focus-card" aria-labelledby="focusTitle">
+  <section class="paper-card focus-card" hidden aria-labelledby="focusTitle">
     <div><h2 id="focusTitle">自习室</h2><output id="focusTime" aria-label="专注剩余时间">25:00</output><p id="focusNote">奶团陪你一起专注</p></div>
     <div class="focus-actions"><button class="primary-button" id="focusToggle" type="button">开始专注</button><button class="text-button" id="focusReset" type="button" hidden>重新计时</button></div>
   </section>
-  <section class="paper-card todo-card" aria-labelledby="todoTitle">
+  <section class="paper-card todo-card" id="journalPlans" hidden aria-labelledby="todoTitle">
     <div class="section-line"><h2 id="todoTitle">待办</h2><button class="text-button" id="todoAdd" type="button"><svg class="ui-icon"><use href="#i-plus"/></svg>添加</button></div>
     <form class="todo-form" id="todoForm" hidden><input id="todoInput" aria-label="新的待办" placeholder="想完成的一件小事" maxlength="120" autocomplete="off" required><button type="submit" class="icon-button" aria-label="保存待办"><svg class="ui-icon"><use href="#i-check"/></svg></button><button type="button" id="todoCancel" class="icon-button" aria-label="取消添加"><svg class="ui-icon"><use href="#i-close"/></svg></button></form>
     <ul class="todo-list" id="todoList"></ul><p class="empty-note" id="todoEmpty" hidden>今天留一点时间给自己吧。</p>
   </section>
+  <div class="journal-tabs" aria-label="记录视图"><button type="button" id="journalNotesTab" aria-pressed="true">日常记录</button><button type="button" id="journalPhotosTab" aria-pressed="false">照片</button><button type="button" id="journalToday" hidden>回到今天</button></div>
+  <div id="journalList" class="journal-list"></div><div id="journalAlbum" class="journal-album" hidden></div>
+  <button id="journalAdd" class="journal-add" type="button"><svg class="ui-icon"><use href="#i-plus"/></svg>记一点今天</button>
+  <div class="journal-secondary"><button id="journalWordOpen" type="button">单词打卡</button><button id="journalUndo" type="button" hidden>撤销删除</button></div>
   <p id="lifeStatus" class="life-status" role="status" aria-live="polite"></p>
 </main>
 
@@ -274,14 +285,16 @@
 <nav class="bottom-nav" id="bottomNav" aria-label="主要页面">
   <button type="button" id="navHome" data-house-action="home" aria-current="page"><svg class="ui-icon"><use href="#i-home"/></svg>窝</button>
   <button type="button" id="navLife" data-house-action="life"><svg class="ui-icon"><use href="#i-leaf"/></svg>生活</button>
+  <button type="button" id="navProfile" data-house-action="profile"><svg class="ui-icon"><use href="#i-user"/></svg>我的</button>
 </nav>
 
-<dialog class="house-dialog" id="profileDialog" aria-labelledby="profileTitle">
-  <button class="dialog-close icon-button" data-close-dialog type="button" aria-label="关闭我的页面"><svg class="ui-icon"><use href="#i-close"/></svg></button>
-  <img class="profile-cat" src="assets/happy.webp" alt="">
-  <h2 id="profileTitle">和奶团的日子</h2><p id="together">已陪伴 0 分钟</p>
-  <div class="profile-stats"><span><b id="profileFish">0</b>小鱼干</span><span><b id="profileGems">0</b>成长宝石</span><span><b id="profileFocus">0</b>专注分钟</span></div>
-  <p class="profile-help">右上角的小鱼、爱心、月亮，分别可以喂食、摸摸和哄睡。轻点奶团也会有回应哦。</p>
+<main class="paper-view journal-profile" id="profileView" aria-labelledby="profileTitle" hidden>
+  <header class="journal-profile-heading"><div><h1 id="profileTitle">我的</h1><p id="together">已陪伴 0 分钟</p></div><img src="assets/shy.webp" alt="陪着你的奶团" draggable="false"></header>
+  <div class="journal-overview" aria-label="生活记录总览"><div><b id="profileRecordCount">0</b><span>日常记录</span></div><div><b id="profileRecordDays">0</b><span>留下记录的天数</span></div><div><b id="profilePhotoCount">0</b><span>照片</span></div></div>
+  <section aria-labelledby="journalHistoryTitle"><h2 id="journalHistoryTitle" class="journal-history-title">日子慢慢留下来</h2><div class="journal-period"><button id="journalRecent" type="button" aria-pressed="true">近三个月</button><button id="journalYear" type="button" aria-pressed="false">今年</button></div><div id="journalHeatmap"></div><div class="journal-heat-legend" aria-hidden="true">少 <i class="journal-swatch"></i><i class="journal-swatch" data-level="1"></i><i class="journal-swatch" data-level="2"></i><i class="journal-swatch" data-level="3"></i><i class="journal-swatch" data-level="4"></i> 多</div><p class="journal-heat-hint">每格是一天，颜色随日常记录数加深。点一下，回看那天。</p></section>
+  <button id="profileAlbum" class="journal-profile-row" type="button"><span><svg class="ui-icon"><use href="#i-camera"/></svg>日期相册</span><span aria-hidden="true">›</span></button>
+  <button id="profileSave" class="journal-profile-row" type="button"><span><svg class="ui-icon"><use href="#i-book"/></svg>完整备份 · 导出 / 恢复</span><span aria-hidden="true">›</span></button>
+  <details class="journal-settings"><summary>小屋与声音</summary><div class="profile-stats"><span><b id="profileFish">0</b>小鱼干</span><span><b id="profileGems">0</b>成长宝石</span><span><b id="profileFocus">0</b>专注分钟</span></div>
   <section class="profile-audio" aria-label="声音设置">
     <button class="secondary-button" id="profileSound" type="button" aria-pressed="true">音效：开</button>
     <label class="profile-slider" for="profileVolume"><span>音效音量</span><output id="profileVolumeValue" for="profileVolume">80%</output><input id="profileVolume" type="range" min="0" max="100" step="5" value="80" aria-label="音效音量"></label>
@@ -289,9 +302,9 @@
     <label class="profile-slider" for="profileMusicVolume"><span>音乐音量</span><output id="profileMusicVolumeValue" for="profileMusicVolume">60%</output><input id="profileMusicVolume" type="range" min="0" max="100" step="5" value="60" aria-label="背景音乐音量"></label>
     <p class="profile-help" id="profileBgmTrack">音乐会跟着当地时间变换</p>
   </section>
-  <button class="secondary-button" id="profileSave" type="button">存档 · 导出 / 导入</button>
-  <p class="local-note">小屋与生活记录保存在这台设备的浏览器里</p>
-</dialog>
+  <p class="profile-help">右上角的小鱼、爱心、月亮，分别可以喂食、摸摸和哄睡。轻点奶团也会有回应哦。</p></details>
+  <p class="local-note">记录和照片保存在这台设备的浏览器里。<br>换设备前，记得导出完整备份。</p>
+</main>
 
 <dialog class="house-dialog" id="wordDialog" aria-labelledby="wordTitle">
   <button class="dialog-close icon-button" data-close-dialog type="button" aria-label="关闭单词打卡"><svg class="ui-icon"><use href="#i-close"/></svg></button>
@@ -306,15 +319,20 @@
   <form id="foodForm"><label class="photo-picker" for="foodFile"><img id="foodPreview" alt="饮食照片预览" hidden><span><svg class="ui-icon"><use href="#i-camera"/></svg>选择照片</span></label><input class="file-input" id="foodFile" type="file" accept="image/*"><label for="foodNote">今天吃了什么</label><textarea id="foodNote" maxlength="240" rows="3" placeholder="比如：热乎乎的番茄鸡蛋面"></textarea><button class="primary-button" id="foodSubmit" type="submit">保存饮食记录</button></form>
   <p id="foodMessage" class="form-message" role="status"></p><p class="local-note">照片只保存在本机，不会上传</p>
 </dialog>
+<dialog class="journal-entry-dialog" id="journalEntryDialog" aria-labelledby="journalEntryTitle">
+  <button id="journalEntryClose" class="dialog-close icon-button" type="button" aria-label="关闭记录编辑"><svg class="ui-icon"><use href="#i-close"/></svg></button>
+  <h2 id="journalEntryTitle">留下一点今天</h2><form id="journalEntryForm"><label class="journal-entry-date" for="journalEntryDate">这一天<input id="journalEntryDate" type="date" required></label><label class="sr-only" for="journalEntryText">日常记录</label><textarea id="journalEntryText" rows="4" maxlength="4000" placeholder="今天有些什么，想留下来？"></textarea><div class="journal-entry-preview"><img id="journalEntryPreview" alt="准备保存的照片" hidden><button id="journalRemovePhoto" type="button" aria-label="移除照片" hidden><svg class="ui-icon"><use href="#i-close"/></svg></button></div><input id="journalEntryFile" class="file-input" type="file" accept="image/*"><div class="journal-entry-actions"><button id="journalPickPhoto" type="button"><svg class="ui-icon"><use href="#i-camera"/></svg>留张照片</button><button id="journalEntrySave" class="primary-button" type="submit">收好这一刻</button></div><p id="journalEntryMessage" class="form-message" role="status"></p></form><p class="local-note">照片只留在本机，不会上传。</p>
+</dialog>
+<dialog class="house-dialog journal-menu" id="journalRecordMenu" aria-labelledby="journalMenuTitle"><button class="dialog-close icon-button" type="button" data-close-dialog aria-label="关闭记录选项"><svg class="ui-icon"><use href="#i-close"/></svg></button><h2 id="journalMenuTitle">这一条日常</h2><button id="journalEdit" type="button">修改记录</button><button id="journalDelete" type="button">删除记录</button></dialog>
+<dialog class="house-dialog journal-photo-dialog" id="journalPhotoDialog" aria-label="照片详情"><button class="dialog-close icon-button" type="button" data-close-dialog aria-label="关闭照片"><svg class="ui-icon"><use href="#i-close"/></svg></button><img id="journalPhotoFull" alt="日常照片"><p id="journalPhotoCaption"></p></dialog>
 <div class="house-toast" id="houseToast" role="status" aria-live="polite" hidden></div>
 
   <div class="modal" id="saveModal" hidden role="dialog" aria-modal="true" aria-labelledby="saveTitle">
     <div class="modal-card">
-      <h2 id="saveTitle">存档</h2>
-      <p>换手机、换地址的时候，用这串码把进度带过去：先在旧的地方复制，再到新的地方粘贴导入。</p>
-      <label for="saveText">存档码</label>
-      <textarea id="saveText" rows="5" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-      <div class="sg-btns"><button id="saveCopy" type="button">复制存档码</button><button id="saveLoad" class="main" type="button">导入这串码</button></div>
+      <h2 id="saveTitle">把日子收好</h2>
+      <p>完整备份包含小屋、游戏、计划、日常记录和照片。换设备时，选这份文件恢复就好。</p>
+      <div class="backup-actions"><button id="saveCopy" type="button">导出完整备份</button><button id="backupPick" type="button">选择备份文件</button><button id="backupRestore" type="button" hidden>确认覆盖并恢复</button></div><input id="backupFile" class="file-input" type="file" accept=".json,application/json">
+      <details class="backup-legacy"><summary>恢复以前的存档码</summary><label class="sr-only" for="saveText">旧存档码</label><textarea id="saveText" rows="4" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="粘贴以 NT1: 开头的旧存档码"></textarea><button id="saveLoad" class="secondary-button" type="button">导入旧存档码</button></details>
       <p class="modal-msg" id="saveMsg" role="status"></p>
       <button class="hs-quit" id="saveClose" type="button">关闭</button>
     </div>
@@ -327,12 +345,16 @@
 <script src="room.js?v=pet-20260930"></script>
 <script src="sound.js?v=volume-20261001"></script>
 <script src="bgm.js?v=20261002-soft-response-v4"></script>
-<script src="game.js?v=volume-20261003b"></script>
+<script src="game.js?v=journal-20261003c"></script>
 <script src="queue.js?v=volume-20261001"></script>
-<script src="life.js?v=sound-20261003b"></script>
+<script src="life.js?v=journal-20261003c"></script>
+<script src="photo-store.js?v=journal-20261003"></script>
+<script src="journal-state.js?v=journal-20261003"></script>
+<script src="journal.js?v=journal-20261003"></script>
 <script src="planner-state.js?v=house-20261003"></script>
 <script src="study-ambience.js?v=immersive-20260929"></script>
-<script src="planner.js?v=immersive-20260929"></script>
-<script src="house.js?v=theme-20261002-v1"></script>
+<script src="planner.js?v=journal-20261003"></script>
+<script src="backup.js?v=journal-20261003"></script>
+<script src="house.js?v=journal-20261003"></script>
 </body>
 </html>
