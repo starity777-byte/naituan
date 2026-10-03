@@ -52,11 +52,19 @@
 
   /* ---------- state ---------- */
   function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, mute: false, vol: 80, bgm: true, bgmVol: 60, cq: null, t: now() }; }
-  function load(hotData) {
-    var d = null;
-    if (hotData && typeof hotData.hunger === 'number') d = hotData;
-    else { try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { d = null; } }
-    S = fresh(); S.life = d && d.life && typeof d.life === 'object' ? d.life : null; loadDecor(d);
+  function isPlainObject(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    var proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  }
+  function adoptLife(raw) {
+    if (!isPlainObject(raw)) return null;
+    var api = window.NaituanLife;
+    if (api && typeof api.sanitize === 'function') return api.sanitize(raw);
+    return raw;
+  }
+  function installState(d) {
+    S = fresh(); S.life = adoptLife(d && d.life); loadDecor(d);
     if (d && typeof d.hunger === 'number') {
       S.hunger = clamp(d.hunger); S.mood = clamp(d.mood); S.energy = clamp(d.energy);
       S.sleeping = !!d.sleeping; S.secs = +d.secs || 0; S.fish = Math.max(0, Math.floor(+d.fish || 0)); S.best = Math.max(0, Math.floor(+d.best || 0)); S.bestBeat = Math.max(0, Math.floor(+d.bestBeat || 0)); S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
@@ -68,6 +76,24 @@
       }
     }
     applyAudio();
+  }
+  function backupStored(raw) {
+    if (raw == null || raw === '') return;
+    try { localStorage.setItem(KEY + '-backup', raw); } catch (e) {}
+  }
+  function load(hotData) {
+    var d = null, fromStore = true, raw = null;
+    if (hotData && typeof hotData.hunger === 'number') { d = hotData; fromStore = false; }
+    else {
+      raw = localStorage.getItem(KEY);
+      try { d = JSON.parse(raw || 'null'); } catch (e) { backupStored(raw); d = null; }
+    }
+    try { installState(d); }
+    catch (e) {
+      if (!fromStore) throw e;
+      backupStored(raw);
+      try { installState(null); } catch (e2) { S = fresh(); S.life = null; }
+    }
   }
   function save() { S.t = now(); try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
 
@@ -878,8 +904,21 @@
     d.appendChild(img); d.hidden = true; propsEl.appendChild(d);
   });
 
-  function hasItem(cat, id) { return (CATALOG[cat] || []).some(function (i) { return i.id === id; }); }
-  function findItem(cat, id) { return CATALOG[cat].filter(function (i) { return i.id === id; })[0]; }
+  function hasItem(cat, id) {
+    if (typeof id !== 'string' || !Object.prototype.hasOwnProperty.call(CATALOG, cat)) return false;
+    return CATALOG[cat].some(function (i) { return i.id === id; });
+  }
+  function findItem(cat, id) {
+    if (typeof id !== 'string' || !Object.prototype.hasOwnProperty.call(CATALOG, cat)) return undefined;
+    return CATALOG[cat].filter(function (i) { return i.id === id; })[0];
+  }
+  function ownKeyOk(key) {
+    if (typeof key !== 'string') return false;
+    var colon = key.indexOf(':');
+    if (colon <= 0 || colon !== key.lastIndexOf(':') || colon === key.length - 1) return false;
+    var cat = key.slice(0, colon), id = key.slice(colon + 1);
+    return Object.prototype.hasOwnProperty.call(CATALOG, cat) && hasItem(cat, id);
+  }
   function loadDecor(d) {
     S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0;
     S.roomLayout = window.NaituanRoom.cleanLayout(d && d.roomLayout);
@@ -893,10 +932,10 @@
       S.roomLayout = { 'prop:attic-cloud-rug': { x: 0.50, y: 0.79 }, 'prop:attic-moon-bed': { x: 0.18, y: 0.72 }, 'prop:attic-telescope': { x: 0.84, y: 0.62 } };
       return;
     }
-    if (d.own && typeof d.own === 'object') Object.keys(d.own).forEach(function (k) { var p = k.split(':'); if (d.own[k] && hasItem(p[0], p[1])) S.own[k] = 1; });
+    if (d.own && typeof d.own === 'object') Object.keys(d.own).forEach(function (k) { if (d.own[k] && ownKeyOk(k)) S.own[k] = 1; });
     if (d.eq && typeof d.eq === 'object') {
       ['wall', 'rug', 'win'].forEach(function (c) { if (hasItem(c, d.eq[c]) && S.own[c + ':' + d.eq[c]]) S.eq[c] = d.eq[c]; });
-      if (Array.isArray(d.eq.prop)) S.eq.prop = d.eq.prop.filter(function (id) { return hasItem('prop', id) && S.own['prop:' + id]; });
+      if (Array.isArray(d.eq.prop)) S.eq.prop = d.eq.prop.filter(function (id) { return typeof id === 'string' && hasItem('prop', id) && S.own['prop:' + id]; });
     }
     S.shopSeen = d.shopSeen ? 1 : 0;
   }
@@ -1061,7 +1100,18 @@
     if (!d) { disarm(); sound('nope'); saveMsg.textContent = '这串码不对，请把以 NT1: 开头的整串完整粘贴进来。'; return; }
     if (!armed) { armed = true; sound('pick'); saveLoad.textContent = '再点一次，确认覆盖'; saveMsg.textContent = '会覆盖这台设备现在的进度（小鱼干 ' + S.fish + '，最高 ' + S.best + ' 层）。'; return; }
     cancelRoomInteraction(); endVisit(); override = null;
-    d.t = now(); load(d); save(); paintDecor(); closeSave(); sound('reward'); say('存档导入好了', 3200); render();
+    var previous = JSON.parse(JSON.stringify(S));
+    try {
+      d.t = now();
+      load(d);
+      save();
+    } catch (e) {
+      S = previous;
+      try { applyAudio(); } catch (e2) {}
+      disarm(); sound('nope'); saveMsg.textContent = '这串码有问题，没有导入';
+      return;
+    }
+    paintDecor(); closeSave(); sound('reward'); say('存档导入好了', 3200); render();
   }
   $('#btnSave').addEventListener('click', openSave);
   $('#saveClose').addEventListener('click', closeSave);
