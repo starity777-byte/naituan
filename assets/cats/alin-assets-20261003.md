@@ -4,6 +4,7 @@
 
 - `assets/cakes/alin-cakes-20261003.png`：原透明 PNG 直接使用，8 款蛋糕从左至右、从上至下映射到收藏编号 8–15。
 - `assets/cats/alin-heads-20261003.png`：8 个原猫头保留原尺寸、位置和画风，通过 Codex 内置 `imagegen.imagegen` 去除原 RGB 图片的纯黑背景；映射到猫种编号 11–18。
+- 游戏实际加载同尺寸的 `.webp` 版本（质量 90、透明通道无损，约为原 PNG 的 1/8）；PNG 留作源文件。
 - 游戏通过 CSS 背景取景使用图集，没有拆分或重画单独头像。角色与素材权利沿用项目素材许可。
 
 猫图编辑参数：`transparent_background: true`，`referenced_image_paths` 使用阿琳提供的第二张素材。实际提示词：
