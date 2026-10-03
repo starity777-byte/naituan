@@ -379,12 +379,14 @@
     NT.ext.active = true; NT.hideCat(true); NT.setChrome(true); NT.setBusyUI(true);
     root.hidden = false; window.scrollTo(0, 0); root.classList.add('on'); NT.stage.classList.add('cqmode');
     audioInit(); openMenu();
+    if (window.NaituanStats) window.NaituanStats.enter('games/cake');
   }
   function leave() {
     if (G) G.token++; G = null; el.field.innerHTML = '';
     var c = cq(), stars3 = c.cleared.reduce(function (a, b) { return a + b; }, 0), got = c.seen.filter(Boolean).length;
     NT.ext.active = false; root.hidden = true; root.classList.remove('on'); NT.stage.classList.remove('cqmode');
     NT.hideCat(false); NT.setChrome(false); NT.setBusyUI(false);
+    if (window.NaituanStats) window.NaituanStats.leave();
     NT.setPose('happy', 2200); NT.say('蛋糕图鉴 ' + got + '/' + CAKES.length + '，下次还想去', 3600);
     NT.render(); NT.save();
   }
@@ -411,6 +413,7 @@
     root.hidden = false; root.classList.add('on'); NT.stage.classList.add('cqmode');
     el.play.hidden = el.menu.hidden = el.win.hidden = el.lose.hidden = true;
     paintBook(); el.book.hidden = false;
+    if (window.NaituanStats) window.NaituanStats.enter('cake-book');
   }
   window.NTQ = { get: function () { return G; }, CAKES: CAKES, cq: cq, openBook: openCollection };
 })();

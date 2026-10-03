@@ -9,6 +9,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="奶团小屋">
 <title>奶团小屋</title>
+<!-- Anonymous visit statistics: reviewed, self-hosted 51.LA SDK. See assets/vendor/51la/README.md -->
+<script src="stats.js?v=stats-20261003"></script>
+<script>window.LA = { config: { id: '3ROZRjfJ2i6G8O02', ck: '3ROZRjfJ2i6G8O02', hashMode: true, autoTrack: false } };</script>
+<script charset="UTF-8" src="assets/vendor/51la/js-sdk-pro-1.58.3.min.js" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon-192.png">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
@@ -303,7 +307,7 @@
     <p class="profile-help" id="profileBgmTrack">音乐会跟着当地时间变换</p>
   </section>
   <p class="profile-help">右上角的小鱼、爱心、月亮，分别可以喂食、摸摸和哄睡。轻点奶团也会有回应哦。</p></details>
-  <p class="local-note">记录和照片保存在这台设备的浏览器里。<br>换设备前，记得导出完整备份。</p>
+  <p class="local-note">记录和照片保存在这台设备的浏览器里，不会上传。<br>换设备前，记得导出完整备份。<br>小屋会匿名统计各页面的访问次数和停留时间，用来把它变得更好。</p>
 </main>
 
 <dialog class="house-dialog" id="wordDialog" aria-labelledby="wordTitle">
@@ -345,8 +349,8 @@
 <script src="room.js?v=layer-20261003"></script>
 <script src="sound.js?v=volume-20261001"></script>
 <script src="bgm.js?v=20261002-soft-response-v4"></script>
-<script src="game.js?v=layer-20261003"></script>
-<script src="queue.js?v=volume-20261001"></script>
+<script src="game.js?v=stats-20261003"></script>
+<script src="queue.js?v=stats-20261003"></script>
 <script src="life.js?v=journal-20261003c"></script>
 <script src="photo-store.js?v=journal-20261003"></script>
 <script src="journal-state.js?v=journal-20261003"></script>
@@ -355,6 +359,6 @@
 <script src="study-ambience.js?v=immersive-20260929"></script>
 <script src="planner.js?v=journal-20261003"></script>
 <script src="backup.js?v=journal-20261003"></script>
-<script src="house.js?v=journal-20261003"></script>
+<script src="house.js?v=stats-20261003"></script>
 </body>
 </html>

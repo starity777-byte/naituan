@@ -36,6 +36,9 @@
   var nextIdleAt = 0, nextWalkAt = 0, lastIdlePose = '', hiddenAt = 0, rubbing = false, visiting = null, pendingFurniture = null, walkPose = 'walkSide';
   var busy = function () { return RH.active || SG.active || EXT.active; };
   var roomView = null;
+  // Anonymous screen statistics (stats.js); a no-op if it is missing.
+  function statsEnter(name) { if (window.NaituanStats) window.NaituanStats.enter(name); }
+  function statsLeave() { if (window.NaituanStats) window.NaituanStats.leave(); }
   function setBusyUI(b) {
     btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = btnCake.disabled = b;
     if (b) { cancelRoomInteraction(); endVisit(); override = null; }
@@ -534,7 +537,7 @@
     sound('tap');
     RH.active = true; RHS = null;
     hsEl.hidden = false; stage.classList.add('playing'); $('#catbox').style.visibility = 'hidden'; bubble.hidden = true;
-    setBusyUI(true); setChrome(true); window.scrollTo(0, 0);
+    setBusyUI(true); setChrome(true); window.scrollTo(0, 0); statsEnter('games/hide');
     rhLayout(1); rhClearSlots(); rhFill.style.width = '0'; rhBpmEl.textContent = 'BPM ' + BPM0; rhJudge.textContent = '';
     rhPaint(); rhOver.hidden = true; rhIntro.hidden = false;
     $('#rhBest').textContent = S.bestBeat ? '最高分 ' + S.bestBeat : '还没有记录，来一局吧';
@@ -675,7 +678,7 @@
     if (RHS && !RHS.ended) { RHS.ended = true; clearInterval(RHS.sched); cancelAnimationFrame(RHS.raf); rhSettle(false); }
     var r = RHS && RHS.result;
     RH.active = false; hsEl.hidden = true; rhIntro.hidden = true; rhOver.hidden = true; rhClearSlots();
-    stage.classList.remove('playing'); bubble.hidden = false; $('#catbox').style.visibility = ''; setChrome(false); setBusyUI(false);
+    stage.classList.remove('playing'); bubble.hidden = false; $('#catbox').style.visibility = ''; setChrome(false); setBusyUI(false); statsLeave();
     if (r && RHS.hits > 0) {
       if (r.grade === 'S' || r.grade === 'A') { setPose('happy', 2600); say('节奏躲猫猫 ' + r.grade + '，小鱼干 +' + r.coins + '！', 4200); }
       else { setPose('shy', 2600); say('躲猫猫玩完了，小鱼干 +' + r.coins, 4200); }
@@ -731,7 +734,7 @@
     if (S.sleeping) { sound('nope'); say('奶团睡着了，先叫醒它'); return; }
     sound('boxgo');
     SG.active = true;
-    sgEl.hidden = false; stage.classList.add('stacking'); $('#catbox').style.visibility = 'hidden'; bubble.hidden = true; setBusyUI(true);
+    sgEl.hidden = false; stage.classList.add('stacking'); $('#catbox').style.visibility = 'hidden'; bubble.hidden = true; setBusyUI(true); statsEnter('games/stack');
     sgReset(); SG.last = performance.now();
     cancelAnimationFrame(SG.raf); SG.raf = requestAnimationFrame(sgLoop);
   }
@@ -843,7 +846,7 @@
   function sgLeave() {
     if (!SG.over) { sgSettle(); }
     SG.active = false; cancelAnimationFrame(SG.raf);
-    sgEl.hidden = true; sgOver.hidden = true; stage.classList.remove('stacking'); $('#catbox').style.visibility = ''; bubble.hidden = false; setBusyUI(false);
+    sgEl.hidden = true; sgOver.hidden = true; stage.classList.remove('stacking'); $('#catbox').style.visibility = ''; bubble.hidden = false; setBusyUI(false); statsLeave();
     var f = SG.floors || 0;
     if (f >= 8) { setPose('happy', 2600); say('堆了 ' + f + ' 层，小鱼干 +' + SG.earned + '！', 4200); }
     else if (f >= 1) { setPose('shy', 2600); say('堆了 ' + f + ' 层，小鱼干 +' + SG.earned, 4200); }
@@ -1077,11 +1080,11 @@
     cancelRoomInteraction(); endVisit(); pendingFurniture = null;
     SH.open = true; SH.sel = null; SH.msg = ''; S.shopSeen = 1; btnShop.removeAttribute('data-new');
     metersEl.hidden = actionsEl.hidden = hintEl.hidden = btnShop.hidden = true; shopEl.hidden = false; appEl.classList.add('shopping');
-    renderShop(); save();
+    renderShop(); save(); statsEnter('shop');
     var top = stage.getBoundingClientRect().top; if (top < 0) window.scrollBy(0, top - 8);
   }
   function closeShop() {
-    sound('tap');
+    sound('tap'); statsLeave();
     SH.open = false; SH.sel = null; shopEl.hidden = true;
     metersEl.hidden = actionsEl.hidden = hintEl.hidden = btnShop.hidden = false; appEl.classList.remove('shopping');
     paintDecor(); render();

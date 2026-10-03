@@ -17,6 +17,7 @@
     if (next !== 'home') NT.finishRoom();
     menu(false);
     page = next;
+    if (window.NaituanStats) window.NaituanStats.page(next);
     Object.keys(views).forEach(function (key) { views[key].hidden = key !== next; });
     app.dataset.page = next;
     ['navHome', 'navLife', 'navProfile'].forEach(function (id) { $(id).removeAttribute('aria-current'); });
