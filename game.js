@@ -43,6 +43,14 @@
   }
 
   var clamp = function (v) { return Math.max(0, Math.min(100, v)); };
+  var STAT_CAP = 1e9;
+  function finiteNumber(v) { return typeof v === 'number' && Number.isFinite(v); }
+  function countStat(v, fallback, nonNegative) {
+    if (!finiteNumber(v)) return fallback;
+    var n = Math.floor(v);
+    if (nonNegative) n = Math.max(0, n);
+    return n > STAT_CAP ? STAT_CAP : n;
+  }
   var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
   var now = function () { return Date.now(); };
 
@@ -64,11 +72,21 @@
     return raw;
   }
   function installState(d) {
+    var base = fresh();
     S = fresh(); S.life = adoptLife(d && d.life); loadDecor(d);
     if (d && typeof d.hunger === 'number') {
-      S.hunger = clamp(d.hunger); S.mood = clamp(d.mood); S.energy = clamp(d.energy);
-      S.sleeping = !!d.sleeping; S.secs = +d.secs || 0; S.fish = Math.max(0, Math.floor(+d.fish || 0)); S.best = Math.max(0, Math.floor(+d.best || 0)); S.bestBeat = Math.max(0, Math.floor(+d.bestBeat || 0)); S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
-      if (typeof d.vol === 'number') S.vol = Math.round(clamp(d.vol)); if (typeof d.bgm === 'boolean') S.bgm = d.bgm; if (typeof d.bgmVol === 'number') S.bgmVol = Math.round(clamp(d.bgmVol));
+      S.hunger = finiteNumber(d.hunger) ? clamp(d.hunger) : base.hunger;
+      S.mood = finiteNumber(d.mood) ? clamp(d.mood) : base.mood;
+      S.energy = finiteNumber(d.energy) ? clamp(d.energy) : base.energy;
+      S.sleeping = !!d.sleeping;
+      S.secs = countStat(d.secs, base.secs, false);
+      S.fish = countStat(d.fish, base.fish, true);
+      S.best = countStat(d.best, base.best, true);
+      S.bestBeat = countStat(d.bestBeat, base.bestBeat, true);
+      S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
+      if (typeof d.vol === 'number') S.vol = finiteNumber(d.vol) ? Math.round(clamp(d.vol)) : base.vol;
+      if (typeof d.bgm === 'boolean') S.bgm = d.bgm;
+      if (typeof d.bgmVol === 'number') S.bgmVol = finiteNumber(d.bgmVol) ? Math.round(clamp(d.bgmVol)) : base.bgmVol;
       var away = Math.min(Math.max((now() - (+d.t || now())) / 1000, 0), 6 * 3600);
       if (away > 20) { /* gentle hourly decay, capped at six hours; do not raise already-low stats */
         if (S.sleeping) { S.energy = clamp(S.energy + away * 0.5); S.hunger = Math.min(S.hunger, Math.max(20, S.hunger - away / 3600)); if (S.energy >= 100) S.sleeping = false; }
@@ -1104,7 +1122,12 @@
     try {
       d.t = now();
       load(d);
-      save();
+      if (!save()) {
+        S = previous;
+        try { applyAudio(); } catch (e2) {}
+        disarm(); sound('nope'); saveMsg.textContent = '存储空间不够，没有导入，可以先清理浏览器空间再试';
+        return;
+      }
     } catch (e) {
       S = previous;
       try { applyAudio(); } catch (e2) {}
