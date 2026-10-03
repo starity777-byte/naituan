@@ -18,14 +18,55 @@
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+KuaiLe&display=swap">
-<link rel="stylesheet" href="style.css?v=challenge-20261003-v2">
+<!-- Fonts load in the background: if Google Fonts is slow or blocked, the page still shows at once with system fonts. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+KuaiLe&display=swap" media="print" onload="this.media='all'">
+<link rel="preload" as="image" href="assets/peek.webp">
+<style>
+/* Splash: inline so it paints before anything else loads. splash.js takes over; if it never runs, the CSS fallback hides it after 12s. */
+.splash { position: fixed; inset: 0; z-index: 2147483000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: radial-gradient(circle at 50% 42%, #fffaf2 0, #f8f1e6 34%, #f3ebde 70%); color: #54392f; cursor: pointer; user-select: none; -webkit-user-select: none;
+  font-family: 'ZCOOL KuaiLe', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; transition: opacity .45s ease, transform .45s ease;
+  animation: splash-fallback 0s 12s forwards; -webkit-tap-highlight-color: transparent; }
+.splash.js { animation: none; }
+.splash:focus { outline: none; }
+.splash.leaving { opacity: 0; transform: scale(1.04); pointer-events: none; }
+.splash-cat { position: relative; width: min(46vw, 210px); aspect-ratio: 1; margin-bottom: 4px; }
+.splash-cat img { position: absolute; inset: 0; width: 100%; height: 100%; transform-origin: 50% 92%; transition: opacity .35s ease; }
+.splash-cat .peek { animation: splash-peek 1.8s ease-in-out infinite; }
+.splash-cat .hello { opacity: 0; }
+.splash.ready .splash-cat .peek { opacity: 0; animation: none; }
+.splash.ready .splash-cat .hello { opacity: 1; animation: splash-hop .6s cubic-bezier(.3,1.6,.5,1) both; }
+.splash.leaving .splash-cat .hello { animation: splash-jump .45s ease-in forwards; }
+.splash-title { margin: 0; font-size: 30px; font-weight: 400; letter-spacing: .08em; }
+.splash-paws { display: flex; gap: 10px; height: 22px; margin: 8px 0 2px; }
+.splash-paws svg { width: 18px; height: 18px; fill: #e7b48a; opacity: .18; animation: splash-step 1.2s ease-in-out infinite; }
+.splash-paws svg:nth-child(2) { animation-delay: .2s; transform: translateY(-5px) rotate(12deg); }
+.splash-paws svg:nth-child(3) { animation-delay: .4s; }
+.splash-paws svg:nth-child(4) { animation-delay: .6s; transform: translateY(-5px) rotate(12deg); }
+.splash.ready .splash-paws svg { animation: none; opacity: .85; }
+.splash-status { margin: 0; min-height: 1.4em; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif; font-size: 14px; color: #8c6f63; letter-spacing: .04em; }
+.splash.ready .splash-status { color: #54392f; animation: splash-breathe 1.6s ease-in-out .5s infinite; }
+@keyframes splash-peek { 0%, 100% { transform: rotate(-3deg) translateX(-2%); } 50% { transform: rotate(3deg) translateX(2%); } }
+@keyframes splash-hop { 0% { transform: translateY(8%) scale(1.06, .9); } 45% { transform: translateY(-9%) scale(.96, 1.05); } 75% { transform: translateY(0) scale(1.04, .96); } 100% { transform: none; } }
+@keyframes splash-jump { 30% { transform: translateY(4%) scale(1.06, .92); } 100% { transform: translateY(-22%) scale(.96, 1.05); } }
+@keyframes splash-step { 0%, 100% { opacity: .18; } 35% { opacity: .9; } }
+@keyframes splash-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@keyframes splash-fallback { to { visibility: hidden; pointer-events: none; } }
+@media (prefers-reduced-motion: reduce) { .splash-cat img, .splash-paws svg, .splash-status { animation: none !important; } .splash-paws svg { opacity: .6; } }
+</style>
+<link rel="stylesheet" href="style.css?v=webp-20261003">
 <link rel="stylesheet" href="decor-shop.css?v=cake-peach-20260929">
 <link rel="stylesheet" href="house.css?v=volume-20261001">
 <link rel="stylesheet" href="planner.css?v=immersive-20260929">
 <link rel="stylesheet" href="journal.css?v=journal-20261003">
 </head>
 <body>
+<div class="splash" id="splash" role="button" tabindex="0" aria-label="奶团小屋，正在加载">
+  <div class="splash-cat" aria-hidden="true"><img class="peek" src="assets/peek.webp" alt="" draggable="false"><img class="hello" src="assets/happy.webp" alt="" draggable="false"></div>
+  <p class="splash-title">奶团小屋</p>
+  <div class="splash-paws" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="14" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19" cy="9" rx="2" ry="2.7"/></svg><svg viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="14" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19" cy="9" rx="2" ry="2.7"/></svg><svg viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="14" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19" cy="9" rx="2" ry="2.7"/></svg><svg viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="14" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19" cy="9" rx="2" ry="2.7"/></svg></div>
+  <p class="splash-status" id="splashStatus" aria-live="polite">奶团正在醒来…</p>
+</div>
 <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <symbol id="i-paw" viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="15" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19.5" cy="10" rx="2" ry="2.7"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v11h-6v-7H9v7H3Z"/></symbol>
@@ -348,10 +389,10 @@
 <script src="decor-catalog.js?v=depth-20260929"></script>
 <script src="walking.js?v=walk-20260929"></script>
 <script src="room.js?v=layer-20261003"></script>
-<script src="sound.js?v=volume-20261001"></script>
+<script src="sound.js?v=splash-20261003"></script>
 <script src="bgm.js?v=games-music-20261003"></script>
-<script src="game.js?v=games-stats-20261003"></script>
-<script src="queue.js?v=games-stats-20261003"></script>
+<script src="game.js?v=splash-stats-20261003"></script>
+<script src="queue.js?v=splash-stats-20261003"></script>
 <script src="life.js?v=journal-20261003c"></script>
 <script src="photo-store.js?v=journal-20261003"></script>
 <script src="journal-state.js?v=journal-20261003"></script>
@@ -361,5 +402,6 @@
 <script src="planner.js?v=journal-20261003"></script>
 <script src="backup.js?v=journal-20261003"></script>
 <script src="house.js?v=games-stats-20261003"></script>
+<script src="splash.js?v=splash-20261003"></script>
 </body>
 </html>
