@@ -111,7 +111,12 @@
       catBox.style.transform = 'translate(-50%,-100%) scale(' + scale + ',' + scale + ')';
       catBox.dataset.depthScale = scale.toFixed(3);
       var support = options && options.onItem && getItemGeometry(options.onItem);
-      catBox.style.zIndex = editing ? 3 : 20 + Math.round(Math.max(p.y, support ? support.center.y + support.size.height * 0.45 : 0) * 1000);
+      // When sitting on a furniture item (knead), force zIndex above that item so the cat is never hidden behind it.
+      // The furniture's own zIndex is 10 + round(bottom * 1000); adding 20 clears any rounding tie.
+      var catZ = editing ? 3 : support
+        ? 10 + Math.round((support.center.y + support.size.height * 0.50) * 1000) + 20
+        : 20 + Math.round(p.y * 1000);
+      catBox.style.zIndex = catZ;
       if (catShadow) {
         catShadow.hidden = surface;
         catShadow.style.left = p.x * 100 + '%'; catShadow.style.top = p.y * 100 + '%';
