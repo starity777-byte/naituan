@@ -301,16 +301,8 @@
   function furnitureDestination(key, pose) {
     var geometry = roomView.getItemGeometry(key);
     if (!geometry) return null;
-    if (pose === 'knead') {
-      // Sit at the furniture's center — guaranteed to be inside the item, so zIndex always puts cat on top.
-      // Use a custom restAnchor from the catalog if present, otherwise fall back to center.
-      var it = window.NaituanDecor && window.NaituanDecor.items && window.NaituanDecor.items.find(function (i) { return 'prop:' + i.id === key; });
-      if (it && it.restAnchor) {
-        return { x: geometry.center.x + (it.restAnchor.x - 0.5) * geometry.size.width,
-                 y: geometry.center.y + (it.restAnchor.y - 0.5) * geometry.size.height };
-      }
-      return { x: geometry.center.x, y: geometry.center.y };
-    }
+    // knead: sit on the furniture itself (default rest anchor = its centre), not on the floor beside it.
+    if (pose === 'knead') return Object.assign({}, geometry.anchors.rest);
     var anchor = pose === 'watch' ? 'watch' : 'approach';
     var point = Object.assign({}, geometry.anchors[anchor]);
     if (pose === 'watch') point.y = roomView.floorY(point.x) + 0.03;

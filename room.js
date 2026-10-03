@@ -100,6 +100,25 @@
       }
       return p;
     }
+    // Furniture is layered by its bottom edge, so pieces in front cover pieces behind.
+    function itemLayer(g) { return 10 + Math.round((g.center.y + g.size.height * 0.5) * 1000); }
+    // The cat is layered by its feet, with one rule on top: once its feet reach a piece of furniture's centre line
+    // (or anywhere nearer the viewer) while standing within that piece's width, it is on the furniture, so it is
+    // drawn above it. Only feet behind the centre line slip behind. onItem forces "on top" for that piece.
+    var catSupport = null;
+    function catLayer(p, onItem) {
+      if (editing) return 3;
+      if (onItem === undefined) onItem = catSupport;
+      var z = 20 + Math.round(p.y * 1000);
+      items.forEach(function (it) {
+        if (!it.obstacle || it.el.hidden) return;
+        var g = getItemGeometry(it.key);
+        if (!g) return;
+        var within = Math.abs(p.x - g.center.x) <= g.size.width * 0.5;
+        if (it.key === onItem || (within && p.y >= g.center.y)) z = Math.max(z, itemLayer(g) + 1);
+      });
+      return z;
+    }
     function placeCat(p, persist, options) {
       p = cleanPoint(p);
       if (!p) return null;
@@ -110,13 +129,8 @@
       catBox.style.right = 'auto'; catBox.style.bottom = 'auto';
       catBox.style.transform = 'translate(-50%,-100%) scale(' + scale + ',' + scale + ')';
       catBox.dataset.depthScale = scale.toFixed(3);
-      var support = options && options.onItem && getItemGeometry(options.onItem);
-      // When sitting on a furniture item (knead), force zIndex above that item so the cat is never hidden behind it.
-      // The furniture's own zIndex is 10 + round(bottom * 1000); adding 20 clears any rounding tie.
-      var catZ = editing ? 3 : support
-        ? 10 + Math.round((support.center.y + support.size.height * 0.50) * 1000) + 20
-        : 20 + Math.round(p.y * 1000);
-      catBox.style.zIndex = catZ;
+      catSupport = options && options.onItem || null;
+      catBox.style.zIndex = catLayer(p, catSupport);
       if (catShadow) {
         catShadow.hidden = surface;
         catShadow.style.left = p.x * 100 + '%'; catShadow.style.top = p.y * 100 + '%';
@@ -138,7 +152,7 @@
       if (!it || it.el.hidden) return null;
       var r = it.el.getBoundingClientRect(), s = scene.getBoundingClientRect();
       if (!r.width || !r.height || !s.width || !s.height) return null;
-      var anchors = {}, definitions = Object.assign({ approach: { x: 0.5, y: 0.95 }, rest: { x: 0.5, y: 0.82 }, watch: { x: 0.5, y: 0.92 } }, it.anchors);
+      var anchors = {}, definitions = Object.assign({ approach: { x: 0.5, y: 0.95 }, rest: { x: 0.5, y: 0.5 }, watch: { x: 0.5, y: 0.92 } }, it.anchors);
       var layout = editing ? draft : o.layout(), transform = layout[key] || {};
       Object.keys(definitions).forEach(function (name) {
         var p = cleanPoint(definitions[name]);
@@ -230,8 +244,9 @@
       items.forEach(function (it) {
         if (!it.obstacle || it.el.hidden) return;
         var g = getItemGeometry(it.key);
-        if (g) it.el.style.zIndex = editing ? '' : 10 + Math.round((g.center.y + g.size.height * 0.50) * 1000);
+        if (g) it.el.style.zIndex = editing ? '' : itemLayer(g);
       });
+      if (!editing) catBox.style.zIndex = catLayer(getCatPosition());
     }
     function place(it, p) {
       draft[it.key] = bounded(it, Object.assign({ scale: 1, flipX: false, flipY: false }, draft[it.key], p));
@@ -259,7 +274,7 @@
     }
     function editUI() {
       scene.classList.toggle('arranging', editing); editTools.hidden = !editing;
-      catBox.style.zIndex = editing ? 3 : 20 + Math.round(getCatPosition().y * 1000);
+      catBox.style.zIndex = catLayer(getCatPosition());
       arrange.textContent = editing ? '确定' : '布置'; arrange.setAttribute('aria-pressed', String(editing));
       o.props.setAttribute('aria-hidden', 'false');
       items.forEach(function (it) {
