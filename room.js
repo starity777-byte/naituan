@@ -133,7 +133,7 @@
       if (!it || it.el.hidden) return null;
       var r = it.el.getBoundingClientRect(), s = scene.getBoundingClientRect();
       if (!r.width || !r.height || !s.width || !s.height) return null;
-      var anchors = {}, definitions = Object.assign({ approach: { x: 0.5, y: 0.95 }, rest: { x: 0.5, y: 0.68 }, watch: { x: 0.5, y: 0.92 } }, it.anchors);
+      var anchors = {}, definitions = Object.assign({ approach: { x: 0.5, y: 0.95 }, rest: { x: 0.5, y: 0.82 }, watch: { x: 0.5, y: 0.92 } }, it.anchors);
       var layout = editing ? draft : o.layout(), transform = layout[key] || {};
       Object.keys(definitions).forEach(function (name) {
         var p = cleanPoint(definitions[name]);

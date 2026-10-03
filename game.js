@@ -309,6 +309,8 @@
       point.x += side * (geometry.size.width * 0.35 + 0.045);
       point.y += 0.025;
     }
+    // knead: sit on the furniture surface, not the floor — skip groundPoint constraint
+    if (pose === 'knead') return point;
     return roomView.groundPoint(point);
   }
   function positionVisit() {
