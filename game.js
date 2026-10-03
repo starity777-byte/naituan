@@ -77,13 +77,21 @@
     }
     applyAudio();
   }
+  function backupStored(raw) {
+    if (raw == null || raw === '') return;
+    try { localStorage.setItem(KEY + '-backup', raw); } catch (e) {}
+  }
   function load(hotData) {
-    var d = null, fromStore = true;
+    var d = null, fromStore = true, raw = null;
     if (hotData && typeof hotData.hunger === 'number') { d = hotData; fromStore = false; }
-    else { try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { d = null; } }
+    else {
+      raw = localStorage.getItem(KEY);
+      try { d = JSON.parse(raw || 'null'); } catch (e) { backupStored(raw); d = null; }
+    }
     try { installState(d); }
     catch (e) {
       if (!fromStore) throw e;
+      backupStored(raw);
       try { installState(null); } catch (e2) { S = fresh(); S.life = null; }
     }
   }

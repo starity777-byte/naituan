@@ -180,6 +180,18 @@ test('corrupt stored JSON falls back to a fresh house', () => {
   assert.equal(Array.isArray(state.life.todos), true);
 });
 
+test('a throwing stored save is backed up before falling back to a fresh house', () => {
+  const original = '{"hunger":61,"fish":8,"life":{"gems":6,"note":"玩家原档"';
+  const { window, store } = boot(original);
+  assert.equal(store.get('naituan-house-v1-backup'), original);
+  assert.equal(store.get('naituan-house-v1'), original);
+  const state = window.NT.S();
+  assert.equal(state.hunger, 72);
+  assert.equal(state.eq.wall, 'scene-attic');
+  assert.equal(state.life.gems, 0);
+  assert.equal(Array.isArray(state.life.todos), true);
+});
+
 test('a normal save code imports back to the same data', () => {
   const photo = 'data:image/jpeg;base64,aaaa';
   const { window, document } = boot(null);
