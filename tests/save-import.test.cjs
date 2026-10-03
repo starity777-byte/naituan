@@ -405,3 +405,74 @@ test('an old localStorage save survives startup without dropping player data', (
   assert.equal(plain(state.life).planner.tasks.some(task => task.id === 'text-only'), false);
   assert.deepEqual(plain(state.life).planner.tasks.map(task => task.title), ['看完第 3 章']);
 });
+
+test('non-finite or 1e400 stats fall back to defaults and huge finite values cap at 1e9', () => {
+  const raw = '{' +
+    '"hunger":1e400,"mood":1e309,"energy":1e308,"sleeping":false,' +
+    '"secs":1500000000.9,"fish":1e400,"best":5e9,"bestBeat":3.7,' +
+    '"mute":false,"vol":1e400,"bgm":false,"bgmVol":101,' +
+    '"cq":null,"t":' + Date.now() + ',' +
+    '"life":{"version":1,"gems":5e9,"days":{' +
+      '"2026-10-03":{"words":1e400,"focusMinutes":2e9,"focusSessions":4},' +
+      '"2026-10-02":{"words":4e9,"focusMinutes":1e400,"focusSessions":9}' +
+    '},"todos":[],"timer":{"duration":1500,"remaining":1500,"endAt":0}}' +
+  '}';
+  const parsed = JSON.parse(raw);
+  assert.equal(Number.isFinite(parsed.hunger), false);
+  assert.equal(Number.isFinite(parsed.fish), false);
+  const { window } = boot(raw);
+  const state = window.NT.S();
+  assert.equal(state.hunger, 72);
+  assert.equal(state.mood, 70);
+  assert.equal(state.energy, 100);
+  assert.equal(state.secs, 1e9);
+  assert.equal(state.fish, 0);
+  assert.equal(state.best, 1e9);
+  assert.equal(state.bestBeat, 3);
+  assert.equal(state.vol, 80);
+  assert.equal(state.bgm, false);
+  assert.equal(state.bgmVol, 100);
+  assert.equal(state.life.gems, 1e9);
+  assert.equal(Object.prototype.hasOwnProperty.call(state.life.days['2026-10-03'], 'words'), false);
+  assert.equal(state.life.days['2026-10-03'].focusMinutes, 1e9);
+  assert.equal(state.life.days['2026-10-03'].focusSessions, 4);
+  assert.equal(state.life.days['2026-10-02'].words, 1e9);
+  assert.equal(Object.prototype.hasOwnProperty.call(state.life.days['2026-10-02'], 'focusMinutes'), false);
+  assert.equal(state.life.days['2026-10-02'].focusSessions, 9);
+  assert.equal(state.eq.wall, 'dots');
+  assert.equal(Number.isFinite(state.hunger), true);
+  assert.equal(Number.isFinite(state.fish), true);
+});
+
+test('importSave restores the previous house when save() returns false', () => {
+  const { window, document, audio, store } = boot(null);
+  window.NT.S().fish = 7;
+  window.NT.S().hunger = 61;
+  click(document, 'btnSave');
+  const before = store.get('naituan-house-v1');
+  const code = encode({
+    hunger: 11, mood: 22, energy: 33, sleeping: false, secs: 9, fish: 99, best: 5, bestBeat: 1,
+    mute: false, vol: 10, bgm: true, bgmVol: 10, cq: null, t: Date.now(),
+    life: { version: 1, gems: 50, days: {}, todos: [], timer: { duration: 1500, remaining: 1500, endAt: 0 } }
+  });
+  document.getElementById('saveText').value = code;
+  click(document, 'saveLoad');
+  const plays = [];
+  audio.play = (kind) => { plays.push(kind); return false; };
+  let sets = 0;
+  window.localStorage.setItem = (key, value) => {
+    sets += 1;
+    if (key === 'naituan-house-v1') throw new Error('quota');
+    store.set(key, String(value));
+  };
+  click(document, 'saveLoad');
+  assert.equal(document.getElementById('saveMsg').textContent, '存储空间不够，没有导入，可以先清理浏览器空间再试');
+  assert.equal(document.getElementById('saveLoad').textContent, '导入这串码');
+  assert.equal(plays.includes('nope'), true);
+  assert.equal(window.NT.S().fish, 7);
+  assert.equal(window.NT.S().hunger, 61);
+  assert.equal(window.NT.S().life.gems, 0);
+  assert.equal(store.get('naituan-house-v1'), before);
+  assert.equal(sets, 1);
+  assert.notEqual(document.getElementById('bubble').textContent, '存档导入好了');
+});

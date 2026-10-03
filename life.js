@@ -25,6 +25,8 @@
     return proto === Object.prototype || proto === null;
   }
   function finiteOr(value, fallback) { return typeof value === 'number' && Number.isFinite(value) ? value : fallback; }
+  var VALUE_CAP = 1e9;
+  function capKept(value) { return value > VALUE_CAP ? VALUE_CAP : value; }
   function photoData(value) {
     if (typeof value !== 'string') return '';
     if (value.indexOf('data:image/png') === 0 || value.indexOf('data:image/jpeg') === 0 || value.indexOf('data:image/webp') === 0) return value;
@@ -39,9 +41,9 @@
   function sanitizeDay(raw) {
     if (!isPlainObject(raw)) return null;
     var day = {};
-    if (typeof raw.words === 'number' && Number.isFinite(raw.words)) day.words = raw.words;
+    if (typeof raw.words === 'number' && Number.isFinite(raw.words)) day.words = capKept(raw.words);
     if (typeof raw.wordRewarded === 'boolean') day.wordRewarded = raw.wordRewarded;
-    if (typeof raw.focusMinutes === 'number' && Number.isFinite(raw.focusMinutes) && raw.focusMinutes >= 0) day.focusMinutes = raw.focusMinutes;
+    if (typeof raw.focusMinutes === 'number' && Number.isFinite(raw.focusMinutes) && raw.focusMinutes >= 0) day.focusMinutes = capKept(raw.focusMinutes);
     if (typeof raw.focusSessions === 'number' && Number.isFinite(raw.focusSessions) && raw.focusSessions >= 0) day.focusSessions = raw.focusSessions;
     if (Object.prototype.hasOwnProperty.call(raw, 'food')) {
       var food = isPlainObject(raw.food) ? raw.food : {};
@@ -77,7 +79,7 @@
     var life = {
       version: finiteOr(raw.version, base.version),
       days: sanitizeDays(raw.days),
-      gems: finiteOr(raw.gems, base.gems),
+      gems: capKept(finiteOr(raw.gems, base.gems)),
       todos: Array.isArray(raw.todos) ? raw.todos.map(sanitizeTodo).filter(Boolean) : base.todos.map(copyTodo),
       timer: sanitizeTimer(raw.timer)
     };
