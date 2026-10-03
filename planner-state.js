@@ -10,13 +10,101 @@
   function shift(value, days) { var d = date(value); d.setDate(d.getDate() + days); return dateKey(d); }
   function uid() { return 'p-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9); }
   function minutes(value) { return Math.max(1, Math.min(180, Math.round(Number(value) || 25))); }
+  function isPlainObject(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    var proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  }
+  function finiteNonNeg(value) { return typeof value === 'number' && Number.isFinite(value) && value >= 0; }
+  function dateKeyOk(value) { return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value); }
+  function cleanDayEntry(entry) {
+    if (!isPlainObject(entry) || !dateKeyOk(entry.date) || !finiteNonNeg(entry.ms)) return null;
+    return { date: entry.date, ms: entry.ms };
+  }
+  function cleanDayList(list) {
+    if (!Array.isArray(list)) return null;
+    var days = [];
+    for (var i = 0; i < list.length; i++) {
+      var day = cleanDayEntry(list[i]);
+      if (day) days.push(day);
+    }
+    return days;
+  }
+  function cleanTask(task) {
+    // Stored tasks use title (not text); see planner.js tasks.push.
+    if (!isPlainObject(task) || typeof task.id !== 'string' || typeof task.title !== 'string' || !dateKeyOk(task.date) || typeof task.done !== 'boolean') return null;
+    var clean = { id: task.id, title: task.title, date: task.date, done: task.done };
+    if (finiteNonNeg(task.createdAt)) clean.createdAt = task.createdAt;
+    return clean;
+  }
+  function cleanTasks(list) {
+    if (!Array.isArray(list)) return [];
+    var tasks = [];
+    for (var i = 0; i < list.length; i++) {
+      var task = cleanTask(list[i]);
+      if (task) tasks.push(task);
+    }
+    return tasks;
+  }
+  function idOrNull(value) { return value === null || typeof value === 'string' ? value : false; }
+  function cleanSession(session) {
+    if (!isPlainObject(session) || typeof session.id !== 'string' || typeof session.title !== 'string' || typeof session.completed !== 'boolean') return null;
+    if (idOrNull(session.taskId) === false) return null;
+    if (!finiteNonNeg(session.startedAt) || !finiteNonNeg(session.endedAt) || !finiteNonNeg(session.durationMs) || !finiteNonNeg(session.plannedMs)) return null;
+    var days = cleanDayList(session.days);
+    if (!days) return null;
+    var clean = { id: session.id, taskId: session.taskId, title: session.title, startedAt: session.startedAt,
+      endedAt: session.endedAt, durationMs: session.durationMs, plannedMs: session.plannedMs, completed: session.completed, days: days };
+    if (typeof session.legacy === 'boolean') clean.legacy = session.legacy;
+    return clean;
+  }
+  function cleanSessions(list) {
+    if (!Array.isArray(list)) return [];
+    var sessions = [];
+    for (var i = 0; i < list.length; i++) {
+      var session = cleanSession(list[i]);
+      if (session) sessions.push(session);
+    }
+    return sessions;
+  }
+  function cleanTimer(timer) {
+    if (!isPlainObject(timer) || typeof timer.id !== 'string' || (timer.kind !== 'focus' && timer.kind !== 'break')) return null;
+    if (idOrNull(timer.taskId) === false || typeof timer.title !== 'string') return null;
+    if (!finiteNonNeg(timer.plannedMs) || timer.plannedMs <= 0 || !finiteNonNeg(timer.elapsedMs) || !finiteNonNeg(timer.startedAt)) return null;
+    if (!(timer.runningSince === null || finiteNonNeg(timer.runningSince))) return null;
+    var days = cleanDayList(timer.days);
+    if (!days) return null;
+    return { id: timer.id, kind: timer.kind, taskId: timer.taskId, title: timer.title, plannedMs: timer.plannedMs,
+      elapsedMs: timer.elapsedMs, startedAt: timer.startedAt, runningSince: timer.runningSince, days: days };
+  }
+  function cleanResult(result) {
+    if (result == null) return null;
+    if (!isPlainObject(result) || (result.kind !== 'focus' && result.kind !== 'break')) return null;
+    if (idOrNull(result.sessionId) === false || idOrNull(result.taskId) === false) return null;
+    if (typeof result.title !== 'string' || typeof result.completed !== 'boolean' || !finiteNonNeg(result.durationMs)) return null;
+    return { kind: result.kind, sessionId: result.sessionId, taskId: result.taskId, title: result.title, durationMs: result.durationMs, completed: result.completed };
+  }
+  function cleanAmbience(raw) {
+    if (!isPlainObject(raw)) return null;
+    var rain = finiteNonNeg(raw.rain) && raw.rain <= 100 ? raw.rain : 30;
+    var purr = finiteNonNeg(raw.purr) && raw.purr <= 100 ? raw.purr : 35;
+    return {
+      scene: typeof raw.scene === 'string' ? raw.scene : 'sunny-desk',
+      enabled: typeof raw.enabled === 'boolean' ? raw.enabled : false,
+      rain: rain, purr: purr
+    };
+  }
   function create(raw) {
-    var s = raw && typeof raw === 'object' ? raw : {};
-    s.version = 1;
-    if (!Array.isArray(s.tasks)) s.tasks = [];
-    if (!Array.isArray(s.sessions)) s.sessions = [];
-    s.minutes = minutes(s.minutes);
-    if (s.timer && (!Number.isFinite(s.timer.plannedMs) || s.timer.plannedMs <= 0 || !Array.isArray(s.timer.days))) s.timer = null;
+    raw = isPlainObject(raw) ? raw : {};
+    var s = { version: 1, tasks: cleanTasks(raw.tasks), sessions: cleanSessions(raw.sessions), minutes: minutes(raw.minutes) };
+    if (Object.prototype.hasOwnProperty.call(raw, 'timer')) s.timer = cleanTimer(raw.timer);
+    if (typeof raw.migrated === 'boolean') s.migrated = raw.migrated;
+    if (Object.prototype.hasOwnProperty.call(raw, 'deletedTask')) s.deletedTask = cleanTask(raw.deletedTask);
+    if (Object.prototype.hasOwnProperty.call(raw, 'result')) s.result = cleanResult(raw.result);
+    if (Object.prototype.hasOwnProperty.call(raw, 'ambience')) {
+      var ambience = cleanAmbience(raw.ambience);
+      if (ambience) s.ambience = ambience;
+    }
     return s;
   }
   function elapsed(timer, now) {

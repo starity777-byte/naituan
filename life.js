@@ -19,13 +19,77 @@
       timer: { duration: 1500, remaining: 1500, endAt: 0 }
     };
   }
+  function isPlainObject(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    var proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  }
+  function finiteOr(value, fallback) { return typeof value === 'number' && Number.isFinite(value) ? value : fallback; }
+  function photoData(value) {
+    if (typeof value !== 'string') return '';
+    if (value.indexOf('data:image/png') === 0 || value.indexOf('data:image/jpeg') === 0 || value.indexOf('data:image/webp') === 0) return value;
+    return '';
+  }
+  function displayPhoto(value) { return typeof value === 'string' && value.indexOf('data:image/') === 0; }
+  function copyTodo(item) { return { id: item.id, text: item.text, done: item.done }; }
+  function sanitizeTodo(item) {
+    if (!isPlainObject(item) || typeof item.id !== 'string' || typeof item.text !== 'string' || typeof item.done !== 'boolean') return null;
+    return copyTodo(item);
+  }
+  function sanitizeDay(raw) {
+    if (!isPlainObject(raw)) return null;
+    var day = {};
+    if (typeof raw.words === 'number' && Number.isFinite(raw.words)) day.words = raw.words;
+    if (typeof raw.wordRewarded === 'boolean') day.wordRewarded = raw.wordRewarded;
+    if (typeof raw.focusMinutes === 'number' && Number.isFinite(raw.focusMinutes) && raw.focusMinutes >= 0) day.focusMinutes = raw.focusMinutes;
+    if (typeof raw.focusSessions === 'number' && Number.isFinite(raw.focusSessions) && raw.focusSessions >= 0) day.focusSessions = raw.focusSessions;
+    if (Object.prototype.hasOwnProperty.call(raw, 'food')) {
+      var food = isPlainObject(raw.food) ? raw.food : {};
+      day.food = { note: typeof food.note === 'string' ? food.note : '', photo: photoData(food.photo) };
+    }
+    return day;
+  }
+  function sanitizeDays(raw) {
+    var days = {};
+    if (!isPlainObject(raw)) return days;
+    Object.keys(raw).forEach(function (key) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
+      var day = sanitizeDay(raw[key]);
+      if (!day) return;
+      Object.defineProperty(days, key, { value: day, enumerable: true, writable: true, configurable: true });
+    });
+    return days;
+  }
+  function sanitizeTimer(raw) {
+    var base = initial().timer;
+    if (!isPlainObject(raw)) return { duration: base.duration, remaining: base.remaining, endAt: base.endAt };
+    return {
+      duration: finiteOr(raw.duration, base.duration),
+      remaining: finiteOr(raw.remaining, base.remaining),
+      endAt: finiteOr(raw.endAt, base.endAt)
+    };
+  }
+  function sanitize(raw) {
+    var base = initial();
+    if (!isPlainObject(raw)) {
+      return { version: base.version, days: {}, gems: base.gems, todos: base.todos.map(copyTodo), timer: { duration: base.timer.duration, remaining: base.timer.remaining, endAt: base.timer.endAt } };
+    }
+    var life = {
+      version: finiteOr(raw.version, base.version),
+      days: sanitizeDays(raw.days),
+      gems: finiteOr(raw.gems, base.gems),
+      todos: Array.isArray(raw.todos) ? raw.todos.map(sanitizeTodo).filter(Boolean) : base.todos.map(copyTodo),
+      timer: sanitizeTimer(raw.timer)
+    };
+    if (Object.prototype.hasOwnProperty.call(raw, 'planner')) {
+      if (window.NaituanPlannerState && typeof window.NaituanPlannerState.create === 'function') life.planner = window.NaituanPlannerState.create(isPlainObject(raw.planner) ? raw.planner : {});
+      else if (isPlainObject(raw.planner)) life.planner = raw.planner;
+    }
+    return life;
+  }
   function state() {
-    if (!NT.S().life || typeof NT.S().life !== 'object') NT.S().life = initial();
-    var life = NT.S().life;
-    if (!life.days || typeof life.days !== 'object' || Array.isArray(life.days)) life.days = {};
-    if (!Array.isArray(life.todos)) life.todos = [];
-    if (!Number.isFinite(life.gems)) life.gems = 0;
-    if (!life.timer || typeof life.timer !== 'object') life.timer = initial().timer;
+    var life = sanitize(NT.S().life);
+    NT.S().life = life;
     return life;
   }
   function read() { return JSON.parse(JSON.stringify(state())); }
@@ -68,10 +132,11 @@
     $('wordStatus').textContent = record.words > 0 ? '已打卡 · ' + record.words + ' 词' : today ? '学一点，进步一点' : '这天还没有记录';
     $('wordCheckin').setAttribute('aria-label', '单词：' + $('wordStatus').textContent);
     var food = record.food || {};
-    $('foodStatus').textContent = food.note ? (food.note.length > 11 ? food.note.slice(0, 11) + '…' : food.note) : food.photo ? '好好吃饭，已记录' : today ? '拍下今天吃了什么' : '这天还没有记录';
-    $('foodThumbnail').hidden = !food.photo;
-    $('foodCheckin').dataset.photo = food.photo ? 'true' : 'false';
-    if (food.photo) $('foodThumbnail').src = food.photo;
+    var photoOk = displayPhoto(food.photo);
+    $('foodStatus').textContent = food.note ? (food.note.length > 11 ? food.note.slice(0, 11) + '…' : food.note) : photoOk ? '好好吃饭，已记录' : today ? '拍下今天吃了什么' : '这天还没有记录';
+    $('foodThumbnail').hidden = !photoOk;
+    $('foodCheckin').dataset.photo = photoOk ? 'true' : 'false';
+    if (photoOk) $('foodThumbnail').src = food.photo;
     else $('foodThumbnail').removeAttribute('src');
     $('gemNum').textContent = data.gems.toLocaleString();
   }
@@ -109,8 +174,9 @@
     openDialog('foodDialog');
   });
   function paintFoodPreview() {
-    $('foodPreview').hidden = !foodPhoto;
-    if (foodPhoto) $('foodPreview').src = foodPhoto;
+    var photoOk = displayPhoto(foodPhoto);
+    $('foodPreview').hidden = !photoOk;
+    if (photoOk) $('foodPreview').src = foodPhoto;
     else $('foodPreview').removeAttribute('src');
   }
   $('foodFile').addEventListener('change', function () {
@@ -144,6 +210,6 @@
     else $('foodMessage').textContent = '没有保存成功，可以缩小照片后重试，或先保存文字。';
   });
   $('foodDialog').addEventListener('cancel', function (event) { if (photoPending) event.preventDefault(); });
-  window.NaituanLife = { read: read, update: update, dateKey: dateKey, selectedDate: function () { return selected; }, selectDate: selectDate, report: report, render: render };
+  window.NaituanLife = { read: read, update: update, dateKey: dateKey, selectedDate: function () { return selected; }, selectDate: selectDate, report: report, render: render, sanitize: sanitize };
   render();
 })();
