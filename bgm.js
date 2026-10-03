@@ -1,6 +1,6 @@
 /* Three locally arranged loops from Alin's two song-maker MIDIs.
-   First gesture unlocks audio. The original volume, visibility and game/study
-   gate APIs are preserved. Time slots use the device's local clock. */
+   First gesture unlocks audio. The original volume, visibility and study
+   gate APIs are preserved. Mini-games share the afternoon loop. Time slots use the device's local clock. */
 (function (root) {
   'use strict';
   var MUSIC_VERSION = '20261002-soft-response-v4';
@@ -12,11 +12,12 @@
   var document = root.document, script = document && document.currentScript;
   var assetBase = root.NAITUAN_MUSIC_BASE || (script && script.src ? new URL('assets/music/', script.src).href : 'assets/music/');
   var ctx = null, master = null, active = null, gate = null;
-  var enabled = true, volume = 60, unlocked = false, mode = 'auto';
+  var enabled = true, volume = 60, unlocked = false, mode = 'auto', gamePlaying = false;
   var buffers = new Map(), positions = {}, voices = new Set();
   var loadingId = '', failedId = '', error = '', request = 0, suspendTimer = 0;
 
   function selected() {
+    if (gamePlaying) return 'afternoon';
     if (mode !== 'auto') return mode;
     var hour = new Date().getHours();
     return hour >= 6 && hour < 12 ? 'morning' : hour >= 12 && hour < 20 ? 'afternoon' : 'night';
@@ -119,6 +120,9 @@
     if ('volume' in options) {
       var value = Number(options.volume);
       volume = Math.max(0, Math.min(100, isFinite(value) ? value : 60));
+    }
+    if ('game' in options && gamePlaying !== !!options.game) {
+      gamePlaying = !!options.game; request++; loadingId = ''; failedId = '';
     }
     if ('mode' in options && (options.mode === 'auto' || TRACKS[options.mode])) {
       if (mode !== options.mode) { request++; loadingId = ''; failedId = ''; }

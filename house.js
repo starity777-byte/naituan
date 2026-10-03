@@ -116,8 +116,8 @@
   $('profileVolume').addEventListener('change', function (event) { NT.setVolume(event.target.value, true); sync(); });
   $('profileMusicVolume').addEventListener('input', function (event) { NT.setBgmVolume(event.target.value, false); sync(); });
   $('profileMusicVolume').addEventListener('change', function (event) { NT.setBgmVolume(event.target.value, true); sync(); });
-  // The music steps aside while a mini-game or the study room brings its own sound.
-  if (window.NaituanBGM) window.NaituanBGM.setGate(function () { var study = $('plannerStudy'); return !NT.isBusy() && !(study && study.open); });
+  // Mini-games keep the afternoon loop; the study room keeps its own ambience.
+  if (window.NaituanBGM) window.NaituanBGM.setGate(function () { var study = $('plannerStudy'); return !(study && study.open); });
   $('profileSave').addEventListener('click', function () { $('btnSave').click(); });
   document.addEventListener('pointerdown', function (event) {
     if (!$('pawMenu').hidden && !$('pawMenu').contains(event.target) && !$('pawToggle').contains(event.target)) menu(false);

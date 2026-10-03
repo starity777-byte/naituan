@@ -62,7 +62,7 @@ test('off, zero volume and unsupported browsers remain silent', () => {
   f=fixture({supported:false}); assert.equal(f.api.unlock(),false); assert.equal(f.api.status().playing,false);
 });
 
-test('game/study gate pauses and resumes at the previous musical position', async () => {
+test('study gate pauses and resumes at the previous musical position', async () => {
   const f=fixture(); let open=true; f.api.setGate(()=>open); f.api.unlock(); await settle();
   f.context().currentTime=14; const position=f.api.status().position;
   open=false; f.poll(); assert.equal(f.api.status().playing,false); f.flush(); assert.equal(f.calls.suspends,1);
@@ -91,4 +91,39 @@ test('MP3 fallback, manual audition and volume changes use the same playback pat
   assert.ok(f.calls.fetches[0].includes('.ogg?v=' + '20261002-soft-response-v4')); assert.ok(f.calls.fetches[1].includes('.mp3?v=' + '20261002-soft-response-v4'));
   const starts=f.calls.starts.length; f.api.configure({volume:35}); assert.equal(f.calls.starts.length,starts); assert.ok(f.gains[0].gain.value>0 && f.gains[0].gain.value<1);
   f.api.configure({enabled:false}); f.flush(); assert.equal(f.api.status().playing,false);
+});
+
+test('mini-games play afternoon at morning and night, then resume the local time track', async () => {
+  for (const [hour, roomTrack] of [[8, 'morning'], [22, 'night']]) {
+    const f = fixture({hour});
+    f.api.configure({volume:35}); f.api.unlock(); await settle();
+    f.context().currentTime=14;
+    const roomPosition=f.api.status().position, volume=f.gains[0].gain.value;
+    f.api.configure({game:true}); await settle();
+    assert.equal(f.api.status().track, 'afternoon');
+    assert.equal(f.api.status().playing, true);
+    assert.equal(f.api.status().mode, 'auto');
+    assert.equal(f.gains[0].gain.value, volume);
+    f.hour(hour === 8 ? 9 : 23); f.poll(); await settle();
+    assert.equal(f.api.status().track, 'afternoon');
+    f.api.configure({game:false}); await settle();
+    assert.equal(f.api.status().track, roomTrack);
+    assert.equal(f.api.status().playing, true);
+    assert.ok(Math.abs(f.calls.starts.at(-1).offset-roomPosition)<1e-9);
+    assert.equal(f.calls.contexts,1);
+  }
+});
+
+test('game transitions preserve silence preferences and cancel an obsolete track download', async () => {
+  for (const options of [{enabled:false}, {volume:0}]) {
+    const f=fixture(); f.api.configure(options); f.api.configure({game:true});
+    assert.equal(f.api.unlock(),false);
+    assert.equal(f.calls.contexts,0);
+    f.api.configure({game:false}); assert.equal(f.api.unlock(),false);
+  }
+  const f=fixture({hour:22,pending:true});
+  f.api.unlock(); f.api.configure({game:true}); f.resolve(); await settle();
+  assert.equal(f.api.status().track,'afternoon');
+  assert.equal(f.calls.starts.length,1);
+  assert.equal(f.calls.starts[0].node.loopEnd,lengths.afternoon);
 });

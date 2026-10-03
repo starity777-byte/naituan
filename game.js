@@ -43,6 +43,7 @@
     btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = btnCake.disabled = b;
     if (b) { cancelRoomInteraction(); endVisit(); override = null; }
     if (roomView) roomView.refresh();
+    if (window.NaituanBGM) window.NaituanBGM.configure({ game: !!b });
   }
 
   var clamp = function (v) { return Math.max(0, Math.min(100, v)); };
@@ -509,6 +510,8 @@
     for (var i = 0; i < 9; i++) (function (i) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'slot'; b.setAttribute('data-i', i); b.setAttribute('aria-label', '箱子 ' + (i + 1));
       var im = document.createElement('img'); im.alt = ''; im.src = SPR.peekc; im.style.transform = slotImgT(i, 118); b.appendChild(im);
+      var impact = document.createElement('span'); impact.className = 'rh-impact'; impact.setAttribute('aria-hidden', 'true'); impact.textContent = '✦'; b.appendChild(impact);
+      var mark = document.createElement('span'); mark.className = 'rh-mark'; mark.setAttribute('aria-hidden', 'true'); b.appendChild(mark);
       b.addEventListener('pointerdown', function (e) {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         e.preventDefault(); rhTap(i); /* accept every finger, including non-primary pointers */
@@ -517,8 +520,11 @@
       slotsEl.appendChild(b); slots.push(b); slotEv.push(null);
     })(i);
   })();
-  function rhLayout(rows) { slotsEl.setAttribute('data-rows', rows); slots.forEach(function (s, i) { s.hidden = i >= rows * 3; }); }
-  function rhClearSlots() { slots.forEach(function (s, i) { s.className = 'slot'; s.querySelector('img').style.transform = slotImgT(i, 118); slotEv[i] = null; }); }
+  function rhLayout(rows) { slotsEl.setAttribute('data-rows', rows); slots.forEach(function (s, i) {
+    var locked = i >= rows * 3; s.hidden = false; s.disabled = locked; s.classList.toggle('locked', locked);
+    s.setAttribute('aria-hidden', locked ? 'true' : 'false');
+  }); }
+  function rhClearSlots() { slots.forEach(function (s, i) { s.className = s.disabled ? 'slot locked' : 'slot'; s.querySelector('.rh-mark').textContent = ''; s.querySelector('img').style.transform = slotImgT(i, 118); slotEv[i] = null; }); }
   function rhJudgeSay(t) { rhJudge.textContent = t; rhJudge.classList.remove('pop'); void rhJudge.offsetWidth; rhJudge.classList.add('pop'); }
   function rhPaint() {
     rhScoreEl.textContent = RHS ? RHS.score : 0;
@@ -586,7 +592,7 @@
     /* Retire old occupants before assigning a new cat to the same box. */
     for (i = RHS.active.length - 1; i >= 0; i--) {
       e = RHS.active[i];
-      if (e.done ? t - e.doneT < 0.16 : t <= e.t + e.half) continue;
+      if (e.done ? t - e.doneT < 0.22 : t <= e.t + e.half) continue;
       RHS.active.splice(i, 1);
       if (slotEv[e.slot] === e) {
         slotEv[e.slot] = null; slots[e.slot].classList.remove('fake', 'ok', 'bad');
@@ -608,7 +614,7 @@
       if (!e.done) {
         var p = Math.max(0, Math.min(1, 1 - Math.abs(t - e.t) / e.half)); y = (1 - ease(p)) * 118; e.y = y;
       } else {
-        var q = Math.min(1, (t - e.doneT) / 0.16); y = e.y + (118 - e.y) * q;
+        var q = Math.min(1, (t - e.doneT) / 0.22); y = e.y + (118 - e.y) * q;
       }
       img.style.transform = slotImgT(e.slot, y);
     }
@@ -636,19 +642,19 @@
     if (e && Math.abs(t - e.t) <= e.half) {
       var dt = Math.abs(t - e.t); e.done = true; e.doneT = t;
       if (e.fake) {
-        RHS.combo = 0; RHS.lives--; slots[idx].classList.add('bad'); rhJudgeSay('假的！'); tone(190, clock(), 0.22, 'sawtooth', 0.22, 70);
+        RHS.combo = 0; RHS.lives--; slots[idx].classList.add('bad'); slots[idx].querySelector('.rh-mark').textContent = '纸片！'; rhJudgeSay('假的！'); tone(190, clock(), 0.22, 'sawtooth', 0.22, 70);
         rhPaint(); if (RHS.lives <= 0) rhFinish(true);
       } else {
-        var q = dt <= 0.07 ? 0 : dt <= 0.13 ? 1 : 2, base = [100, 70, 40][q];
+        var q = dt <= 0.09 ? 0 : dt <= 0.15 ? 1 : 2, base = [100, 70, 40][q];
         RHS.realSeen++; RHS.hits++; if (q === 0) RHS.perfects++; RHS.combo++; if (RHS.combo > RHS.maxCombo) RHS.maxCombo = RHS.combo;
         RHS.score += Math.round(base * (1 + Math.min(RHS.combo, 20) * 0.05));
-        rhJudgeSay(['完美！', '很好', '还行'][q]); slots[idx].classList.remove('bad'); slots[idx].classList.add('ok');
-        var f = SCALE[(RHS.hits * 2 + idx) % 5 + (q === 0 ? 0 : 0)], now0 = clock(); tone(f, now0, 0.28, 'sine', 0.32); tone(f * 2, now0, 0.14, 'triangle', 0.07);
+        rhJudgeSay(['完美！', '很好', '还行'][q]); slots[idx].classList.remove('bad'); slots[idx].classList.add('ok'); slots[idx].querySelector('.rh-mark').textContent = ['完美', '很好', '摸到啦'][q];
+        var f = SCALE[Math.min(RHS.combo - 1, SCALE.length - 1)], now0 = clock(); tone(f, now0, 0.28, 'sine', 0.32); tone(f * 2, now0, 0.14, 'triangle', 0.07);
         if (q < 2) { var r = stage.getBoundingClientRect(), b = slots[idx].getBoundingClientRect(); heartAt(b.left - r.left + b.width / 2, b.top - r.top + 12); }
         rhPaint();
       }
     } else {
-      RHS.score = Math.max(0, RHS.score - 20); RHS.combo = 0; rhJudgeSay('空的'); tone(140, clock(), 0.1, 'sine', 0.15, 100); rhPaint();
+      RHS.score = Math.max(0, RHS.score - 20); RHS.combo = 0; rhJudgeSay('慢一点点～'); tone(140, clock(), 0.1, 'sine', 0.15, 100); rhPaint();
     }
   }
   function rhSettle(dead) {
