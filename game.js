@@ -58,9 +58,23 @@
   var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
   var now = function () { return Date.now(); };
 
-  /* preload sprites */
+  /* preload sprites — the pose on screen loads by itself. The other animations (about 12 MB) wait until the page
+     has finished loading and then come in two at a time, most-used first, so they don't slow down the first look at 奶团. */
   var IMG = {};
-  Object.keys(SPR).forEach(function (k) { var im = new Image(); im.src = SPR[k]; IMG[k] = im; });
+  var PRELOAD_FIRST = ['sit', 'wave', 'walkSide', 'walkFront', 'happy', 'shy', 'fish', 'curious', 'ear', 'nose', 'chin', 'paw', 'rub', 'sniff', 'watch', 'knead', 'roll'];
+  function preloadSprites() {
+    var queue = PRELOAD_FIRST.concat(Object.keys(SPR)).filter(function (k, i, all) { return SPR[k] && all.indexOf(k) === i; });
+    function next() {
+      var k = queue.shift();
+      if (!k) return;
+      var im = new Image(); IMG[k] = im;
+      im.onload = im.onerror = next;
+      im.src = SPR[k];
+    }
+    next(); next();
+  }
+  if (document.readyState === 'complete') setTimeout(preloadSprites, 400);
+  else window.addEventListener('load', function () { setTimeout(preloadSprites, 400); });
 
   /* ---------- state ---------- */
   function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, mute: false, vol: 80, bgm: true, bgmVol: 60, cq: null, t: now() }; }
