@@ -4,81 +4,91 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../bgm.js'), 'utf8');
+const settle = () => new Promise(resolve => setImmediate(resolve));
+const lengths = {morning: 3291429 / 48000, afternoon: 4006957 / 48000, night: 5421176 / 48000};
 
-function fixture(supported = true) {
-  const calls = { contexts: 0, starts: 0, stops: 0, resumes: 0, suspends: 0 }, events = {}, intervals = {}, timeouts = [];
-  const document = { hidden: false, addEventListener: (name, fn) => { events[name] = fn; } };
-  const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} });
-  const node = extra => Object.assign({ connect() {}, disconnect() {} }, extra);
-  const masters = [];
+function fixture(options = {}) {
+  let hour = options.hour ?? 8;
+  const calls = {contexts: 0, starts: [], stops: [], fetches: [], suspends: 0}, events = {}, timers = [], pending = [];
+  const document = {hidden: false, addEventListener(name, fn) {events[name] = fn;}};
+  const param = () => ({value: 0, setValueAtTime(v) {this.value=v;}, linearRampToValueAtTime(v) {this.value=v;}, setTargetAtTime(v) {this.value=v;}, cancelScheduledValues() {}});
+  const node = extra => Object.assign({connect() {}, disconnect() {}}, extra);
+  let context;
+  const gains = [];
   class AudioContext {
-    constructor() { calls.contexts++; this.currentTime = 1; this.state = 'suspended'; this.destination = {}; }
-    resume() { calls.resumes++; this.state = 'running'; return Promise.resolve(); }
-    suspend() { calls.suspends++; this.state = 'suspended'; return Promise.resolve(); }
-    createGain() { const n = node({ gain: param() }); masters.push(n); return n; }
-    createDelay() { return node({ delayTime: param() }); }
-    createBiquadFilter() { return node({ frequency: param(), Q: param() }); }
-    createOscillator() { return node({ frequency: param(), detune: param(), start() { calls.starts++; }, stop() { calls.stops++; } }); }
+    constructor() {calls.contexts++; context=this; this.currentTime=1; this.state='suspended'; this.destination={};}
+    resume() {this.state='running'; return Promise.resolve();}
+    suspend() {calls.suspends++; this.state='suspended'; return Promise.resolve();}
+    createGain() {const g=node({gain:param()}); gains.push(g); return g;}
+    createBufferSource() {const n=node({start(at, offset) {calls.starts.push({node:n,at,offset});},stop(at) {calls.stops.push({node:n,at});}});return n;}
+    decodeAudioData(data) {
+      if (options.rejectOgg && data.extension==='ogg') return Promise.reject(new Error('unsupported codec'));
+      return Promise.resolve({duration:lengths[data.id], length: Math.round(lengths[data.id] * 48000), sampleRate:48000});
+    }
   }
-  const window = supported ? { AudioContext } : {};
-  window.document = document;
-  const setInterval = (fn, ms) => { intervals[ms] = fn; return ms; };
-  const clearInterval = ms => { delete intervals[ms]; };
-  const setTimeout = fn => { timeouts.push(fn); return timeouts.length; };
-  vm.runInNewContext(source, { window, document, Math, Number, isFinite, Set, setInterval, clearInterval, setTimeout, clearTimeout() {} });
-  return { api: window.NaituanBGM, calls, document, events, intervals, timeouts, masters, poll: () => intervals[500](), flush: () => timeouts.splice(0).forEach(fn => fn()) };
+  const window = options.supported === false ? {} : {AudioContext};
+  window.document=document;
+  window.fetch = url => {
+    calls.fetches.push(url);
+    const match = url.match(/naituan-(\w+)\.(\w+)(?:\?.*)?$/);
+    const response = {ok:true,arrayBuffer: () => Promise.resolve({id:match[1],extension:match[2]})};
+    if (options.pending) return new Promise(resolve => pending.push(() => resolve(response)));
+    return Promise.resolve(response);
+  };
+  class Clock extends Date {getHours() {return hour;}}
+  let poll;
+  vm.runInNewContext(source, {window,document,Date:Clock,URL,Map,Set,Math,Number,isFinite,setInterval(fn) {poll=fn;return 1;},setTimeout(fn) {timers.push(fn);return timers.length;},clearTimeout() {}});
+  return {api:window.NaituanBGM,calls,events,document,gains,poll: () => poll(),hour: h=>hour=h,context:()=>context,flush:()=>timers.splice(0).forEach(fn=>fn()),resolve:()=>pending.splice(0).forEach(fn=>fn())};
 }
 
-test('loading is silent: nothing starts until a real gesture unlocks audio', () => {
-  const f = fixture();
-  f.api.configure({ enabled: true, volume: 60 });
-  f.poll();
-  assert.equal(f.calls.contexts, 0);
-  assert.equal(f.api.status().playing, false);
-  assert.equal(f.api.status().waitingForTap, true);
+test('silent until a gesture, with time slots following the device clock', () => {
+  for (const [hour, id] of [[0,'night'],[5,'night'],[6,'morning'],[11,'morning'],[12,'afternoon'],[19,'afternoon'],[20,'night']]) {
+    const f=fixture({hour}); f.api.configure({enabled:true,volume:60}); f.poll();
+    assert.equal(f.api.status().track,id); assert.equal(f.calls.contexts,0); assert.equal(f.calls.fetches.length,0); assert.equal(f.api.status().waitingForTap,true);
+  }
 });
 
-test('a gesture starts one context and the pad plus music-box notes begin', () => {
-  const f = fixture();
-  assert.equal(f.api.unlock(), true);
-  assert.equal(f.calls.contexts, 1);
-  assert.ok(f.calls.starts >= 12, 'first chord is 6 notes x 2 oscillators, got ' + f.calls.starts);
-  assert.equal(f.api.status().playing, true);
-  f.api.unlock();
-  assert.equal(f.calls.contexts, 1);
+test('one gesture decodes one exact loop, and later gestures reuse the context', async () => {
+  const f=fixture(); assert.equal(f.api.unlock(),true); await settle();
+  assert.equal(f.api.status().playing,true); assert.equal(f.calls.starts.length,1);
+  const buffer=f.calls.starts[0].node;
+  assert.equal(buffer.loop,true); assert.equal(buffer.loopStart,0); assert.equal(buffer.loopEnd,lengths.morning);
+  f.api.unlock(); await settle(); assert.equal(f.calls.contexts,1); assert.equal(f.calls.fetches.length,1); assert.equal(f.calls.starts.length,1);
 });
 
-test('turned off, silent or unsupported audio never creates a context', () => {
-  let f = fixture(); f.api.configure({ enabled: false }); assert.equal(f.api.unlock(), false); assert.equal(f.calls.contexts, 0);
-  f = fixture(); f.api.configure({ enabled: true, volume: 0 }); assert.equal(f.api.unlock(), false); assert.equal(f.calls.contexts, 0);
-  f = fixture(false); assert.equal(f.api.unlock(), false); assert.equal(f.api.status().playing, false);
+test('off, zero volume and unsupported browsers remain silent', () => {
+  let f=fixture(); f.api.configure({enabled:false}); assert.equal(f.api.unlock(),false); assert.equal(f.calls.contexts,0);
+  f=fixture(); f.api.configure({volume:0}); assert.equal(f.api.unlock(),false); assert.equal(f.calls.contexts,0);
+  f=fixture({supported:false}); assert.equal(f.api.unlock(),false); assert.equal(f.api.status().playing,false);
 });
 
-test('music steps aside while the gate is closed and returns when it opens', () => {
-  const f = fixture();
-  let open = true;
-  f.api.setGate(() => open);
-  f.api.unlock();
-  assert.equal(f.api.status().playing, true);
-  open = false; f.poll();
-  assert.equal(f.api.status().playing, false);
-  f.flush();
-  assert.equal(f.calls.suspends, 1);
-  open = true; f.poll();
-  assert.equal(f.api.status().playing, true);
+test('game/study gate pauses and resumes at the previous musical position', async () => {
+  const f=fixture(); let open=true; f.api.setGate(()=>open); f.api.unlock(); await settle();
+  f.context().currentTime=14; const position=f.api.status().position;
+  open=false; f.poll(); assert.equal(f.api.status().playing,false); f.flush(); assert.equal(f.calls.suspends,1);
+  open=true; f.poll(); await settle(); assert.equal(f.api.status().playing,true);
+  assert.ok(Math.abs(f.calls.starts.at(-1).offset-position)<1e-9);
 });
 
-test('switching off fades out and silences; hidden pages stop at once', () => {
-  const f = fixture();
-  f.api.unlock();
-  f.api.configure({ enabled: false });
-  assert.equal(f.api.status().playing, false);
-  f.flush();
-  assert.ok(f.calls.stops > 0);
-  f.api.configure({ enabled: true });
-  assert.equal(f.api.status().playing, true);
-  f.document.hidden = true; f.events.visibilitychange();
-  assert.equal(f.api.status().playing, false);
-  f.document.hidden = false; f.api.unlock();
-  assert.equal(f.api.status().playing, true);
+test('crossing noon changes to afternoon with a fade, and hidden pages silence both voices', async () => {
+  const f=fixture({hour:11}); f.api.unlock(); await settle();
+  f.hour(12); f.poll(); await settle(); assert.equal(f.api.status().track,'afternoon'); assert.equal(f.calls.starts.length,2);
+  assert.ok(f.calls.stops.some(call=>call.node===f.calls.starts[0].node));
+  f.document.hidden=true; f.events.visibilitychange(); assert.equal(f.api.status().playing,false); f.flush();
+  assert.equal(f.calls.suspends,1);
+  f.document.hidden=false; f.events.visibilitychange(); await settle(); assert.equal(f.api.status().playing,true);
+});
+
+test('a download completing after music is disabled never starts playing', async () => {
+  const f=fixture({pending:true}); f.api.unlock(); f.api.configure({enabled:false}); f.resolve(); await settle();
+  assert.equal(f.calls.starts.length,0); assert.equal(f.api.status().playing,false);
+  f.api.configure({enabled:true}); await settle(); assert.equal(f.calls.starts.length,1);
+});
+
+test('MP3 fallback, manual audition and volume changes use the same playback path', async () => {
+  const f=fixture({rejectOgg:true}); f.api.configure({mode:'night'}); f.api.unlock(); await settle();
+  assert.equal(f.api.status().track,'night'); assert.equal(f.api.status().playing,true);
+  assert.ok(f.calls.fetches[0].includes('.ogg?v=' + '20261002-soft-response-v4')); assert.ok(f.calls.fetches[1].includes('.mp3?v=' + '20261002-soft-response-v4'));
+  const starts=f.calls.starts.length; f.api.configure({volume:35}); assert.equal(f.calls.starts.length,starts); assert.ok(f.gains[0].gain.value>0 && f.gains[0].gain.value<1);
+  f.api.configure({enabled:false}); f.flush(); assert.equal(f.api.status().playing,false);
 });

@@ -1,0 +1,84 @@
+{
+  "version": "20261002-soft-response-v4",
+  "sampleRate": 48000,
+  "results": [
+    {
+      "id": "morning",
+      "expectedFrames": 3291429,
+      "codecs": {
+        "ogg": {
+          "frames": 3291429,
+          "frameDifference": 0,
+          "peakDb": -12.44,
+          "rmsDb": -27.38,
+          "volumeDifferenceDb": 0.061,
+          "seamComparedWithNormalTransient": 0.0156,
+          "bytes": 1027408,
+          "sha256": "763856df5c853b56d832e1f205c596a681c12f132fd9e259beb4b39d5daec8c1"
+        },
+        "mp3": {
+          "frames": 3291429,
+          "frameDifference": 0,
+          "peakDb": -12.4,
+          "rmsDb": -27.44,
+          "volumeDifferenceDb": -0.0,
+          "seamComparedWithNormalTransient": 0.059,
+          "bytes": 2196674,
+          "sha256": "e921dc501bb5924535d5aba497bf6bda72b90d794565da1d7771f7c395db61e8"
+        }
+      }
+    },
+    {
+      "id": "afternoon",
+      "expectedFrames": 4006957,
+      "codecs": {
+        "ogg": {
+          "frames": 4006957,
+          "frameDifference": 0,
+          "peakDb": -12.58,
+          "rmsDb": -29.49,
+          "volumeDifferenceDb": 0.055,
+          "seamComparedWithNormalTransient": 0.0247,
+          "bytes": 1318703,
+          "sha256": "8133bf460da3ab44585a31fea929f90f0a975cb22a69c50619a74328dda6e5c4"
+        },
+        "mp3": {
+          "frames": 4006957,
+          "frameDifference": 0,
+          "peakDb": -12.56,
+          "rmsDb": -29.55,
+          "volumeDifferenceDb": -0.0,
+          "seamComparedWithNormalTransient": 0.0199,
+          "bytes": 2673602,
+          "sha256": "66c1e53ca3418c224b164533beacbfe44b170b2865f896db80160c2beaa3c37c"
+        }
+      }
+    },
+    {
+      "id": "night",
+      "expectedFrames": 5421176,
+      "codecs": {
+        "ogg": {
+          "frames": 5421176,
+          "frameDifference": 0,
+          "peakDb": -23.88,
+          "rmsDb": -35.29,
+          "volumeDifferenceDb": 0.074,
+          "seamComparedWithNormalTransient": 0.0023,
+          "bytes": 1799110,
+          "sha256": "3af3ed34772713e2c60a4a370917a4f98ee668e069b0ecba334390b334159f07"
+        },
+        "mp3": {
+          "frames": 5421176,
+          "frameDifference": 0,
+          "peakDb": -23.94,
+          "rmsDb": -35.37,
+          "volumeDifferenceDb": -0.0,
+          "seamComparedWithNormalTransient": 0.0076,
+          "bytes": 3615941,
+          "sha256": "f903b6234c6fbdf965e3b838010e1d4e029902dc071528c6240d8e18758c1a29"
+        }
+      }
+    }
+  ]
+}

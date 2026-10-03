@@ -79,6 +79,10 @@
       $('profileMusic').setAttribute('aria-pressed', String(state.bgm));
       paintSlider($('profileVolume'), $('profileVolumeValue'), state.vol);
       paintSlider($('profileMusicVolume'), $('profileMusicVolumeValue'), state.bgmVol);
+      if ($('profileBgmTrack') && window.NaituanBGM) {
+        var music = window.NaituanBGM.status();
+        $('profileBgmTrack').textContent = music.period + ' · ' + music.title + '（随当地时间变化）';
+      }
     }
   }
   function action(name) {

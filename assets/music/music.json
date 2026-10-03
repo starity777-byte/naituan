@@ -1,0 +1,131 @@
+{
+  "version": "20261002-soft-response-v4",
+  "sources": [
+    {
+      "file": "song-maker.mid",
+      "sha256": "066ee65e24ed47a6fdd9b1286a9242cbe839a556285869dee8bcac6701773b66"
+    },
+    {
+      "file": "song-maker (1).mid",
+      "sha256": "e8158e23ebe2ae0a110d974c6a5ad16135925d3f89ce175b02ee7947d6aad3a6"
+    }
+  ],
+  "form": [
+    "A",
+    "A-answer",
+    "B",
+    "B-answer",
+    "a",
+    "b",
+    "A-return",
+    "B-close"
+  ],
+  "tracks": [
+    {
+      "title": "晴窗小步 · 轻回应",
+      "bpm": 112,
+      "time": "06:00–12:00",
+      "program": 12,
+      "rms": -31,
+      "high": 85,
+      "low": 3600,
+      "velocity": 52,
+      "id": "morning",
+      "form": [
+        "A",
+        "A-answer",
+        "B",
+        "B-answer",
+        "a",
+        "b",
+        "A-return",
+        "B-close"
+      ],
+      "bars": 32,
+      "frames": 3291429,
+      "seconds": 68.5714375,
+      "phraseSeconds": 8.571428571428571,
+      "peakDb": -12.4,
+      "rmsDb": -27.44,
+      "seamStepDb": -57.47,
+      "sampleRate": 48000,
+      "loopStart": 0,
+      "loopEnd": 68.5714375,
+      "files": {
+        "ogg": "naituan-morning.ogg",
+        "mp3": "naituan-morning.mp3"
+      }
+    },
+    {
+      "title": "蜜糖软垫 · 轻回应",
+      "bpm": 92,
+      "time": "12:00–20:00",
+      "program": 10,
+      "rms": -33,
+      "high": 80,
+      "low": 2200,
+      "velocity": 46,
+      "id": "afternoon",
+      "form": [
+        "A",
+        "A-answer",
+        "B",
+        "B-answer",
+        "a",
+        "b",
+        "A-return",
+        "B-close"
+      ],
+      "bars": 32,
+      "frames": 4006957,
+      "seconds": 83.47827083333334,
+      "phraseSeconds": 10.434782608695652,
+      "peakDb": -12.56,
+      "rmsDb": -29.55,
+      "seamStepDb": -60.81,
+      "sampleRate": 48000,
+      "loopStart": 0,
+      "loopEnd": 83.47827083333334,
+      "files": {
+        "ogg": "naituan-afternoon.ogg",
+        "mp3": "naituan-afternoon.mp3"
+      }
+    },
+    {
+      "title": "月牙摇篮 · 暖电钢琴",
+      "bpm": 68,
+      "time": "20:00–次日06:00",
+      "program": 4,
+      "rms": -37,
+      "high": 65,
+      "low": 1100,
+      "velocity": 32,
+      "attackMs": 90,
+      "id": "night",
+      "form": [
+        "A",
+        "A-answer",
+        "B",
+        "B-answer",
+        "a",
+        "b",
+        "A-return",
+        "B-close"
+      ],
+      "bars": 32,
+      "frames": 5421176,
+      "seconds": 112.94116666666666,
+      "phraseSeconds": 14.117647058823529,
+      "peakDb": -23.94,
+      "rmsDb": -35.37,
+      "seamStepDb": -88.03,
+      "sampleRate": 48000,
+      "loopStart": 0,
+      "loopEnd": 112.94116666666666,
+      "files": {
+        "ogg": "naituan-night.ogg",
+        "mp3": "naituan-night.mp3"
+      }
+    }
+  ]
+}
