@@ -150,11 +150,11 @@
       return geometry && geometry.anchors[anchor || 'approach'] || null;
     }
     function walkObstacles(except) {
-      var padding = catBox.offsetWidth / scene.clientWidth * 0.09;
+      var padding = catBox.offsetWidth / scene.clientWidth * 0.06;
       return items.filter(function (it) { return it.obstacle && it.key !== except && !it.el.hidden; }).map(function (it) {
         var g = getItemGeometry(it.key);
         if (!g || g.size.width < 0.09) return null;
-        var bottom = g.center.y + g.size.height * 0.45;
+        var bottom = g.center.y + g.size.height * 0.50;
         if (bottom < floorY(g.center.x) + 0.02) return null;
         // The cat is drawn behind a piece of furniture whenever its feet are above the furniture's base, so it
         // must not stand anywhere inside the picture: it would be hidden there. Feet just above the top edge
@@ -225,7 +225,7 @@
       items.forEach(function (it) {
         if (!it.obstacle || it.el.hidden) return;
         var g = getItemGeometry(it.key);
-        if (g) it.el.style.zIndex = editing ? '' : 10 + Math.round((g.center.y + g.size.height * 0.45) * 1000);
+        if (g) it.el.style.zIndex = editing ? '' : 10 + Math.round((g.center.y + g.size.height * 0.50) * 1000);
       });
     }
     function place(it, p) {
