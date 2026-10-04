@@ -212,8 +212,6 @@
   var accCtx = accCanvas.getContext('2d');
   var ACC_SHEETS = {}, ACC_LOOKS = {};
   var accRaf = 0, accPose = null, accStart = 0, accDrawn = '';
-  var accFrame = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : function (fn) { return setTimeout(function () { fn(Date.now()); }, 40); };
-  var accCancel = window.cancelAnimationFrame ? window.cancelAnimationFrame.bind(window) : clearTimeout;
   /* 毫秒。注意别叫 clock：躲猫猫里已经有一个按秒算的 clock()。 */
   function accNow() { return window.performance && performance.now ? performance.now() : Date.now(); }
   function accSheet(pose) {
@@ -246,7 +244,7 @@
   function accWorn() { var id = S && S.acc && S.acc.wear; return id && ACC_ITEMS[id] ? ACC_ITEMS[id] : null; }
   function accReady(im) { return !!(im && im.complete && im.naturalWidth > 0); }
   function accRefresh() {
-    clearTimeout(accRaf); accCancel(accRaf); accRaf = 0;
+    clearTimeout(accRaf); accRaf = 0;
     var item = accWorn(), data = item && ACC_SLOTS.poses[curPose], sheet = data ? accSheet(curPose) : null;
     if (item) accPreloadAll();
     var on = accReady(sheet);
@@ -265,7 +263,7 @@
     while (f < data.ms.length - 1 && sum <= t) { f++; sum += data.ms[f]; }
     var look = item.looks[item.side.indexOf(curPose) >= 0 ? 'angled' : 'front'], art = accLook(look.src);
     var key = curPose + ':' + f + ':' + look.src + ':' + accReady(art);
-    if (key !== accDrawn) {
+    try { if (key !== accDrawn) {
       accDrawn = key;
       var cols = data.cols;
       accCtx.clearRect(0, 0, 503, 402);
@@ -277,10 +275,10 @@
         accCtx.drawImage(art, -look.pivot[0] * w, -look.pivot[1] * h, w, h);
         accCtx.restore();
       }
-    }
-    var wait = sum - t;
-    /* 下一帧到了再画；页面在后台时不画。 */
-    if (!document.hidden) accRaf = setTimeout(function () { accRaf = accFrame(accTick); }, Math.max(0, wait - 8));
+    } } catch (e) { accDrawn = ''; }
+    /* 下一帧到了再画。只用 setTimeout：有些手机里的内置浏览器 requestAnimationFrame 不触发，
+       或者把页面错报成"在后台"，那样奶团会停在一帧不动。页面真在后台时浏览器自己会放慢计时器。 */
+    accRaf = setTimeout(accTick, Math.max(16, sum - t));
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) { accDrawn = ''; accRefresh(); } });
   function cleanAcc(raw) {
