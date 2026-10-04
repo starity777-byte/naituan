@@ -68,3 +68,32 @@ test('堆过虚线并停住足够久才算输；刚放下的不算', () => {
   assert.equal(high.over, true);
   assert.ok(high.drain().some((e) => e.type === 'over'));
 });
+
+test('合成出来的动物从小慢慢长大，不会把邻居弹飞', () => {
+  const w = P.create({ rng: seeded(5) });
+  w.add(2, 150, 440); w.add(2, 202, 440);
+  w.add(0, 176, 405); /* 一只小球正好卡在两只中间的缝上，合成出来的大圆会压到它 */
+  w.step(1 / 60);
+  const born = w.bodies.find((b) => b.lvl === 3);
+  assert.ok(born, '应该合成出第 3 级');
+  assert.ok(born.r < born.rt, '刚合成出来时比最终的小');
+  const small = w.bodies.find((b) => b.lvl === 0);
+  let fastest = 0;
+  for (let t = 0; t < 1.5; t += 1 / 60) { w.step(1 / 60); fastest = Math.max(fastest, Math.hypot(small.vx, small.vy)); }
+  assert.ok(Math.abs(born.r - born.rt) < 1e-6, '最后长到该有的大小');
+  assert.ok(fastest < 600, '小球被挤开的速度要正常，实际 ' + Math.round(fastest));
+});
+
+test('随机玩很多局：没有动物被弹到容器上方很远的地方', () => {
+  const pool = [0, 0, 0, 0, 1, 1, 1, 2, 2, 3];
+  for (let seed = 1; seed <= 12; seed++) {
+    const rng = seeded(seed), w = P.create({ rng });
+    let drops = 0, highest = 0;
+    for (let t = 0; t < 240 && !w.over; t += 1 / 60) {
+      if (Math.floor(t / .8) > drops) { drops++; const lvl = pool[Math.floor(rng() * pool.length)], r = w.radius(lvl); w.add(lvl, r + rng() * (w.width - 2 * r), w.holdY); }
+      w.step(1 / 60); w.drain();
+      for (const b of w.bodies) if (b.age > .4) highest = Math.min(highest, b.y);
+    }
+    assert.ok(highest > -20, 'seed ' + seed + ' 有动物飞到了 y=' + Math.round(highest));
+  }
+});

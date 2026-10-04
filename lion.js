@@ -154,8 +154,8 @@
   function Y(y) { return view.oy + y * view.scale; }
   function popScale(body) {
     if (body.popAt == null) return 1;
-    var t = (world.time - body.popAt) / .26; if (t >= 1) return 1;
-    var u = t - 1; return .72 + .28 * (1 + 2.70158 * u * u * u + 1.70158 * u * u);
+    var t = (world.time - body.popAt) / .3; if (t >= 1) return 1;
+    return 1 + .09 * Math.sin(t * Math.PI); /* 大小由物理慢慢长出来，这里只加一点弹跳 */
   }
   function draw() {
     if (!view.w) return;

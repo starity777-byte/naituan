@@ -7,7 +7,8 @@
   var DEFAULTS = {
     width: 340, height: 470, lineY: 76, holdY: 36,
     gravity: 1500, damping: .06, contactDamping: 2.2, substeps: 4, iterations: 5,
-    mergeGap: 1.5, graceSeconds: .9, restSpeed: 28, overSeconds: 2.2
+    mergeGap: 1.5, graceSeconds: .9, restSpeed: 28, overSeconds: 2.2,
+    maxSpeed: 1200, ceiling: -60, growStart: .72, growSeconds: .16
   };
   /* 各级半径（占容器宽度的比例）：11 级，最大的大狮子直径略过容器一半。 */
   var RADIUS_RATIO = [.046, .059, .075, .092, .112, .133, .156, .182, .209, .239, .272];
@@ -21,9 +22,20 @@
     var world = { width: o.width, height: o.height, lineY: o.lineY, holdY: o.holdY, radii: radii, top: top, bodies: [], events: [], time: 0, nextId: 1, over: false, danger: 0 };
 
     function radius(level) { return radii[level]; }
-    function add(level, x, y, vx, vy) {
-      var r = radii[level];
-      var body = { id: world.nextId++, lvl: level, r: r, x: Math.min(Math.max(x, r), o.width - r), y: Math.min(y, o.height - r), vx: vx || 0, vy: vy || 0, px: x, py: y, born: world.time, age: 0, over: 0, contact: 0 };
+    /* grow：合成出来的新动物从小一点开始，慢慢长到该有的大小，周围的动物是被一点点挤开的。
+       起始半径取「不压到任何邻居」的最大值（比如卡在两个圆缝里的小球），再慢慢长；
+       一下子变大会产生很深的重叠，位置修正会把邻居弹飞。 */
+    function add(level, x, y, vx, vy, grow) {
+      var rt = radii[level], r = rt;
+      if (grow) {
+        r = rt * o.growStart;
+        for (var n = 0; n < world.bodies.length; n++) {
+          var other = world.bodies[n], gap = Math.sqrt((other.x - x) * (other.x - x) + (other.y - y) * (other.y - y)) - other.r - .3;
+          if (gap < r) r = gap;
+        }
+        r = Math.max(rt * .3, r);
+      }
+      var body = { grow: rt * (1 - o.growStart) / o.growSeconds, id: world.nextId++, lvl: level, rt: rt, r: r, x: Math.min(Math.max(x, r), o.width - r), y: Math.min(y, o.height - r), vx: vx || 0, vy: vy || 0, px: x, py: y, born: world.time, age: 0, over: 0, contact: 0 };
       world.bodies.push(body);
       return body;
     }
@@ -33,6 +45,7 @@
       if (b.x < b.r) { b.x = b.r; b.contact++; }
       else if (b.x > o.width - b.r) { b.x = o.width - b.r; b.contact++; }
       if (b.y > o.height - b.r) { b.y = o.height - b.r; b.contact++; }
+      else if (b.y < o.ceiling + b.r) { b.y = o.ceiling + b.r; if (b.vy < 0) b.vy = 0; } /* 保险：不会飞出画面太远 */
     }
     function solvePair(a, b) {
       var dx = b.x - a.x, dy = b.y - a.y, min = a.r + b.r, d2 = dx * dx + dy * dy;
@@ -63,7 +76,7 @@
       if (!Object.keys(dead).length) return;
       world.bodies = list.filter(function (body) { return !dead[body.id]; });
       born.forEach(function (item) {
-        var body = add(item.level, item.x, item.y, item.vx, item.vy);
+        var body = add(item.level, item.x, item.y, item.vx, item.vy, true);
         body.age = o.graceSeconds; /* 合成出来的不算刚放下的 */
         emit({ type: 'merge', level: item.level, from: item.from, x: item.x, y: item.y, id: body.id });
       });
@@ -75,6 +88,7 @@
         list = world.bodies;
         for (i = 0; i < list.length; i++) {
           b = list[i]; b.contact = 0;
+          if (b.r < b.rt) b.r = Math.min(b.rt, b.r + b.grow * h);
           b.vy += o.gravity * h;
           var damp = Math.max(0, 1 - o.damping * h);
           b.vx *= damp; b.vy *= damp;
@@ -88,6 +102,8 @@
           b = list[i];
           b.vx = (b.x - b.px) / h; b.vy = (b.y - b.py) / h;
           if (b.contact) { var f = Math.max(0, 1 - o.contactDamping * h); b.vx *= f; b.vy *= f; }
+          var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+          if (speed > o.maxSpeed) { b.vx *= o.maxSpeed / speed; b.vy *= o.maxSpeed / speed; }
         }
         mergePass();
       }
