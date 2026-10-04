@@ -134,9 +134,13 @@
   $('journalEntryDialog').addEventListener('close', function () { photoTicket++; clearPreview(); });
   $('journalPickPhoto').addEventListener('click', function () { $('journalEntryFile').click(); });
   $('journalEntryFile').addEventListener('change', async function () {
-    var file = this.files[0]; if (!file || !draft || saving) return;
+    var file = this.files[0]; this.value = ''; if (!file || !draft || saving) return;
     var ticket = ++photoTicket; preparing = true; $('journalEntrySave').disabled = true; $('journalEntryMessage').textContent = '正在准备照片…';
-    try { var blob = await Photos.compress(file); if (ticket !== photoTicket) return; draft.blob = blob; draft.originalPhotoId = draft.originalPhotoId || draft.photoId; draft.photoId = ''; draft.photo = ''; await paintDraft(); $('journalEntryMessage').textContent = '照片准备好了，只保存在本机。'; }
+    try {
+      var blob = window.NaituanCrop ? await window.NaituanCrop.pick(file, { maxEdge: 1280, quality: .82 }) : await Photos.compress(file);
+      if (ticket !== photoTicket) return;
+      if (!blob) { $('journalEntryMessage').textContent = draft.blob || draft.photoId || draft.photo ? '' : '没有选照片，也可以只写文字。'; return; }
+      draft.blob = blob; draft.originalPhotoId = draft.originalPhotoId || draft.photoId; draft.photoId = ''; draft.photo = ''; await paintDraft(); $('journalEntryMessage').textContent = '照片准备好了，只保存在本机。'; }
     catch (error) { if (ticket === photoTicket) $('journalEntryMessage').textContent = error.message; }
     finally { if (ticket === photoTicket) { preparing = false; $('journalEntrySave').disabled = false; } }
   });

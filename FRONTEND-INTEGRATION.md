@@ -18,6 +18,7 @@ life.js 只拥有单词与饮食卡片、公共存档 API；待办的渲染与�
 - `journal-state.js` 统一读取新记录及旧 `day.food`，只统计日常记录；单词、任务、专注仍是当天的独立事实。旧饮食照片在成功写入 IndexedDB 后才移除内联数据。
 - `journal.js` 负责日期时间线、日期相册、编辑与可撤销删除、我的记录总览。`NaituanJournal.dayStats(date)` 给日历提供记录圆点。
 - `photo-store.js` 的 `NaituanPhotos` 负责本机照片压缩、读写、显示和导出。照片不会上传。
+- `photo-crop.js` 的 `NaituanCrop.pick(file, {maxEdge, quality})` 在选好照片后弹出裁剪框（默认方形，可换其它形状或原图），返回 JPEG Blob，取消返回 null；日常记录与饮食打卡都经过它。需要在 `life.js` 之前引入。
 - 我的为独立 `profileView` 页面；保留小屋声音、游戏和专注统计，在底部导航及爪爪菜单中均可进入。
 
 ## 完整备份

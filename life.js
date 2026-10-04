@@ -191,13 +191,21 @@
     else $('foodPreview').removeAttribute('src');
   }
   $('foodFile').addEventListener('change', function () {
-    var file = this.files[0];
+    var file = this.files[0]; this.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) { $('foodMessage').textContent = '请选择一张图片。'; return; }
     photoPending = true; $('foodSubmit').disabled = true;
     $('foodMessage').textContent = '正在准备照片…';
+    function done() { photoPending = false; $('foodSubmit').disabled = false; }
+    if (window.NaituanCrop) {
+      window.NaituanCrop.pick(file, { maxEdge: 800, quality: .8 }).then(function (blob) {
+        if (!blob) { $('foodMessage').textContent = foodPhoto ? '' : '没有选照片，也可以只写文字。'; return; }
+        return window.NaituanCrop.toDataURL(blob).then(function (data) { foodPhoto = data; paintFoodPreview(); $('foodMessage').textContent = '照片准备好了。'; });
+      }).catch(function (error) { $('foodMessage').textContent = error && error.message || '这张照片暂时读不了，请换一张或先写下饮食记录。'; }).then(done);
+      return;
+    }
     var url = URL.createObjectURL(file), img = new Image();
-    function finish() { URL.revokeObjectURL(url); photoPending = false; $('foodSubmit').disabled = false; }
+    function finish() { URL.revokeObjectURL(url); done(); }
     img.onload = function () {
       try {
         var ratio = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
