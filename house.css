@@ -271,3 +271,13 @@ button:disabled { cursor: default; }
 .shop .item { position: relative; }
 .shop .item.wished { border-color: #e2a397 !important; box-shadow: 0 0 0 2px #f6d2c9; }
 .shop .item.wished::after { content: "♥"; position: absolute; top: 6px; right: 8px; font-size: 15px; line-height: 1; color: #e58f84; }
+
+/* 饰品小窗 */
+.acc-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.acc-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #e6d9c8; border-radius: 16px; background: #fbf4ea; }
+.acc-pic { flex: none; width: 58px; height: 44px; object-fit: contain; }
+.acc-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.acc-info b { font: 17px var(--font-display); font-weight: 400; color: var(--house-brown); }
+.acc-info span { font-size: 12px; line-height: 1.5; color: #8f7564; }
+.acc-row .acc-btn { flex: none; width: auto; margin: 0; min-height: 40px; padding: 8px 14px; }
+.acc-list > .secondary-button { margin-top: 2px; }

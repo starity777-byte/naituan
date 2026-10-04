@@ -180,8 +180,101 @@
     curPose = p;
     catimg.src = SPR[p];
     cat.setAttribute('data-pose', p);
-    catimg.classList.remove('pop');
-    if (!walkingChange) { void catimg.offsetWidth; catimg.classList.add('pop'); }
+    catimg.classList.remove('pop'); accCanvas.classList.remove('pop');
+    if (!walkingChange) { void catimg.offsetWidth; catimg.classList.add('pop'); accCanvas.classList.add('pop'); }
+    accRefresh();
+  }
+
+  /* ---------- 饰品 ----------
+     奶团平时由动图（assets/animated）播放。戴上饰品时，改用 assets/sheets 里同一套动画的逐帧图，
+     在画布上一帧一帧画，这样每一帧都知道头在哪里（accessory-slots.js），饰品能稳稳地跟着动。
+     某个动作的逐帧图还没下载好，或者这个动作没有点位数据时，先照常显示动图，只是暂时不戴。 */
+  var ACC_ITEMS = {
+    flower: {
+      name: '小白花', blurb: '在窝边捡到的一小枝花，还带着两片嫩叶子。',
+      slot: 0,
+      /* 一般戴正面那朵；头转向侧面的动作换成斜着的那朵。pivot 是花心在图里的位置。 */
+      looks: {
+        front: { src: 'assets/accessories/flower-front.webp', pivot: [0.349, 0.507], w: 84 },
+        angled: { src: 'assets/accessories/flower-angled.webp', pivot: [0.285, 0.458], w: 74 }
+      },
+      side: ['watch', 'curious', 'fish', 'sniff']
+    }
+  };
+  var ACC_SLOTS = window.NT_ACC_SLOTS || { poses: {} };
+  var accCanvas = document.createElement('canvas');
+  accCanvas.className = 'cat-canvas'; accCanvas.width = 503; accCanvas.height = 402; accCanvas.hidden = true;
+  accCanvas.setAttribute('aria-hidden', 'true');
+  cat.appendChild(accCanvas);
+  var accCtx = accCanvas.getContext('2d');
+  var ACC_SHEETS = {}, accSheetOrder = [], ACC_LOOKS = {};
+  var accRaf = 0, accPose = null, accStart = 0, accDrawn = '';
+  var raf = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : function (fn) { return setTimeout(function () { fn(Date.now()); }, 40); };
+  var caf = window.cancelAnimationFrame ? window.cancelAnimationFrame.bind(window) : clearTimeout;
+  function clock() { return window.performance && performance.now ? performance.now() : Date.now(); }
+  function accSheet(pose) {
+    if (!ACC_SHEETS[pose]) {
+      var im = new Image(); im.decoding = 'async';
+      im.onload = function () { accRefresh(); };
+      im.src = 'assets/sheets/' + pose + '.webp?v=acc-20261004';
+      ACC_SHEETS[pose] = im; accSheetOrder.push(pose);
+      /* 每张逐帧图解码后比较占内存，只留最近用过的几张。 */
+      while (accSheetOrder.length > 5) { var old = accSheetOrder.shift(); if (old !== pose && old !== curPose) delete ACC_SHEETS[old]; }
+    }
+    return ACC_SHEETS[pose];
+  }
+  function accLook(src) {
+    if (!ACC_LOOKS[src]) { var im = new Image(); im.onload = function () { accDrawn = ''; }; im.src = src + '?v=acc-20261004'; ACC_LOOKS[src] = im; }
+    return ACC_LOOKS[src];
+  }
+  function accWorn() { var id = S && S.acc && S.acc.wear; return id && ACC_ITEMS[id] ? ACC_ITEMS[id] : null; }
+  function accReady(im) { return !!(im && im.complete && im.naturalWidth > 0); }
+  function accRefresh() {
+    clearTimeout(accRaf); caf(accRaf); accRaf = 0;
+    var item = accWorn(), data = item && ACC_SLOTS.poses[curPose], sheet = data ? accSheet(curPose) : null;
+    if (item) ['sit', 'walkSide', 'walkFront'].forEach(function (p) { if (p !== curPose && ACC_SLOTS.poses[p]) accSheet(p); });
+    var on = accReady(sheet);
+    accCanvas.hidden = !on; catimg.style.visibility = on ? 'hidden' : '';
+    if (!on) { accPose = null; return; }
+    if (accPose !== curPose) { accPose = curPose; accStart = clock(); accDrawn = ''; }
+    accTick();
+  }
+  function accTick() {
+    accRaf = 0;
+    var item = accWorn(), data = item && ACC_SLOTS.poses[curPose], sheet = ACC_SHEETS[curPose];
+    if (!data || !accReady(sheet) || accPose !== curPose) return accRefresh();
+    var total = 0, i;
+    for (i = 0; i < data.ms.length; i++) total += data.ms[i];
+    var t = (clock() - accStart) % total, f = 0, sum = data.ms[0];
+    while (f < data.ms.length - 1 && sum <= t) { f++; sum += data.ms[f]; }
+    var look = item.looks[item.side.indexOf(curPose) >= 0 ? 'angled' : 'front'], art = accLook(look.src);
+    var key = curPose + ':' + f + ':' + look.src + ':' + accReady(art);
+    if (key !== accDrawn) {
+      accDrawn = key;
+      var cols = data.cols;
+      accCtx.clearRect(0, 0, 503, 402);
+      accCtx.drawImage(sheet, (f % cols) * 503, Math.floor(f / cols) * 402, 503, 402, 0, 0, 503, 402);
+      if (accReady(art)) {
+        var q = data.f[f], x = q[item.slot * 2], y = q[item.slot * 2 + 1];
+        var scale = Math.min(1.15, Math.max(0.9, q[11])), w = look.w * scale, h = w * art.naturalHeight / art.naturalWidth;
+        accCtx.save(); accCtx.translate(x, y); accCtx.rotate(q[10] * Math.PI / 180);
+        accCtx.drawImage(art, -look.pivot[0] * w, -look.pivot[1] * h, w, h);
+        accCtx.restore();
+      }
+    }
+    var wait = sum - t;
+    /* 下一帧到了再画；页面在后台时不画。 */
+    if (!document.hidden) accRaf = setTimeout(function () { accRaf = raf(accTick); }, Math.max(0, wait - 8));
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { accDrawn = ''; accRefresh(); } });
+  function cleanAcc(raw) {
+    var acc = { own: {}, wear: null, gift: 0 };
+    if (raw && typeof raw === 'object') {
+      if (raw.own && typeof raw.own === 'object') Object.keys(ACC_ITEMS).forEach(function (id) { if (raw.own[id]) acc.own[id] = 1; });
+      if (typeof raw.wear === 'string' && acc.own[raw.wear]) acc.wear = raw.wear;
+      acc.gift = raw.gift ? 1 : 0;
+    }
+    return acc;
   }
 
   /* ---------- render ---------- */
@@ -968,7 +1061,7 @@
     return Object.prototype.hasOwnProperty.call(CATALOG, cat) && hasItem(cat, id);
   }
   function loadDecor(d) {
-    S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0; S.wish = null; S.welcome = 0;
+    S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0; S.wish = null; S.welcome = 0; S.acc = cleanAcc(d && d.acc);
     S.roomLayout = window.NaituanRoom.cleanLayout(d && d.roomLayout);
     S.hiddenFixtures = { win: !!(d && d.hiddenFixtures && d.hiddenFixtures.win), rug: !!(d && d.hiddenFixtures && d.hiddenFixtures.rug) };
     S.catPosition = window.NaituanRoom.cleanPoint(d && d.catPosition);
@@ -1119,6 +1212,64 @@
     metersEl.hidden = actionsEl.hidden = hintEl.hidden = btnShop.hidden = false; appEl.classList.remove('shopping');
     paintDecor(); render();
     if (pendingFurniture) { var key = pendingFurniture; pendingFurniture = null; visitFurniture(key); }
+  }
+
+
+  /* ---------- 饰品小窗：送花、戴上、摘下 ---------- */
+  var accDialog = $('#accDialog');
+  function accThumb(item) { return item.looks.front.src + '?v=acc-20261004'; }
+  function paintAccDialog(gift) {
+    var list = $('#accList'); list.innerHTML = '';
+    $('#accTitle').textContent = gift ? '奶团捡到了一小枝花' : '奶团的饰品';
+    $('#accIntro').textContent = gift
+      ? '它在窝边找到一小枝白花，叼着跑过来蹭你的手，好像想让你帮它戴在耳朵旁边。'
+      : '点一下，就能给奶团戴上或者摘下来。以后还会有更多小饰品。';
+    Object.keys(ACC_ITEMS).filter(function (id) { return S.acc.own[id]; }).forEach(function (id) {
+      var item = ACC_ITEMS[id], worn = S.acc.wear === id;
+      var row = document.createElement('div'); row.className = 'acc-row';
+      var pic = document.createElement('img'); pic.src = accThumb(item); pic.alt = ''; pic.className = 'acc-pic';
+      var info = document.createElement('div'); info.className = 'acc-info';
+      var nm = document.createElement('b'); nm.textContent = item.name;
+      var bl = document.createElement('span'); bl.textContent = worn ? '正戴着' : item.blurb;
+      info.appendChild(nm); info.appendChild(bl);
+      var btn = document.createElement('button'); btn.type = 'button';
+      btn.className = worn ? 'secondary-button acc-btn' : 'primary-button acc-btn';
+      btn.textContent = worn ? '摘下来' : gift ? '帮它戴上' : '戴上';
+      btn.addEventListener('click', function () { wearAcc(worn ? null : id); });
+      row.appendChild(pic); row.appendChild(info); row.appendChild(btn); list.appendChild(row);
+    });
+    if (gift) {
+      var later = document.createElement('button'); later.type = 'button'; later.className = 'secondary-button';
+      later.textContent = '先收起来，以后在爪爪菜单「饰品」里戴';
+      later.addEventListener('click', function () { sound('tap'); accDialog.close(); say('收好啦，想戴的时候叫我~', 3600); });
+      list.appendChild(later);
+    }
+  }
+  function openAccessories(gift) {
+    if (!accDialog || accDialog.open) return;
+    paintAccDialog(!!gift);
+    try { accDialog.showModal(); } catch (_) { accDialog.setAttribute('open', ''); }
+  }
+  function wearAcc(id) {
+    S.acc.wear = id && S.acc.own[id] ? id : null;
+    save(); accRefresh();
+    if (accDialog && accDialog.open) accDialog.close();
+    if (id) {
+      sound('reward'); setPose('happy', 2800); say(pick(['嘿嘿，好看吗？', '戴上啦，小花香香的~', '谢谢你帮我戴上！']), 4200);
+      var r = stage.getBoundingClientRect();
+      for (var i = 0; i < 3; i++) (function (i) { setTimeout(function () { heartAt(r.width * (0.38 + Math.random() * 0.24), r.height * (0.45 + Math.random() * 0.12)); }, i * 120); })(i);
+    } else { sound('pick'); setPose('sit', 1600); say('先摘下来收好~', 3000); }
+  }
+  /* 小白花免费送给每一位玩家，每份存档一次。新玩家先收见面礼，过一会儿再送花。 */
+  function offerFlowerGift(delay) {
+    setTimeout(function tryGift() {
+      if (S.acc.gift) return;
+      var homeShown = !$('#homeView') || !$('#homeView').hidden;
+      if (busy() || SH.open || S.sleeping || !homeShown || document.hidden || (accDialog && accDialog.open) || document.querySelector('dialog[open]')) { setTimeout(tryGift, 6000); return; }
+      S.acc.gift = 1; S.acc.own.flower = 1; save();
+      setPose('happy', 3000); say('我捡到一小枝花！', 4000);
+      setTimeout(function () { openAccessories(true); }, 900);
+    }, delay);
   }
 
   /* ---------- 心愿：玩完一局，看得到下一件想要的东西 ---------- */
@@ -1310,6 +1461,7 @@
       if (busy() || SH.open) return;
       setPose('happy', 3000); say('见面礼！送你 666 个小鱼干，点右上角的小鱼去小铺逛逛吧~', 6500);
     }, 3800);
+    offerFlowerGift(S.welcome ? 4200 : 14000);
     render();
     setInterval(tick, 1000);
     document.addEventListener('visibilitychange', function () {
@@ -1335,7 +1487,7 @@
     },
     sound: sound,
     setMute: setMute, setVolume: setVolume, setBgm: setBgm, setBgmVolume: setBgmVolume, miniGain: miniGain, finishRoom: function () { cancelRoomInteraction(); endVisit(); if (roomView) roomView.finish(); deferIdle(); },
-    S: function () { return S; }, save: save, paintWish: paintWish, say: say, addFish: addFish, clamp: clamp, pick: pick, render: render, setPose: setPose, heartAt: heartAt, textAt: textAt,
+    S: function () { return S; }, save: save, paintWish: paintWish, openAccessories: function () { openAccessories(false); }, say: say, addFish: addFish, clamp: clamp, pick: pick, render: render, setPose: setPose, heartAt: heartAt, textAt: textAt,
     stage: stage, ext: EXT, isBusy: busy, setChrome: setChrome, setBusyUI: setBusyUI, hideCat: function (h) { $('#catbox').style.visibility = h ? 'hidden' : ''; bubble.hidden = !!h; stage.classList.toggle('playing', !!h); }
   };
 

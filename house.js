@@ -92,6 +92,7 @@
     menu(false);
     if (name === 'shop') $('btnShop').click();
     if (name === 'book') window.NTQ.openBook();
+    if (name === 'acc') NT.openAccessories();
     if (name === 'arrange') { $('roomArrange').click(); $('roomArrange').focus({ preventScroll: true }); }
     if (name === 'fullscreen') toggleFullscreen();
   }

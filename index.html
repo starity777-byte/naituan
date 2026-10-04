@@ -54,9 +54,9 @@
 @keyframes splash-fallback { to { visibility: hidden; pointer-events: none; } }
 @media (prefers-reduced-motion: reduce) { .splash-cat img, .splash-paws svg, .splash-status { animation: none !important; } .splash-paws svg { opacity: .6; } }
 </style>
-<link rel="stylesheet" href="style.css?v=webp-20261003">
+<link rel="stylesheet" href="style.css?v=acc-20261004">
 <link rel="stylesheet" href="decor-shop.css?v=cake-peach-20260929">
-<link rel="stylesheet" href="house.css?v=wish-20261004">
+<link rel="stylesheet" href="house.css?v=acc-20261004">
 <link rel="stylesheet" href="planner.css?v=immersive-20260929">
 <link rel="stylesheet" href="journal.css?v=journal-20261003">
 <link rel="stylesheet" href="photo-crop.css?v=crop-20261004">
@@ -87,6 +87,7 @@
   <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 6"/></symbol>
+  <symbol id="i-flower" viewBox="0 0 24 24"><circle cx="12" cy="10" r="2.6"/><path d="M12 7.4C11 4.5 13 3 14.6 4.4c1.6 1.4.6 3.6-1.6 4.1M14.4 9.2c2.9-.6 4.4 1.5 3.1 3-1.3 1.6-3.5.8-4.2-1.2M13.2 12.5c.9 2.8-1 4.4-2.7 3.2-1.6-1.2-1-3.4.9-4.2M10.4 11.6c-2.8.9-4.5-1-3.3-2.7 1.2-1.6 3.4-1 4.2.9M12 12.6V21M12 18c-2.6-.2-4.2-1.4-4.6-3.2 2.2-.2 3.8.9 4.6 3.2Z"/></symbol>
   <symbol id="i-fullscreen" viewBox="0 0 24 24"><path d="M9 3H3v6M15 3h6v6M3 15v6h6M21 15v6h-6"/></symbol>
 </svg>
 <div class="app house-app" id="app" data-page="home">
@@ -104,6 +105,7 @@
     <button type="button" data-house-action="games"><svg class="ui-icon"><use href="#i-game"/></svg><span>游戏</span></button>
     <button type="button" data-house-action="shop"><svg class="ui-icon"><use href="#i-shop"/></svg><span>小铺</span></button>
     <button type="button" data-house-action="book"><svg class="ui-icon"><use href="#i-book"/></svg><span>图鉴</span></button>
+    <button type="button" data-house-action="acc"><svg class="ui-icon"><use href="#i-flower"/></svg><span>饰品</span></button>
     <button type="button" data-house-action="arrange"><svg class="ui-icon"><use href="#i-sofa"/></svg><span>布置</span></button>
     <button type="button" id="houseFullscreen" data-house-action="fullscreen" aria-pressed="false"><svg class="ui-icon"><use href="#i-fullscreen"/></svg><span>全屏</span></button>
   </nav>
@@ -376,6 +378,13 @@
 </dialog>
 <dialog class="house-dialog journal-menu" id="journalRecordMenu" aria-labelledby="journalMenuTitle"><button class="dialog-close icon-button" type="button" data-close-dialog aria-label="关闭记录选项"><svg class="ui-icon"><use href="#i-close"/></svg></button><h2 id="journalMenuTitle">这一条日常</h2><button id="journalEdit" type="button">修改记录</button><button id="journalDelete" type="button">删除记录</button></dialog>
 <dialog class="house-dialog journal-photo-dialog" id="journalPhotoDialog" aria-label="照片详情"><button class="dialog-close icon-button" type="button" data-close-dialog aria-label="关闭照片"><svg class="ui-icon"><use href="#i-close"/></svg></button><img id="journalPhotoFull" alt="日常照片"><p id="journalPhotoCaption"></p></dialog>
+<dialog class="house-dialog acc-dialog" id="accDialog" aria-labelledby="accTitle">
+  <button class="dialog-close icon-button" data-close-dialog type="button" aria-label="关闭饰品"><svg class="ui-icon"><use href="#i-close"/></svg></button>
+  <h2 id="accTitle">奶团的饰品</h2>
+  <p id="accIntro">点一下，就能给奶团戴上或者摘下来。</p>
+  <div class="acc-list" id="accList"></div>
+</dialog>
+
 <div class="house-toast" id="houseToast" role="status" aria-live="polite" hidden></div>
 
   <div class="modal" id="saveModal" hidden role="dialog" aria-modal="true" aria-labelledby="saveTitle">
@@ -397,7 +406,8 @@
 <script src="room.js?v=layer-20261003"></script>
 <script src="sound.js?v=jelly-20261004"></script>
 <script src="bgm.js?v=games-music-20261003"></script>
-<script src="game.js?v=wish-20261004"></script>
+<script src="accessory-slots.js?v=acc-20261004"></script>
+<script src="game.js?v=acc-20261004"></script>
 <script src="queue.js?v=wish-20261004"></script>
 <script src="lion-physics.js?v=lion-20261004e"></script>
 <script src="lion.js?v=lion-20261004e"></script>
@@ -410,7 +420,7 @@
 <script src="study-ambience.js?v=immersive-20260929"></script>
 <script src="planner.js?v=journal-20261003"></script>
 <script src="backup.js?v=journal-20261003"></script>
-<script src="house.js?v=games-stats-20261003"></script>
+<script src="house.js?v=acc-20261004"></script>
 <script src="splash.js?v=splash-20261003"></script>
 </body>
 </html>

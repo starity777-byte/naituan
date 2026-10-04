@@ -164,12 +164,14 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .stage:not(.room-ready) .cat-ground-shadow { display: none; }
 .room-scene.arranging .cat-ground-shadow { opacity: .2; }
 .cat { width: 100%; height: 100%; transform-origin: 50% 99%; }
+.cat { position: relative; }
 .cat img { display: block; width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
-.cat img { transform-origin: 50% 99%; }
-.cat img.pop { animation: pop .32s ease-out; }
-.cat[data-pose="walkSide"] img { transform: translateY(1.74%) scaleX(var(--walk-facing, 1)); }
-.cat[data-pose="walkFront"] img { transform: translateY(1.74%); }
-.room-cat-walking .cat img { animation: none; }
+.cat .cat-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+.cat img, .cat .cat-canvas { transform-origin: 50% 99%; }
+.cat img.pop, .cat .cat-canvas.pop { animation: pop .32s ease-out; }
+.cat[data-pose="walkSide"] img, .cat[data-pose="walkSide"] .cat-canvas { transform: translateY(1.74%) scaleX(var(--walk-facing, 1)); }
+.cat[data-pose="walkFront"] img, .cat[data-pose="walkFront"] .cat-canvas { transform: translateY(1.74%); }
+.room-cat-walking .cat img, .room-cat-walking .cat .cat-canvas { animation: none; }
 @keyframes pop { 0% { transform: scale(.9, 1.08); } 60% { transform: scale(1.05, .95); } 100% { transform: none; } }
 
 /* Two-frame gestures: slow, small deformations keep the drawings soft. */
@@ -447,7 +449,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 @media (max-width: 400px) { .cq-chip { font-size: 14.5px; padding: 2px 8px; } .cq-bar { gap: 6px; } }
 @media (max-width: 340px) { .top h1 { font-size: 24px; } .act { font-size: 13px; } .top .time { display: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .cat, .cat img.pop, .cloud, .zzz span, .act.nudge, .catbtn.duang, .cat-ground-shadow.duang { animation: none !important; }
+  .cat, .cat img.pop, .cat .cat-canvas.pop, .cloud, .zzz span, .act.nudge, .catbtn.duang, .cat-ground-shadow.duang { animation: none !important; }
   .zzz span { opacity: .8; }
   .fx { animation-duration: .01s; }
 }
