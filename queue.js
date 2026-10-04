@@ -432,6 +432,7 @@
     $('#cqWinC').innerHTML = G.got.length ? '<small>这一局买到的蛋糕角</small><div>' + Object.keys(cnt).map(function (i) { return '<span class="cq-mini big">' + cakeHTML(+i) + '<i>×' + cnt[i] + '</i></span>'; }).join('') + '</div>' : '';
     $('#cqWinNext').textContent = G.challenge ? '继续闯关' : last ? '再玩一次' : '下一关';
     $('#cqWinNext').setAttribute('data-act', G.challenge ? 'challenge' : last ? 'again' : 'next');
+    if (NT.paintWish) NT.paintWish($('#cqWin .sg-card'), leave);
     later(function () { el.win.hidden = false; }, 520);
   }
 

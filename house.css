@@ -251,3 +251,23 @@ button:disabled { cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .house-app *, .house-app *::before, .house-app *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* 心愿：结算卡片里的"离下一件还差多少"，以及小铺里的心愿按钮 */
+.wish-line { margin-top: 4px; padding: 10px 12px; border-radius: 14px; background: #f6ece0; border: 1px solid #e6d6c3; display: flex; flex-direction: column; gap: 7px; text-align: left; }
+.wish-line p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--house-brown); text-wrap: pretty; }
+.wish-line p .ui-icon { vertical-align: -3px; margin-right: 3px; }
+.wish-line p b { font-size: 15px; color: #c46f63; }
+.wish-line small { font-size: 11.5px; color: #9a7f6d; }
+.wish-line .ui-icon, .wishbtn .ui-icon, .item.wished::after { width: 15px; height: 15px; }
+.wish-line .ui-icon { fill: #eaa199; stroke: #b9665b; stroke-width: 1.6; }
+.wish-bar { height: 8px; border-radius: 99px; background: #eadbca; overflow: hidden; }
+.wish-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #f3b9a8, #e58f84); transition: width .5s ease; }
+.wish-go { min-height: 40px; border: 1px solid #d9a99c; border-radius: 12px; background: #fde8e1; color: var(--house-brown); font: inherit; font-size: 13.5px; cursor: pointer; }
+.wish-go:active { transform: translateY(1px); }
+.wishbtn { flex: none; display: inline-flex; align-items: center; gap: 3px; min-height: 40px; padding: 0 10px; border: 1px solid #d9c6b6; border-radius: 14px; background: #fffaf1; color: #8a6a5a; font: inherit; font-size: 12.5px; cursor: pointer; }
+.wishbtn .ui-icon { stroke: #b9665b; }
+.wishbtn[aria-pressed="true"] { background: #fde8e1; border-color: #d9a99c; color: #a4554b; }
+.wishbtn[aria-pressed="true"] .ui-icon { fill: #eaa199; }
+.shop .item { position: relative; }
+.shop .item.wished { border-color: #e2a397 !important; box-shadow: 0 0 0 2px #f6d2c9; }
+.shop .item.wished::after { content: "♥"; position: absolute; top: 6px; right: 8px; font-size: 15px; line-height: 1; color: #e58f84; }

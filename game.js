@@ -692,6 +692,7 @@
     $('#rhSub').textContent = '得分 ' + RHS.score + (r.record ? ' · 新纪录！' : ' · 最高 ' + S.bestBeat);
     $('#rhStats').textContent = '命中 ' + RHS.hits + ' / ' + RHS.realSeen + ' · 完美 ' + RHS.perfects + ' · 最高连击 ' + RHS.maxCombo + ' · 识破假猫 ' + RHS.dodged;
     $('#rhRew').textContent = '小鱼干 +' + r.coins;
+    paintWish(rhOver.querySelector('.sg-card'), rhLeave);
     setTimeout(function () { if (RH.active && RHS && RHS.ended) rhOver.hidden = false; }, 500);
   }
   function rhLeave() {
@@ -773,6 +774,7 @@
     setTimeout(function () {
       if (!SG.active || !SG.over) return;
       $('#sgTitle').textContent = SG.floors > 0 ? '堆了 ' + SG.floors + ' 层' : '一层都没堆上';
+      paintWish(sgOver.querySelector('.sg-card'), sgLeave);
       $('#sgBest').textContent = SG.record && SG.floors > 0 ? '新纪录！' : '最高 ' + S.best + ' 层';
       $('#sgRew').textContent = '小鱼干 +' + SG.earned;
       sgOver.hidden = false;
@@ -963,7 +965,7 @@
     return Object.prototype.hasOwnProperty.call(CATALOG, cat) && hasItem(cat, id);
   }
   function loadDecor(d) {
-    S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0;
+    S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0; S.wish = null; S.welcome = 0;
     S.roomLayout = window.NaituanRoom.cleanLayout(d && d.roomLayout);
     S.hiddenFixtures = { win: !!(d && d.hiddenFixtures && d.hiddenFixtures.win), rug: !!(d && d.hiddenFixtures && d.hiddenFixtures.rug) };
     S.catPosition = window.NaituanRoom.cleanPoint(d && d.catPosition);
@@ -981,6 +983,8 @@
       if (Array.isArray(d.eq.prop)) S.eq.prop = d.eq.prop.filter(function (id) { return typeof id === 'string' && hasItem('prop', id) && S.own['prop:' + id]; });
     }
     S.shopSeen = d.shopSeen ? 1 : 0;
+    S.wish = typeof d.wish === 'string' && ownKeyOk(d.wish) ? d.wish : null;
+    S.welcome = d.welcome ? 1 : 0;
   }
   function owned(cat, id) { return !!S.own[cat + ':' + id]; }
   function equipped(cat, id) {
@@ -1035,6 +1039,7 @@
   }
   function updateBuy() {
     var nameEl = $('#buyName'), descEl = $('#buyDesc'), btn = $('#buyBtn'), s = SH.sel;
+    paintWishBtn();
     if (!s) { nameEl.textContent = SH.msg || '选一件试试'; descEl.textContent = SH.msg ? '还想逛逛别的吗' : '点上面的东西，先在房间里看看效果'; btn.disabled = true; btn.textContent = '—'; return; }
     var it = findItem(s.cat, s.id), st = itemState(s.cat, s.id);
     nameEl.textContent = it.name;
@@ -1043,7 +1048,7 @@
       else { descEl.textContent = '正在使用'; btn.disabled = true; btn.textContent = '使用中'; }
     } else if (st === 'own') { descEl.textContent = s.cat === 'rug' || s.cat === 'win' ? '使用后回到经典房间' : '已经拥有，可以换上'; btn.disabled = false; btn.textContent = '使用'; }
     else if (S.fish >= it.price) { descEl.textContent = s.cat === 'rug' || s.cat === 'win' ? '用于经典房间，买下后切换' : s.cat === 'wall' && it.image ? '房间底图，家具可另外选配' : it.image ? '买下后可在「布置」里拖动摆放' : '买下后马上放进房间'; btn.disabled = false; btn.innerHTML = '买 ' + FISH_MINI + it.price; }
-    else { descEl.textContent = '小鱼干还差 ' + (it.price - S.fish) + ' 个'; btn.disabled = true; btn.textContent = '不够'; }
+    else { descEl.textContent = '小鱼干还差 ' + (it.price - S.fish) + ' 个' + (S.wish === s.cat + ':' + s.id ? '，玩小游戏攒一攒' : '，可以先设成心愿'); btn.disabled = true; btn.textContent = '不够'; }
   }
   function renderShop() {
     var tabsEl = $('#tabs'); tabsEl.innerHTML = '';
@@ -1059,6 +1064,7 @@
       b.type = 'button'; b.className = 'item'; b.setAttribute('data-eq', st === 'eq' ? '1' : '0');
       b.setAttribute('aria-pressed', SH.sel && SH.sel.cat === category && SH.sel.id === it.id ? 'true' : 'false');
       b.dataset.itemId = it.id;
+      if (S.wish === category + ':' + it.id && st === 'buy') b.classList.add('wished');
       b.appendChild(swatch(category, it.id));
       var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = it.name; b.appendChild(nm);
       var t = document.createElement('span'); t.className = 'st'; t.innerHTML = st === 'eq' ? '使用中' : st === 'own' ? '已拥有' : FISH_MINI + '<b>' + it.price + '</b>'; b.appendChild(t);
@@ -1082,14 +1088,15 @@
       if (s.cat !== 'prop') return;
       S.eq.prop = S.eq.prop.filter(function (x) { return x !== s.id; }); SH.msg = '收起来了'; sound('pick');
     } else {
-      if (st === 'buy') { if (S.fish < it.price) return; addFish(-it.price); S.own[s.cat + ':' + s.id] = 1; }
+      var wishDone = st === 'buy' && S.wish === s.cat + ':' + s.id;
+      if (st === 'buy') { if (S.fish < it.price) return; addFish(-it.price); S.own[s.cat + ':' + s.id] = 1; if (wishDone) S.wish = null; }
       if (s.cat === 'prop') { if (S.eq.prop.indexOf(s.id) < 0) S.eq.prop.push(s.id); } else S.eq[s.cat] = s.id;
       if (s.cat === 'rug' || s.cat === 'win') {
         S.hiddenFixtures[s.cat] = false;
         S.eq.wall = 'dots';
         S.eq.prop = S.eq.prop.filter(function (id) { return findItem('prop', id).placement !== (s.cat === 'win' ? 'window' : 'rug'); });
       }
-      SH.msg = st === 'buy' ? '买到了，已经放进房间' : '换好了';
+      SH.msg = wishDone ? '心愿达成！已经放进房间' : st === 'buy' ? '买到了，已经放进房间' : '换好了';
       celebrate(s);
     }
     SH.sel = null; save(); renderShop();
@@ -1110,6 +1117,84 @@
     paintDecor(); render();
     if (pendingFurniture) { var key = pendingFurniture; pendingFurniture = null; visitFurniture(key); }
   }
+
+  /* ---------- 心愿：玩完一局，看得到下一件想要的东西 ---------- */
+  var HEART_MINI = '<svg class="ui-icon" aria-hidden="true"><use href="#i-heart"/></svg>';
+  function allShopItems() {
+    var seen = {}, list = [];
+    TABS.forEach(function (t) {
+      var cat = shopCategory(t[0]);
+      shopItems(t[0]).forEach(function (it) {
+        var key = cat + ':' + it.id;
+        if (seen[key] || !(it.price > 0)) return;
+        seen[key] = 1; list.push({ key: key, cat: cat, id: it.id, tab: t[0], name: it.name, price: it.price });
+      });
+    });
+    return list;
+  }
+  function wishTarget() {
+    var list = allShopItems().filter(function (x) { return !owned(x.cat, x.id); });
+    if (!list.length) return null;
+    if (S.wish) { var w = list.filter(function (x) { return x.key === S.wish; })[0]; if (w) return { item: w, chosen: true, list: list }; }
+    list.sort(function (a, b) { return a.price - b.price; });
+    return { item: list[0], chosen: false, list: list };
+  }
+  function paintWishBtn() {
+    var b = $('#wishBtn'); if (!b) return;
+    var s = SH.sel, show = !!s && itemState(s.cat, s.id) === 'buy';
+    b.hidden = !show; if (!show) return;
+    var on = S.wish === s.cat + ':' + s.id;
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.innerHTML = HEART_MINI + (on ? '心愿中' : '设为心愿');
+  }
+  function toggleWish() {
+    var s = SH.sel; if (!s || itemState(s.cat, s.id) !== 'buy') return;
+    var key = s.cat + ':' + s.id;
+    S.wish = S.wish === key ? null : key;
+    sound(S.wish ? 'reward' : 'pick'); save(); renderShop();
+    if (S.wish) { setPose('happy', 2000); say('记下啦，一起攒小鱼干！', 2600); }
+  }
+  function openShopAt(key) {
+    openShop();
+    if (!SH.open || !key) return;
+    var x = allShopItems().filter(function (i) { return i.key === key; })[0];
+    if (!x) return;
+    SH.tab = x.tab; SH.sel = { cat: x.cat, id: x.id }; SH.msg = ''; renderShop();
+    var p = $('#items .item[aria-pressed="true"]'); if (p && p.scrollIntoView) p.scrollIntoView({ block: 'nearest' });
+  }
+  /* Adds a "离心愿还差多少" line to a game's result card. leave() closes that game. */
+  function paintWish(card, leave) {
+    if (!card) return;
+    var box = card.querySelector('.wish-line');
+    if (!box) {
+      box = document.createElement('div'); box.className = 'wish-line';
+      card.insertBefore(box, card.querySelector('.sg-btns'));
+    }
+    var t = wishTarget();
+    if (!t) { box.hidden = true; return; }
+    box.hidden = false;
+    var it = t.item, have = S.fish, need = it.price - have, html, go = null;
+    var label = t.chosen ? '心愿' : '下一件';
+    if (need <= 0) {
+      if (t.chosen) { html = '<p>' + HEART_MINI + '够买心愿「' + esc(it.name) + '」啦！</p>'; go = it.key; }
+      else {
+        var n = t.list.filter(function (x) { return x.price <= have; }).length;
+        html = '<p>小鱼干够买 ' + n + ' 件东西啦，去挑一件喜欢的</p>';
+      }
+      html += '<button class="wish-go" type="button">去小铺看看</button>';
+    } else {
+      var pct = Math.max(4, Math.min(100, Math.round(have / it.price * 100)));
+      html = '<p>' + (t.chosen ? HEART_MINI : '') + '离' + label + '「' + esc(it.name) + '」还差 <b>' + need + '</b> 个小鱼干</p>' +
+        '<div class="wish-bar" role="progressbar" aria-valuemin="0" aria-valuemax="' + it.price + '" aria-valuenow="' + have + '"><i style="width:' + pct + '%"></i></div>' +
+        (t.chosen ? '' : '<small>在小铺里点「设为心愿」，换成你想要的</small>');
+    }
+    box.innerHTML = html;
+    var btn = box.querySelector('.wish-go');
+    if (btn) btn.addEventListener('click', function () { sound('tap'); leave(); setTimeout(function () { openShopAt(go); }, 60); });
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  $('#wishBtn').addEventListener('click', toggleWish);
+
   btnShop.addEventListener('click', openShop);
   $('#coins').addEventListener('click', function () { if (!SH.open) openShop(); });
   $('#shopClose').addEventListener('click', closeShop);
@@ -1215,6 +1300,13 @@
     load(hotData);
     paintDecor(); if (!S.shopSeen) btnShop.setAttribute('data-new', '1');
     greet();
+    /* 见面礼：每份存档送一次 666 小鱼干，等开场画面过去再给，和下一次自动保存一起存下。 */
+    setTimeout(function () {
+      if (S.welcome) return;
+      S.welcome = 1; addFish(666);
+      if (busy() || SH.open) return;
+      setPose('happy', 3000); say('见面礼！送你 666 个小鱼干，点右上角的小鱼去小铺逛逛吧~', 6500);
+    }, 3800);
     render();
     setInterval(tick, 1000);
     document.addEventListener('visibilitychange', function () {
@@ -1240,7 +1332,7 @@
     },
     sound: sound,
     setMute: setMute, setVolume: setVolume, setBgm: setBgm, setBgmVolume: setBgmVolume, miniGain: miniGain, finishRoom: function () { cancelRoomInteraction(); endVisit(); if (roomView) roomView.finish(); deferIdle(); },
-    S: function () { return S; }, save: save, say: say, addFish: addFish, clamp: clamp, pick: pick, render: render, setPose: setPose, heartAt: heartAt, textAt: textAt,
+    S: function () { return S; }, save: save, paintWish: paintWish, say: say, addFish: addFish, clamp: clamp, pick: pick, render: render, setPose: setPose, heartAt: heartAt, textAt: textAt,
     stage: stage, ext: EXT, isBusy: busy, setChrome: setChrome, setBusyUI: setBusyUI, hideCat: function (h) { $('#catbox').style.visibility = h ? 'hidden' : ''; bubble.hidden = !!h; stage.classList.toggle('playing', !!h); }
   };
 
