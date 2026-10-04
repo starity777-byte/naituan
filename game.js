@@ -29,7 +29,7 @@
   var $ = function (s) { return document.querySelector(s); };
   var cat = $('#cat'), catimg = $('#catimg'), catBox = $('#catbox'), stage = $('#stage'), bubble = $('#bubble'), zzz = $('#zzz');
   var btnFeed = $('#btnFeed'), btnSleep = $('#btnSleep'), btnHide = $('#btnHide'), sleepLabel = $('#sleepLabel');
-  var btnStack = $('#btnStack'), btnCake = $('#btnCake'), coinEl = $('#coins');
+  var btnStack = $('#btnStack'), btnCake = $('#btnCake'), btnLion = $('#btnLion'), coinEl = $('#coins');
   var hsEl = $('#hs'), slots = [];
   var meters = { hunger: $('#m-hunger'), mood: $('#m-mood'), energy: $('#m-energy') };
   var S, curPose = '', override = null, sayUntil = 0, sayText = '', lastTap = [], RH = { active: false }, EXT = { active: false }, SG = { active: false, over: false };
@@ -41,6 +41,7 @@
   function statsLeave() { if (window.NaituanStats) window.NaituanStats.leave(); }
   function setBusyUI(b) {
     btnFeed.disabled = btnSleep.disabled = btnHide.disabled = btnStack.disabled = btnCake.disabled = b;
+    if (btnLion) btnLion.disabled = b;
     if (b) { cancelRoomInteraction(); endVisit(); override = null; }
     if (roomView) roomView.refresh();
     if (window.NaituanBGM) window.NaituanBGM.configure({ game: !!b });
@@ -77,7 +78,7 @@
   else window.addEventListener('load', function () { setTimeout(preloadSprites, 400); });
 
   /* ---------- state ---------- */
-  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, mute: false, vol: 80, bgm: true, bgmVol: 60, cq: null, t: now() }; }
+  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, bestLion: 0, lionTop: 0, mute: false, vol: 80, bgm: true, bgmVol: 60, cq: null, t: now() }; }
   function isPlainObject(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     var proto = Object.getPrototypeOf(value);
@@ -101,6 +102,8 @@
       S.fish = countStat(d.fish, base.fish, true);
       S.best = countStat(d.best, base.best, true);
       S.bestBeat = countStat(d.bestBeat, base.bestBeat, true);
+      S.bestLion = countStat(d.bestLion, base.bestLion, true);
+      S.lionTop = Math.min(10, countStat(d.lionTop, base.lionTop, true));
       S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
       if (typeof d.vol === 'number') S.vol = finiteNumber(d.vol) ? Math.round(clamp(d.vol)) : base.vol;
       if (typeof d.bgm === 'boolean') S.bgm = d.bgm;

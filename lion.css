@@ -1,0 +1,11 @@
+/* 合成大狮子（lion.js） */
+.ml { position: absolute; inset: 0; z-index: 5; background-color: #f2e7d4;
+  background-image: linear-gradient(rgba(84, 57, 47, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(84, 57, 47, .06) 1px, transparent 1px); background-size: 34px 34px; }
+.ml[hidden] { display: none; }
+.stage.lionmode .window, .stage.lionmode .rug, .stage.lionmode .floor, .stage.lionmode .props { visibility: hidden; }
+.ml-play { height: 100%; display: flex; flex-direction: column; gap: 4px; padding: max(12px, env(safe-area-inset-top, 0px)) 12px 8px; box-sizing: border-box; }
+.ml-bar { display: flex; align-items: center; gap: 8px; flex: none; }
+.ml-bar .hs-quit { margin-left: auto; }
+.ml-play canvas { flex: 1; min-height: 0; width: 100%; display: block; touch-action: none; cursor: pointer; user-select: none; -webkit-user-select: none; }
+.lion-art { background: #efdfb4; }
+.lion-art img { width: 65%; max-height: 90px; }
