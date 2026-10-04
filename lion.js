@@ -104,7 +104,7 @@
         if (G.combo >= 2) addPop('连击 ×' + G.combo, e.x, e.y - world.radius(e.level) - 20, '#c4694f', 14);
         NT.sound('jelly', CHIME[Math.min(e.level - 1, CHIME.length - 1)] - 7);
         NT.sound('chime', CHIME[Math.min(e.level - 1, CHIME.length - 1)], .05);
-        if (e.level > G.topLevel) G.topLevel = e.level;
+        if (e.level > G.topLevel) { G.topLevel = e.level; G.topAt = performance.now(); }
         if (e.level === TOP && !G.lion) { G.lion = true; G.shake = .5; addPop('合成了' + NAMES[TOP] + '！', world.width / 2, world.height * .38, '#b9731f', 26); burst(e.x, e.y, '#ffd84d', 36, 260); NT.sound('fanfare'); }
       } else if (e.type === 'vanish') {
         G.score += 100; G.shake = .4; burst(e.x, e.y, '#ffd84d', 40, 280); addPop('+100 两只' + NAMES[TOP] + '一起消失！', e.x, e.y - 40, '#b9731f', 20); NT.sound('fanfare');
@@ -226,6 +226,11 @@
     var span = right - left, cy = bottom + FOOT / 2 + 3, gap = span / (TOP + 1);
     cx.strokeStyle = 'rgba(84,57,47,.2)'; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(left + gap / 2, cy); cx.lineTo(right - gap / 2, cy); cx.stroke();
     for (var i = 0; i <= TOP; i++) drawAnimal(i, left + gap * (i + .5), cy, Math.min(13, gap / 2 - 1) * (.52 + .48 * i / TOP));
+    if (G.topLevel >= 0) { /* 淡淡的红圈：这一局目前合成出的最大动物；刚升级时圈会弹一下 */
+      var ringR = Math.min(13, gap / 2 - 1) * (.52 + .48 * G.topLevel / TOP), grow = Math.max(0, 1 - (performance.now() - (G.topAt || 0)) / 350), rr = ringR + 4.5 + 4 * grow * grow;
+      cx.beginPath(); cx.arc(left + gap * (G.topLevel + .5), cy, rr, 0, Math.PI * 2);
+      cx.fillStyle = 'rgba(224,92,84,.10)'; cx.fill(); cx.lineWidth = 2; cx.strokeStyle = 'rgba(224,92,84,.6)'; cx.stroke();
+    }
   }
 
   /* ---------- 主循环 ---------- */
