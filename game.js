@@ -103,7 +103,7 @@
       S.best = countStat(d.best, base.best, true);
       S.bestBeat = countStat(d.bestBeat, base.bestBeat, true);
       S.bestLion = countStat(d.bestLion, base.bestLion, true);
-      S.lionTop = Math.min(10, countStat(d.lionTop, base.lionTop, true));
+      S.lionTop = Math.min(12, countStat(d.lionTop, base.lionTop, true));
       S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
       if (typeof d.vol === 'number') S.vol = finiteNumber(d.vol) ? Math.round(clamp(d.vol)) : base.vol;
       if (typeof d.bgm === 'boolean') S.bgm = d.bgm;

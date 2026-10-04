@@ -10,8 +10,8 @@
     mergeGap: 1.5, graceSeconds: .9, restSpeed: 28, overSeconds: 2.2,
     maxSpeed: 1200, ceiling: -60, growStart: .72, growSeconds: .16
   };
-  /* 各级半径（占容器宽度的比例）：11 级，最大的大狮子直径略过容器一半。 */
-  var RADIUS_RATIO = [.046, .059, .075, .092, .112, .133, .156, .182, .209, .239, .272];
+  /* 各级半径（占容器宽度的比例）：13 级，每级大约大 16%，最大的一只直径略过容器一半。 */
+  var RADIUS_RATIO = [.044, .051, .059, .069, .08, .092, .107, .124, .144, .167, .194, .224, .26];
 
   function create(options) {
     var o = {}, k;

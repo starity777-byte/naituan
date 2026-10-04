@@ -5,11 +5,11 @@ const P = require('../lion-physics.js');
 function seeded(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function run(world, seconds) { for (let t = 0; t < seconds; t += 1 / 60) world.step(1 / 60); }
 
-test('一共 11 级，半径从小到大，最大的略过容器一半宽', () => {
+test('一共 13 级，半径从小到大，最大的略过容器一半宽', () => {
   const w = P.create();
-  assert.equal(w.radii.length, 11);
+  assert.equal(w.radii.length, 13);
   for (let i = 1; i < w.radii.length; i++) assert.ok(w.radii[i] > w.radii[i - 1]);
-  assert.ok(w.radii[10] * 2 > w.width * .5 && w.radii[10] * 2 < w.width * .6);
+  assert.ok(w.radii[12] * 2 > w.width * .5 && w.radii[12] * 2 < w.width * .6);
 });
 
 test('同一级碰到会合成下一级，不同级不会', () => {
@@ -28,7 +28,7 @@ test('同一级碰到会合成下一级，不同级不会', () => {
 
 test('两个最高级碰到一起会消失', () => {
   const w = P.create({ rng: seeded(2) });
-  w.add(10, 120, 300); w.add(10, 215, 300);
+  w.add(12, 120, 300); w.add(12, 215, 300);
   run(w, 2);
   const events = w.drain();
   assert.equal(events.filter((e) => e.type === 'vanish').length, 1);
@@ -54,7 +54,7 @@ test('随机放几百只：不出界、没有 NaN、能合成到很高的级别'
 
 test('堆过虚线并停住足够久才算输；刚放下的不算', () => {
   const w = P.create({ rng: seeded(3) });
-  const body = w.add(10, 170, 20); /* 一只大狮子从线上方放下，很快落到底 */
+  const body = w.add(12, 170, 20); /* 一只最大的从线上方放下，很快落到底 */
   run(w, .3);
   assert.equal(w.over, false);
   assert.ok(body.y > w.lineY);
@@ -71,11 +71,11 @@ test('堆过虚线并停住足够久才算输；刚放下的不算', () => {
 
 test('合成出来的动物从小慢慢长大，不会把邻居弹飞', () => {
   const w = P.create({ rng: seeded(5) });
-  w.add(2, 150, 440); w.add(2, 202, 440);
-  w.add(0, 176, 405); /* 一只小球正好卡在两只中间的缝上，合成出来的大圆会压到它 */
+  w.add(4, 150, 440); w.add(4, 204, 440);
+  w.add(0, 177, 410); /* 一只小球正好卡在两只中间的缝上，合成出来的大圆会压到它 */
   w.step(1 / 60);
-  const born = w.bodies.find((b) => b.lvl === 3);
-  assert.ok(born, '应该合成出第 3 级');
+  const born = w.bodies.find((b) => b.lvl === 5);
+  assert.ok(born, '应该合成出第 5 级');
   assert.ok(born.r < born.rt, '刚合成出来时比最终的小');
   const small = w.bodies.find((b) => b.lvl === 0);
   let fastest = 0;

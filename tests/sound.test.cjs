@@ -30,6 +30,7 @@ test('loading is silent; a user gesture unlocks audio and all cues produce short
   assert.equal(f.calls.starts, 0);
   for (const name of ['tap', 'head', 'ear', 'nose', 'paw', 'belly', 'tail', 'lift', 'land', 'feed', 'sleep', 'wake', 'sniff', 'watch', 'save', 'reward', 'rub', 'chin', 'knead',
     'boxgo', 'boxland', 'chime', 'chop', 'boxmiss', 'fanfare', 'coin', 'pick', 'nope',
+    'jelly', 'jellysoft',
     'mew', 'mrrp', 'boop', 'squeak', 'chirp', 'twinkle', 'pat', 'trill', 'giggle', 'whine', 'spark']) {
     const before = f.calls.starts;
     assert.equal(f.api.play(name, false), true, name);

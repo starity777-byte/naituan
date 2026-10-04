@@ -1,16 +1,17 @@
-/* 合成大狮子：把一样的动物碰在一起，合成更大的一种，一路合成到大狮子。
+/* 合成大狮子：把一样的动物碰在一起，合成更大的一种，一路合成到最大的白虎。
    物理在 lion-physics.js（只处理圆）；这里负责画面、操作、计分和存档。
-   动物的图放在 assets/animals/animal01.webp … animal11.webp（也认 .png）；缺哪张就先用带名字的彩色圆代替，不用改代码。 */
+   动物的图放在 assets/animals/animal01.webp … animal13.webp（也认 .png）；缺哪张就先用带名字的彩色圆代替，不用改代码。
+   Q 弹只是画面效果：每只动物挂一个弹簧，碰撞时沿撞击方向被压扁、再弹回来晃几下；物理里的圆大小和弹起高度都不变。 */
 (function () {
   'use strict';
   var NT = window.NT, PH = window.NaituanLionPhysics;
   var root = document.getElementById('ml'), btn = document.getElementById('btnLion');
   if (!NT || !PH || !root || !btn) return;
 
-  var NAMES = ['仓鼠', '小鸡', '兔子', '小猫', '柴犬', '狐狸', '奶团', '大熊猫', '老虎', '狮子', '大狮子'];
-  var COLORS = ['#f3c9a0', '#f8e08e', '#f4bccb', '#ddb892', '#e8ad72', '#ea8c6c', '#fff4ee', '#d8d8d8', '#f2a548', '#e7b95a', '#ffd84d'];
+  var NAMES = ['小橘猫', '奶白猫', '兔狲', '狞猫', '猞猁', '云豹', '猎豹', '雪豹', '金钱豹', '老虎', '狮子', '黑豹', '白虎'];
+  var COLORS = ['#f3c9a0', '#fbe9dc', '#c9c6c4', '#e8ad72', '#cdb59b', '#c9a77a', '#efc27c', '#dcdcdc', '#e9b45f', '#f2a548', '#d79a4f', '#6b6670', '#f6efe6'];
   var POOL = [0, 0, 0, 0, 1, 1, 1, 2, 2, 3];
-  var CHIME = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+  var CHIME = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28];
   var INK = '#54392f', STEP = 1 / 60, HEAD = 46, FOOT = 42, FONT = '"Noto Sans SC", system-ui, sans-serif';
   var TOP = PH.RADIUS_RATIO.length - 1;
 
@@ -20,7 +21,7 @@
       '<canvas id="mlCanvas" aria-label="合成大狮子：点一下或拖动选位置，放开就放下动物"></canvas>' +
     '</div>' +
     '<div class="sg-over" id="mlIntro" hidden><div class="sg-card" role="dialog" aria-label="合成大狮子的玩法">' +
-      '<h2>合成大狮子</h2><p>点一下或拖动选位置，放开就放下动物。</p><p>两只一样的碰在一起，会变成更大的一种，一路合成到大狮子。</p><p>动物堆过虚线太久，这一局就结束啦。</p><p id="mlIntroBest"></p>' +
+      '<h2>合成大狮子</h2><p>点一下或拖动选位置，放开就放下动物。</p><p>两只一样的碰在一起，会变成更大的一种，一路合成到最大的白虎。</p><p>动物堆过虚线太久，这一局就结束啦。</p><p id="mlIntroBest"></p>' +
       '<div class="sg-btns"><button id="mlIntroBack" type="button">回房间</button><button id="mlGo" class="main" type="button">开始</button></div></div></div>' +
     '<div class="sg-over" id="mlOver" hidden><div class="sg-card" role="dialog" aria-label="本局结果">' +
       '<h2 id="mlTitle"></h2><p id="mlSub"></p><p id="mlTopLine"></p><p class="rew" id="mlRew"></p>' +
@@ -47,12 +48,12 @@
   }
   function drawAnimal(level, x, y, r) {
     var image = art[level];
-    if (image) { var k = 1.06; cx.drawImage(image, x - r * k, y - r * k, r * 2 * k, r * 2 * k); return; }
+    if (image) { var k = 1.1; cx.drawImage(image, x - r * k, y - r * k, r * 2 * k, r * 2 * k); return; }
     cx.beginPath(); cx.arc(x, y, r, 0, Math.PI * 2);
     cx.fillStyle = COLORS[level]; cx.fill(); cx.lineWidth = Math.max(1.5, Math.min(3, r * .12)); cx.strokeStyle = INK; cx.stroke();
     cx.beginPath(); cx.arc(x - r * .3, y - r * .32, r * .38, Math.PI * 1.05, Math.PI * 1.55);
     cx.strokeStyle = 'rgba(255,255,255,.65)'; cx.lineWidth = Math.max(1.5, r * .1); cx.lineCap = 'round'; cx.stroke();
-    if (level === TOP) { /* 大狮子的小皇冠 */
+    if (level === TOP) { /* 最大一只的小皇冠 */
       cx.beginPath(); cx.moveTo(x - r * .42, y - r * .78); cx.lineTo(x - r * .42, y - r * 1.1); cx.lineTo(x - r * .14, y - r * .92); cx.lineTo(x, y - r * 1.16); cx.lineTo(x + r * .14, y - r * .92); cx.lineTo(x + r * .42, y - r * 1.1); cx.lineTo(x + r * .42, y - r * .78); cx.closePath();
       cx.fillStyle = '#ffe27a'; cx.fill(); cx.strokeStyle = INK; cx.lineWidth = Math.max(1.5, r * .06); cx.stroke();
     }
@@ -67,7 +68,7 @@
   function pick() { return POOL[Math.floor(Math.random() * POOL.length)]; }
   function newGame() {
     world = PH.create();
-    G = { state: 'idle', score: 0, held: pick(), next: pick(), aimX: world.width / 2, aiming: false, cool: 0, combo: 0, comboAt: -9, topLevel: -1, lion: false, parts: [], pops: [], settled: false, earned: 0, record: false, shake: 0, overAt: 0 };
+    G = { state: 'idle', score: 0, held: pick(), next: pick(), aimX: world.width / 2, aiming: false, cool: 0, combo: 0, comboAt: -9, topLevel: -1, lion: false, parts: [], pops: [], settled: false, earned: 0, record: false, shake: 0, overAt: 0, landAt: -9 };
     acc = 0; paintBar(); elOver.hidden = true;
   }
   function paintBar() {
@@ -97,15 +98,16 @@
         G.combo = now - G.comboAt < .9 ? G.combo + 1 : 1; G.comboAt = now;
         var bonus = G.combo >= 2 ? G.combo * 2 : 0;
         G.score += points + bonus;
-        var body = world.bodies.filter(function (b) { return b.id === e.id; })[0]; if (body) body.popAt = now;
+        var body = world.bodies.filter(function (b) { return b.id === e.id; })[0]; if (body) kick(body, 1, Math.PI / 2, 1.15);
         burst(e.x, e.y, COLORS[e.level], 8 + e.level, 120 + e.level * 12);
         addPop('+' + (points + bonus), e.x, e.y - world.radius(e.level), INK, 14 + Math.min(8, e.level));
         if (G.combo >= 2) addPop('连击 ×' + G.combo, e.x, e.y - world.radius(e.level) - 20, '#c4694f', 14);
-        NT.sound('chime', CHIME[Math.min(e.level - 1, CHIME.length - 1)]);
+        NT.sound('jelly', CHIME[Math.min(e.level - 1, CHIME.length - 1)] - 7);
+        NT.sound('chime', CHIME[Math.min(e.level - 1, CHIME.length - 1)], .05);
         if (e.level > G.topLevel) G.topLevel = e.level;
-        if (e.level === TOP && !G.lion) { G.lion = true; G.shake = .5; addPop('合成大狮子！', world.width / 2, world.height * .38, '#b9731f', 26); burst(e.x, e.y, '#ffd84d', 36, 260); NT.sound('fanfare'); }
+        if (e.level === TOP && !G.lion) { G.lion = true; G.shake = .5; addPop('合成了' + NAMES[TOP] + '！', world.width / 2, world.height * .38, '#b9731f', 26); burst(e.x, e.y, '#ffd84d', 36, 260); NT.sound('fanfare'); }
       } else if (e.type === 'vanish') {
-        G.score += 100; G.shake = .4; burst(e.x, e.y, '#ffd84d', 40, 280); addPop('+100 超级大狮子！', e.x, e.y - 40, '#b9731f', 20); NT.sound('fanfare');
+        G.score += 100; G.shake = .4; burst(e.x, e.y, '#ffd84d', 40, 280); addPop('+100 两只' + NAMES[TOP] + '一起消失！', e.x, e.y - 40, '#b9731f', 20); NT.sound('fanfare');
       } else if (e.type === 'over') {
         finish();
       }
@@ -119,7 +121,7 @@
     G.record = G.score > (S.bestLion || 0);
     if (G.record) S.bestLion = G.score;
     if (top > (S.lionTop || 0)) S.lionTop = top;
-    G.earned = Math.min(40, Math.floor(G.score / 100) + (top >= 6 ? top - 5 : 0) + (G.lion ? 10 : 0));
+    G.earned = Math.min(40, Math.floor(G.score / 100) + (top >= 7 ? top - 6 : 0) + (G.lion ? 10 : 0));
     S.mood = NT.clamp(S.mood + Math.min(20, Math.floor(G.score / 60))); S.hunger = NT.clamp(S.hunger - 2); S.energy = NT.clamp(S.energy - 3);
     NT.addFish(G.earned); NT.save();
   }
@@ -129,7 +131,7 @@
     setTimeout(function () {
       if (!active || !G || G.state !== 'over') return;
       var S = NT.S();
-      $('#mlTitle').textContent = G.lion ? '合成了大狮子！' : '堆满啦';
+      $('#mlTitle').textContent = G.lion ? '合成了' + NAMES[TOP] + '！' : '堆满啦';
       $('#mlSub').textContent = '得分 ' + G.score + (G.record ? ' · 新纪录！' : ' · 最高 ' + (S.bestLion || 0));
       $('#mlTopLine').textContent = '这局合到了：' + NAMES[Math.max(0, G.topLevel)];
       $('#mlRew').textContent = '小鱼干 +' + G.earned;
@@ -152,10 +154,36 @@
   function toWorldX(clientX) { var rect = cv.getBoundingClientRect(); return (clientX - rect.left - view.ox) / view.scale; }
   function X(x) { return view.ox + x * view.scale; }
   function Y(y) { return view.oy + y * view.scale; }
-  function popScale(body) {
-    if (body.popAt == null) return 1;
-    var t = (world.time - body.popAt) / .3; if (t >= 1) return 1;
-    return 1 + .09 * Math.sin(t * Math.PI); /* 大小由物理慢慢长出来，这里只加一点弹跳 */
+  /* ---------- Q 弹：每只动物一个小弹簧（只影响画面） ---------- */
+  function springOf(body) {
+    if (!body.jq) body.jq = { q: 0, v: 0, a: Math.PI / 2, lvx: body.vx, lvy: body.vy };
+    return body.jq;
+  }
+  /* strength 0~1：压扁的力度；angle：被压的方向（撞击方向）；power：整体放大 */
+  function kick(body, strength, angle, power) {
+    var j = springOf(body), amount = strength * (power || 1) * (1 - body.lvl * .025);
+    if (Math.abs(j.q) < amount * .6) j.a = angle;
+    j.v += 30 * amount;
+  }
+  function wobble(body) {
+    var j = springOf(body), dvx = body.vx - j.lvx, dvy = body.vy - j.lvy, dv = Math.sqrt(dvx * dvx + dvy * dvy);
+    j.lvx = body.vx; j.lvy = body.vy;
+    if (dv > 110) {
+      var strength = Math.min(1, (dv - 110) / 520);
+      kick(body, strength, Math.atan2(dvy, dvx));
+      if (strength > .3 && world.time - G.landAt > .12) { G.landAt = world.time; NT.sound('jellysoft', CHIME[Math.min(body.lvl, 4)] - 5); }
+    }
+    var w = 25 - body.lvl * .45; /* 越大的动物晃得越慢 */
+    j.v += (-w * w * j.q - 2 * .17 * w * j.v) * STEP;
+    j.q += j.v * STEP;
+    if (j.q > 1.25) { j.q = 1.25; if (j.v > 0) j.v = 0; } else if (j.q < -1.1) { j.q = -1.1; if (j.v < 0) j.v = 0; }
+  }
+  function jellyDraw(body, x, y, r) {
+    var j = body.jq;
+    if (!j || (Math.abs(j.q) < .01 && Math.abs(j.v) < .1)) { drawAnimal(body.lvl, x, y, r); return; }
+    var along = 1 - .22 * j.q, across = 1 + .17 * j.q;
+    cx.save(); cx.translate(x, y); cx.rotate(j.a); cx.scale(along, across); cx.rotate(-j.a); cx.translate(-x, -y);
+    drawAnimal(body.lvl, x, y, r); cx.restore();
   }
   function draw() {
     if (!view.w) return;
@@ -179,7 +207,7 @@
       drawAnimal(G.held, X(ax), Y(world.holdY), ar * s);
     }
     /* 动物们 */
-    world.bodies.forEach(function (b) { drawAnimal(b.lvl, X(b.x), Y(b.y), b.r * s * popScale(b)); });
+    world.bodies.forEach(function (b) { jellyDraw(b, X(b.x), Y(b.y), b.r * s); });
     /* 火花和飘字 */
     G.parts.forEach(function (p) { var a = 1 - p.life / p.max; cx.globalAlpha = Math.max(0, a); cx.fillStyle = p.color; cx.beginPath(); cx.arc(X(p.x), Y(p.y), p.size * s, 0, Math.PI * 2); cx.fill(); });
     cx.globalAlpha = 1;
@@ -207,7 +235,7 @@
     if (!view.w || Math.abs(cv.clientWidth - view.w) > 1 || Math.abs(cv.clientHeight - view.h) > 1) layout();
     if (G.state === 'play') {
       acc += dt; var n = 0;
-      while (acc >= STEP && n < 3 && !world.over) { world.step(STEP); acc -= STEP; n++; handleEvents(); }
+      while (acc >= STEP && n < 3 && !world.over) { world.step(STEP); acc -= STEP; n++; handleEvents(); world.bodies.forEach(wobble); }
       if (n === 3) acc = 0;
       if (world.over && G.state === 'play') handleEvents(); /* 保险：结束事件一定要被处理 */
       if (G.cool > 0) { G.cool -= dt; if (G.cool <= 0 && G.held == null) { G.held = G.next; G.next = pick(); G.aimX = clampAim(G.aimX); } }
