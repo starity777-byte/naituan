@@ -18,4 +18,6 @@ assert.deepEqual(J.summary(cleaned),{count:4,days:2,photos:3});
 assert.deepEqual(J.photoIds(cleaned),['restored','restored-old']);
 assert.equal(cleaned.days['2026-10-02'].entries[0].createdAt,1);
 assert.deepEqual(J.summary(sanitize(JSON.parse(JSON.stringify(cleaned)))),J.summary(cleaned));
+const rewardedDay=sanitize({version:1,gems:2,days:{'2026-10-04':{entryRewarded:true,entries:[{id:'e',text:'今天',createdAt:1}]},'2026-10-05':{entryRewarded:'yes'}}});
+assert.equal(rewardedDay.days['2026-10-04'].entryRewarded,true);assert.equal(rewardedDay.days['2026-10-05'].entryRewarded,undefined);assert.equal(rewardedDay.gems,2);
 console.log('Journal counts, legacy records, photo remapping and existing planner data passed.');

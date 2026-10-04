@@ -71,6 +71,13 @@
     else { var monday = J.shift(current, -((J.date(current).getDay() + 6) % 7)); html = heatmap(J.shift(monday, -84), J.shift(monday, 6), counts); }
     $('journalHeatmap').innerHTML = html;
   }
+  /* 每天第一条新记录（只算今天、只算新增）送一颗成长宝石；当天领过就不再送，删掉重记也不会再领。 */
+  function gemAvailable(date) {
+    if (!draft || draft.legacy || date !== today()) return false;
+    var data = L.read();
+    return !(data.days[date] || {}).entryRewarded && !J.entries(data, date).some(function (row) { return row.id === draft.id; });
+  }
+  function paintGemNote() { $('journalEntryGem').hidden = !gemAvailable($('journalEntryDate').value); }
   function clearPreview() { if (previewURL) URL.revokeObjectURL(previewURL); previewURL = ''; }
   async function paintDraft() {
     var image = $('journalEntryPreview'); image.hidden = !draft || !(draft.blob || draft.photoId || draft.photo);
@@ -87,7 +94,7 @@
     draft = entry ? Object.assign({}, entry) : { id: uid(), date: L.selectedDate(), text: '', createdAt: Date.now(), photoId: '', photo: '' };
     $('journalEntryTitle').textContent = entry ? '修改这条日常' : '留下一点今天'; $('journalEntryText').value = draft.text;
     $('journalEntryDate').value = draft.date; $('journalEntryDate').disabled = !!entry; $('journalEntryFile').value = ''; $('journalEntryMessage').textContent = '';
-    $('journalEntrySave').disabled = false; $('journalEntryClose').disabled = false; paintDraft(); $('journalEntryDialog').showModal(); $('journalEntryText').focus();
+    $('journalEntrySave').disabled = false; $('journalEntryClose').disabled = false; paintDraft(); paintGemNote(); $('journalEntryDialog').showModal(); $('journalEntryText').focus();
   }
   function removeEntry(next, entry) {
     var day = next.days[entry.date]; if (!day) return;
@@ -100,15 +107,20 @@
     if (!text && !draft.blob && !draft.photoId && !draft.photo) { $('journalEntryMessage').textContent = '写一句话，或留一张照片就好。'; return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
     saving = true; $('journalEntrySave').disabled = $('journalEntryClose').disabled = true; $('journalEntryMessage').textContent = '正在收好…';
-    var added = '', previousPhoto = draft.originalPhotoId || draft.photoId;
+    var added = '', previousPhoto = draft.originalPhotoId || draft.photoId, gem = gemAvailable(date);
     try {
       var id = draft.photoId || ''; if (draft.blob) { id = await Photos.put(draft.blob); added = id; }
       var entry = { id: draft.id, text: text, photoId: id, createdAt: draft.createdAt || Date.now(), updatedAt: Date.now(), reply: reply(text) };
       if (!L.update(function (next) {
         var day = next.days[date] || (next.days[date] = {});
         if (draft.legacy) { day.food = Object.assign({}, day.food, { note: text, photoId: id, photo: draft.photo || '', createdAt: entry.createdAt }); }
-        else { if (!Array.isArray(day.entries)) day.entries = []; var index = day.entries.findIndex(function (row) { return row.id === entry.id; }); if (index >= 0) day.entries[index] = entry; else day.entries.push(entry); }
-      }, entry.reply)) throw new Error('还没有保存成功，文字和照片都留在这里，可以再试一次。');
+        else {
+          if (!Array.isArray(day.entries)) day.entries = [];
+          var index = day.entries.findIndex(function (row) { return row.id === entry.id; });
+          if (index >= 0) day.entries[index] = entry; else day.entries.push(entry);
+          if (index < 0 && date === today() && !day.entryRewarded) { next.gems++; day.entryRewarded = true; }
+        }
+      }, gem ? entry.reply + ' 成长宝石 +1。' : entry.reply)) throw new Error('还没有保存成功，文字和照片都留在这里，可以再试一次。');
       if (previousPhoto && previousPhoto !== id && !J.photoIds(L.read()).includes(previousPhoto)) Photos.remove(previousPhoto).catch(function () {});
       saving = false; $('journalEntryDialog').close(); draft = null; clearPreview(); tab = 'notes'; allPhotos = false; L.selectDate(date);
       if (!window.NT.isBusy() && !window.NT.S().sleeping) window.NT.setPose('happy', 1800);
@@ -129,6 +141,7 @@
     }
   }
   $('journalEntryForm').addEventListener('submit', saveDraft);
+  $('journalEntryDate').addEventListener('change', paintGemNote);
   $('journalEntryClose').addEventListener('click', function () { if (!saving) $('journalEntryDialog').close(); });
   $('journalEntryDialog').addEventListener('cancel', function (event) { if (saving) event.preventDefault(); });
   $('journalEntryDialog').addEventListener('close', function () { photoTicket++; clearPreview(); });

@@ -355,8 +355,8 @@
 
 <dialog class="house-dialog" id="wordDialog" aria-labelledby="wordTitle">
   <button class="dialog-close icon-button" data-close-dialog type="button" aria-label="关闭单词打卡"><svg class="ui-icon"><use href="#i-close"/></svg></button>
-  <img class="dialog-cat" src="assets/shy.webp" alt=""><h2 id="wordTitle">今天也有一点进步</h2><p>记录今天学过的单词，奶团送你一颗成长宝石。</p>
-  <form id="wordForm"><label for="wordCount">今天学了多少个单词？</label><input id="wordCount" type="number" min="1" max="9999" value="50" required><button class="primary-button" type="submit">完成打卡 · +1 宝石</button></form>
+  <img class="dialog-cat" src="assets/shy.webp" alt=""><h2 id="wordTitle">今天也有一点进步</h2><p>记录今天学过的单词，奶团陪你一起记着。</p>
+  <form id="wordForm"><label for="wordCount">今天学了多少个单词？</label><input id="wordCount" type="number" min="1" max="9999" value="50" required><button class="primary-button" type="submit">完成打卡</button></form>
   <p id="wordMessage" class="form-message" role="status"></p>
 </dialog>
 
@@ -368,7 +368,7 @@
 </dialog>
 <dialog class="journal-entry-dialog" id="journalEntryDialog" aria-labelledby="journalEntryTitle">
   <button id="journalEntryClose" class="dialog-close icon-button" type="button" aria-label="关闭记录编辑"><svg class="ui-icon"><use href="#i-close"/></svg></button>
-  <h2 id="journalEntryTitle">留下一点今天</h2><form id="journalEntryForm"><label class="journal-entry-date" for="journalEntryDate">这一天<input id="journalEntryDate" type="date" required></label><label class="sr-only" for="journalEntryText">日常记录</label><textarea id="journalEntryText" rows="4" maxlength="4000" placeholder="今天有些什么，想留下来？"></textarea><div class="journal-entry-preview"><img id="journalEntryPreview" alt="准备保存的照片" hidden><button id="journalRemovePhoto" type="button" aria-label="移除照片" hidden><svg class="ui-icon"><use href="#i-close"/></svg></button></div><input id="journalEntryFile" class="file-input" type="file" accept="image/*"><div class="journal-entry-actions"><button id="journalPickPhoto" type="button"><svg class="ui-icon"><use href="#i-camera"/></svg>留张照片</button><button id="journalEntrySave" class="primary-button" type="submit">收好这一刻</button></div><p id="journalEntryMessage" class="form-message" role="status"></p></form><p class="local-note">照片只留在本机，不会上传。</p>
+  <h2 id="journalEntryTitle">留下一点今天</h2><form id="journalEntryForm"><label class="journal-entry-date" for="journalEntryDate">这一天<input id="journalEntryDate" type="date" required></label><label class="sr-only" for="journalEntryText">日常记录</label><textarea id="journalEntryText" rows="4" maxlength="4000" placeholder="今天有些什么，想留下来？"></textarea><div class="journal-entry-preview"><img id="journalEntryPreview" alt="准备保存的照片" hidden><button id="journalRemovePhoto" type="button" aria-label="移除照片" hidden><svg class="ui-icon"><use href="#i-close"/></svg></button></div><input id="journalEntryFile" class="file-input" type="file" accept="image/*"><div class="journal-entry-actions"><button id="journalPickPhoto" type="button"><svg class="ui-icon"><use href="#i-camera"/></svg>留张照片</button><button id="journalEntrySave" class="primary-button" type="submit">收好这一刻</button></div><p id="journalEntryMessage" class="form-message" role="status"></p></form><p class="local-note" id="journalEntryGem" hidden>今天的第一条日常，奶团会送你一颗成长宝石。</p><p class="local-note">照片只留在本机，不会上传。</p>
 </dialog>
 <dialog class="house-dialog journal-menu" id="journalRecordMenu" aria-labelledby="journalMenuTitle"><button class="dialog-close icon-button" type="button" data-close-dialog aria-label="关闭记录选项"><svg class="ui-icon"><use href="#i-close"/></svg></button><h2 id="journalMenuTitle">这一条日常</h2><button id="journalEdit" type="button">修改记录</button><button id="journalDelete" type="button">删除记录</button></dialog>
 <dialog class="house-dialog journal-photo-dialog" id="journalPhotoDialog" aria-label="照片详情"><button class="dialog-close icon-button" type="button" data-close-dialog aria-label="关闭照片"><svg class="ui-icon"><use href="#i-close"/></svg></button><img id="journalPhotoFull" alt="日常照片"><p id="journalPhotoCaption"></p></dialog>
@@ -396,10 +396,10 @@
 <script src="game.js?v=wish-20261004"></script>
 <script src="queue.js?v=wish-20261004"></script>
 <script src="photo-crop.js?v=crop-20261004"></script>
-<script src="life.js?v=crop-20261004"></script>
+<script src="life.js?v=gem-20261004"></script>
 <script src="photo-store.js?v=journal-20261003"></script>
 <script src="journal-state.js?v=journal-20261003"></script>
-<script src="journal.js?v=crop-20261004"></script>
+<script src="journal.js?v=gem-20261004"></script>
 <script src="planner-state.js?v=house-20261003"></script>
 <script src="study-ambience.js?v=immersive-20260929"></script>
 <script src="planner.js?v=journal-20261003"></script>

@@ -49,6 +49,7 @@
     var day = {};
     if (typeof raw.words === 'number' && Number.isFinite(raw.words)) day.words = capKept(raw.words);
     if (typeof raw.wordRewarded === 'boolean') day.wordRewarded = raw.wordRewarded;
+    if (typeof raw.entryRewarded === 'boolean') day.entryRewarded = raw.entryRewarded;
     if (typeof raw.focusMinutes === 'number' && Number.isFinite(raw.focusMinutes) && raw.focusMinutes >= 0) day.focusMinutes = capKept(raw.focusMinutes);
     if (typeof raw.focusSessions === 'number' && Number.isFinite(raw.focusSessions) && raw.focusSessions >= 0) day.focusSessions = raw.focusSessions;
     if (Object.prototype.hasOwnProperty.call(raw, 'food')) {
@@ -169,8 +170,7 @@
     if (update(function (next) {
       var record = day(next, wordDate);
       record.words = count;
-      if (!record.wordRewarded) { next.gems++; record.wordRewarded = true; }
-    }, '单词打卡完成，成长宝石 +1。奶团为你开心！')) {
+    }, '单词打卡完成，奶团为你开心！')) {
       $('wordDialog').close();
       NT.setPose('happy', 2600);
     } else $('wordMessage').textContent = '还没有保存成功，可以直接重新提交。';
