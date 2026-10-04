@@ -281,3 +281,8 @@ button:disabled { cursor: default; }
 .acc-info span { font-size: 12px; line-height: 1.5; color: #8f7564; }
 .acc-row .acc-btn { flex: none; width: auto; margin: 0; min-height: 40px; padding: 8px 14px; }
 .acc-list > .secondary-button { margin-top: 2px; }
+
+/* 第一次的小提示：奶团说到哪个圆圈，那个圆圈就轻轻跳一跳 */
+.stat-ring.hint { animation: ring-hop 1.3s ease-in-out infinite; box-shadow: 0 0 0 2px #f2b8a8, 0 0 0 6px #f2b8a833; }
+@keyframes ring-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); } 60% { transform: translateY(-1px); } }
+@media (prefers-reduced-motion: reduce) { .stat-ring.hint { animation: none; } }

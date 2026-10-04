@@ -166,6 +166,40 @@
     return new Date().getHours() < 11 ? '早呀，今天也一起加油～' : '今天也一起加油～';
   }
 
+
+  /* ---------- 第一次的小提示 ----------
+     不做教程。奶团第一次饿了、闷了、困了、攒够小鱼干、想玩游戏时，自己在气泡里说一句怎么办，
+     对应的小圆圈轻轻跳一跳。每句只说一次；玩家在那之前已经自己做过，就不说。 */
+  var HINTS = [
+    { key: 'feed', ring: 'quickFeed', when: function () { return S.hunger < 50; }, line: '肚子咕咕叫……点右上角的小鱼圆圈，喂我一条小鱼吧~' },
+    { key: 'pet', ring: 'quickPet', when: function () { return S.mood < 50; }, line: '有点闷闷的……摸摸我的头好不好？' },
+    { key: 'sleep', ring: 'quickSleep', when: function () { return S.energy < 35; }, line: '好困呀……点右上角的月亮圆圈，让我睡一会儿~' },
+    { key: 'shop', when: function () { return !S.shopSeen && S.fish >= 100; }, line: '小鱼干攒了好多！点右上角的小鱼干，带我去小铺逛逛吧~' },
+    { key: 'game', when: function () { return S.secs >= 120; }, line: '想玩游戏！点左上角的爪爪，里面有小游戏哦~' }
+  ];
+  var hintRing = null, hintRingUntil = 0;
+  function learned(key) {
+    if (!S.hints) S.hints = {};
+    S.hints[key] = 1;
+    if (hintRing && hintRing.key === key) stopHintRing();
+  }
+  function stopHintRing() { if (hintRing) { var el = document.getElementById(hintRing.ring); if (el) el.classList.remove('hint'); } hintRing = null; }
+  function checkHints() {
+    if (hintRing && now() > hintRingUntil) stopHintRing();
+    if (now() < sayUntil || busy() || SH.open || S.sleeping || !roomAvailable() || document.querySelector('dialog[open]')) return;
+    if (!S.hints) S.hints = {};
+    if (S.shopSeen) S.hints.shop = 1;
+    for (var i = 0; i < HINTS.length; i++) {
+      var h = HINTS[i];
+      if (S.hints[h.key] || !h.when()) continue;
+      S.hints[h.key] = 1; save();
+      say(h.line, 7000);
+      if (h.ring) { stopHintRing(); var el = document.getElementById(h.ring); if (el) { el.classList.add('hint'); hintRing = h; hintRingUntil = now() + 20000; } }
+      return;
+    }
+  }
+  window.addEventListener('naituan:page', function (e) { if (e.detail && e.detail.page === 'games' && S) learned('game'); });
+
   /* ---------- pose ---------- */
   function setPose(name, ms) { override = { name: name, until: now() + ms }; render(); }
   function computePose() {
@@ -281,6 +315,11 @@
     accRaf = setTimeout(accTick, Math.max(16, sum - t));
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) { accDrawn = ''; accRefresh(); } });
+  function cleanHints(raw) {
+    var out = {};
+    if (raw && typeof raw === 'object') ['feed', 'pet', 'sleep', 'shop', 'game'].forEach(function (k) { if (raw[k]) out[k] = 1; });
+    return out;
+  }
   function cleanAcc(raw) {
     var acc = { own: {}, wear: null, gift: 0 };
     if (raw && typeof raw === 'object') {
@@ -377,6 +416,7 @@
     var r = stage.getBoundingClientRect();
     var x = (ev && ev.clientX != null ? ev.clientX : r.left + r.width / 2) - r.left;
     var y = (ev && ev.clientY != null ? ev.clientY : r.top + r.height / 2) - r.top - 10;
+    learned('pet');
     if (S.sleeping) { S.sleeping = false; sound('wake'); setPose('stretch', 2000); say('被戳醒啦……'); render(); save(); return; }
     var part = chosenPart || petPart(ev), t = now();
     tapStreak = t - lastPetAt < 1400 ? tapStreak + 1 : 1; lastPetAt = t;
@@ -504,7 +544,7 @@
     cancelRoomInteraction();
     if (S.sleeping) { say('睡着啦，等它醒了再吃'); return; }
     if (S.hunger >= 92) { say('吃不下啦，肚子圆圆的'); shake(); return; }
-    S.hunger = clamp(S.hunger + 28); S.mood = clamp(S.mood + 2);
+    S.hunger = clamp(S.hunger + 28); S.mood = clamp(S.mood + 2); learned('feed');
     sound('feed');
     setPose('fish', 3200); say(pick(['好吃！', '小鱼最棒了', '咔哧咔哧……']), 3200);
     render(); save();
@@ -514,7 +554,7 @@
     cancelRoomInteraction(); endVisit();
     if (S.sleeping) { S.sleeping = false; sound('wake'); setPose('stretch', 2200); say(S.energy >= 100 ? '睡饱啦！' : '才睡了一会儿……'); render(); save(); return; }
     if (S.energy >= 90) { say('还不困呢，再玩一会儿'); return; }
-    override = null; S.sleeping = true; sound('sleep'); say('蜷好身子，晚安……', 3000); render(); save();
+    override = null; S.sleeping = true; learned('sleep'); sound('sleep'); say('蜷好身子，晚安……', 3000); render(); save();
   }
 
   /* ---------- rhythm hide-and-seek ---------- */
@@ -1075,7 +1115,7 @@
     return Object.prototype.hasOwnProperty.call(CATALOG, cat) && hasItem(cat, id);
   }
   function loadDecor(d) {
-    S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0; S.wish = null; S.welcome = 0; S.acc = cleanAcc(d && d.acc);
+    S.own = { 'wall:dots': 1, 'rug:pink': 1, 'win:plain': 1 }; S.eq = { wall: 'dots', rug: 'pink', win: 'plain', prop: [] }; S.shopSeen = 0; S.wish = null; S.welcome = 0; S.acc = cleanAcc(d && d.acc); S.hints = cleanHints(d && d.hints);
     S.roomLayout = window.NaituanRoom.cleanLayout(d && d.roomLayout);
     S.hiddenFixtures = { win: !!(d && d.hiddenFixtures && d.hiddenFixtures.win), rug: !!(d && d.hiddenFixtures && d.hiddenFixtures.rug) };
     S.catPosition = window.NaituanRoom.cleanPoint(d && d.catPosition);
@@ -1460,6 +1500,7 @@
         idleAction();
       }
     }
+    checkHints();
     render();
     if (S.secs % 5 === 0) save();
   }
