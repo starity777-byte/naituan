@@ -65,6 +65,9 @@
   var PRELOAD_FIRST = ['sit', 'wave', 'walkSide', 'walkFront', 'happy', 'shy', 'fish', 'curious', 'ear', 'nose', 'chin', 'paw', 'rub', 'sniff', 'watch', 'knead', 'roll'];
   function preloadSprites() {
     var queue = PRELOAD_FIRST.concat(Object.keys(SPR)).filter(function (k, i, all) { return SPR[k] && all.indexOf(k) === i; });
+    /* 戴着饰品时奶团用逐帧图播放，这些动图只是备用，放到最后再下。 */
+    var worn = S && S.acc && S.acc.wear && window.NT_ACC_SLOTS;
+    if (worn) queue = queue.filter(function (k) { return !window.NT_ACC_SLOTS.poses[k]; }).concat(queue.filter(function (k) { return window.NT_ACC_SLOTS.poses[k]; }));
     function next() {
       var k = queue.shift();
       if (!k) return;
@@ -207,21 +210,34 @@
   accCanvas.setAttribute('aria-hidden', 'true');
   cat.appendChild(accCanvas);
   var accCtx = accCanvas.getContext('2d');
-  var ACC_SHEETS = {}, accSheetOrder = [], ACC_LOOKS = {};
+  var ACC_SHEETS = {}, ACC_LOOKS = {};
   var accRaf = 0, accPose = null, accStart = 0, accDrawn = '';
-  var raf = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : function (fn) { return setTimeout(function () { fn(Date.now()); }, 40); };
-  var caf = window.cancelAnimationFrame ? window.cancelAnimationFrame.bind(window) : clearTimeout;
-  function clock() { return window.performance && performance.now ? performance.now() : Date.now(); }
+  var accFrame = window.requestAnimationFrame ? window.requestAnimationFrame.bind(window) : function (fn) { return setTimeout(function () { fn(Date.now()); }, 40); };
+  var accCancel = window.cancelAnimationFrame ? window.cancelAnimationFrame.bind(window) : clearTimeout;
+  /* 毫秒。注意别叫 clock：躲猫猫里已经有一个按秒算的 clock()。 */
+  function accNow() { return window.performance && performance.now ? performance.now() : Date.now(); }
   function accSheet(pose) {
     if (!ACC_SHEETS[pose]) {
       var im = new Image(); im.decoding = 'async';
       im.onload = function () { accRefresh(); };
       im.src = 'assets/sheets/' + pose + '.webp?v=acc-20261004';
-      ACC_SHEETS[pose] = im; accSheetOrder.push(pose);
-      /* 每张逐帧图解码后比较占内存，只留最近用过的几张。 */
-      while (accSheetOrder.length > 5) { var old = accSheetOrder.shift(); if (old !== pose && old !== curPose) delete ACC_SHEETS[old]; }
+      ACC_SHEETS[pose] = im;
     }
     return ACC_SHEETS[pose];
+  }
+  /* 戴上饰品后，把所有动作的逐帧图在后台陆续下好（常用的先下，两张两张来），
+     这样点一下换动作时花能马上出现，不用等。 */
+  var accPreloading = false;
+  function accPreloadAll() {
+    if (accPreloading) return; accPreloading = true;
+    var queue = PRELOAD_FIRST.concat(Object.keys(ACC_SLOTS.poses)).filter(function (k, i, all) { return ACC_SLOTS.poses[k] && all.indexOf(k) === i; });
+    function next() {
+      var k = queue.shift(); if (!k) return;
+      var im = accSheet(k);
+      if (accReady(im)) { next(); return; }
+      im.addEventListener('load', next); im.addEventListener('error', next);
+    }
+    next(); next();
   }
   function accLook(src) {
     if (!ACC_LOOKS[src]) { var im = new Image(); im.onload = function () { accDrawn = ''; }; im.src = src + '?v=acc-20261004'; ACC_LOOKS[src] = im; }
@@ -230,13 +246,13 @@
   function accWorn() { var id = S && S.acc && S.acc.wear; return id && ACC_ITEMS[id] ? ACC_ITEMS[id] : null; }
   function accReady(im) { return !!(im && im.complete && im.naturalWidth > 0); }
   function accRefresh() {
-    clearTimeout(accRaf); caf(accRaf); accRaf = 0;
+    clearTimeout(accRaf); accCancel(accRaf); accRaf = 0;
     var item = accWorn(), data = item && ACC_SLOTS.poses[curPose], sheet = data ? accSheet(curPose) : null;
-    if (item) ['sit', 'walkSide', 'walkFront'].forEach(function (p) { if (p !== curPose && ACC_SLOTS.poses[p]) accSheet(p); });
+    if (item) accPreloadAll();
     var on = accReady(sheet);
     accCanvas.hidden = !on; catimg.style.visibility = on ? 'hidden' : '';
     if (!on) { accPose = null; return; }
-    if (accPose !== curPose) { accPose = curPose; accStart = clock(); accDrawn = ''; }
+    if (accPose !== curPose) { accPose = curPose; accStart = accNow(); accDrawn = ''; }
     accTick();
   }
   function accTick() {
@@ -245,7 +261,7 @@
     if (!data || !accReady(sheet) || accPose !== curPose) return accRefresh();
     var total = 0, i;
     for (i = 0; i < data.ms.length; i++) total += data.ms[i];
-    var t = (clock() - accStart) % total, f = 0, sum = data.ms[0];
+    var t = (accNow() - accStart) % total, f = 0, sum = data.ms[0];
     while (f < data.ms.length - 1 && sum <= t) { f++; sum += data.ms[f]; }
     var look = item.looks[item.side.indexOf(curPose) >= 0 ? 'angled' : 'front'], art = accLook(look.src);
     var key = curPose + ':' + f + ':' + look.src + ':' + accReady(art);
@@ -264,7 +280,7 @@
     }
     var wait = sum - t;
     /* 下一帧到了再画；页面在后台时不画。 */
-    if (!document.hidden) accRaf = setTimeout(function () { accRaf = raf(accTick); }, Math.max(0, wait - 8));
+    if (!document.hidden) accRaf = setTimeout(function () { accRaf = accFrame(accTick); }, Math.max(0, wait - 8));
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) { accDrawn = ''; accRefresh(); } });
   function cleanAcc(raw) {
