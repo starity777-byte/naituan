@@ -8,8 +8,8 @@
   var root = document.getElementById('ml'), btn = document.getElementById('btnLion');
   if (!NT || !PH || !root || !btn) return;
 
-  var NAMES = ['小橘猫', '奶白猫', '兔狲', '狞猫', '猞猁', '云豹', '猎豹', '雪豹', '金钱豹', '老虎', '狮子', '黑豹', '白虎'];
-  var COLORS = ['#f3c9a0', '#fbe9dc', '#c9c6c4', '#e8ad72', '#cdb59b', '#c9a77a', '#efc27c', '#dcdcdc', '#e9b45f', '#f2a548', '#d79a4f', '#6b6670', '#f6efe6'];
+  var NAMES = ['小橘猫', '兔狲', '奶白猫', '狞猫', '云豹', '猞猁', '雪豹', '猎豹', '金钱豹', '黑豹', '狮子', '老虎', '白虎'];
+  var COLORS = ['#f3c9a0', '#c9c6c4', '#fbe9dc', '#e8ad72', '#c9a77a', '#cdb59b', '#dcdcdc', '#efc27c', '#e9b45f', '#6b6670', '#d79a4f', '#f2a548', '#f6efe6'];
   var POOL = [0, 0, 0, 0, 1, 1, 1, 2, 2, 3];
   var CHIME = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28];
   var INK = '#54392f', STEP = 1 / 60, HEAD = 46, FOOT = 42, FONT = '"Noto Sans SC", system-ui, sans-serif';
