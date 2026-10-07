@@ -559,6 +559,7 @@
 
   /* ---------- rhythm hide-and-seek ---------- */
   var NB = 80, COUNTIN = 4, BPM0 = 84, BPM1 = 150, ROWS_AT = [0, 20, 44];
+  var WARMUP = 16, HEAL_EVERY = 15, MAX_LIVES = 5, SHIELD0 = 2; /* forgiveness: no heart lost in the first 16 beats, +1 heart every 15 combo, 2 shields until the first record */
   var slotsEl = $('#slots'), rhScoreEl = $('#rhScore'), rhLivesEl = $('#rhLives'), rhFill = $('#rhFill'), rhJudge = $('#rhJudge');
   var rhBpmEl = $('#rhBpm'), rhComboEl = $('#rhCombo'), rhIntro = $('#rhIntro'), rhOver = $('#rhOver'), rhSoundBtn = $('#rhSound');
   var metersEl0 = $('#meters'), actionsEl0 = $('#actions'), hintEl0 = $('#hint'), btnShop0 = $('#btnShop'), btnSave0 = $('#btnSave'), app0 = $('#app');
@@ -693,8 +694,8 @@
   function rhPaint() {
     rhScoreEl.textContent = RHS ? RHS.score : 0;
     rhComboEl.textContent = '连击 ' + (RHS ? RHS.combo : 0);
-    var lv = RHS ? RHS.lives : 5, h = ''; for (var i = 0; i < 5; i++) h += i < lv ? LIFE : LIFE.replace('<svg ', '<svg class="off" ');
-    rhLivesEl.innerHTML = h; rhLivesEl.setAttribute('aria-label', '剩余生命 ' + lv);
+    var lv = RHS ? RHS.lives : MAX_LIVES, h = ''; for (var i = 0; i < MAX_LIVES; i++) h += i < lv ? LIFE : LIFE.replace('<svg ', '<svg class="off" ');
+    rhLivesEl.innerHTML = h; rhLivesEl.setAttribute('aria-label', '剩余生命 ' + lv + (RHS && RHS.shield ? '，护盾 ' + RHS.shield : ''));
   }
   function setChrome(hide) {
     metersEl0.hidden = actionsEl0.hidden = hintEl0.hidden = btnShop0.hidden = btnSave0.hidden = hide;
@@ -710,7 +711,7 @@
     setBusyUI(true); setChrome(true); window.scrollTo(0, 0); statsEnter('games/hide');
     rhLayout(1); rhClearSlots(); rhFill.style.width = '0'; rhBpmEl.textContent = 'BPM ' + BPM0; rhJudge.textContent = '';
     rhPaint(); rhOver.hidden = true; rhIntro.hidden = false;
-    $('#rhBest').textContent = S.bestBeat ? '最高分 ' + S.bestBeat : '还没有记录，来一局吧';
+    $('#rhBest').textContent = S.bestBeat ? '最高分 ' + S.bestBeat : '还没有记录，第一局送你 ' + SHIELD0 + ' 层护盾';
     rhSoundBtn.textContent = S.mute ? '音效：关' : '音效：开';
   }
   function rhGo() {
@@ -721,7 +722,7 @@
   function rhBegin() {
     useAC = !!(AC && AC.state === 'running' && AC.currentTime > 0.02);
     var beats = buildBeats(), evs = genEvents(beats);
-    RHS = { beats: beats, evs: evs, evIdx: 0, active: [], t0: clock() + 0.6, score: 0, combo: 0, maxCombo: 0, lives: 5, hits: 0, perfects: 0, realSeen: 0, dodged: 0,
+    RHS = { beats: beats, evs: evs, evIdx: 0, active: [], t0: clock() + 0.6, score: 0, combo: 0, maxCombo: 0, lives: MAX_LIVES, shield: S.bestBeat ? 0 : SHIELD0, hits: 0, perfects: 0, realSeen: 0, dodged: 0,
             nextBeat: 0, lastBeat: -1, rows: 1, ended: false, settled: false, sched: 0, raf: 0 };
     rhPaint();
     RHS.sched = setInterval(rhSchedule, 25); rhSchedule();
@@ -790,10 +791,23 @@
     rhUpdate(clock() - RHS.t0);
     if (!RHS.ended) RHS.raf = requestAnimationFrame(rhFrame);
   }
+  /* A miss that costs a heart; a first-timer's shield takes it first. */
+  function rhLoseLife(msg, sfx) {
+    var now0 = clock(); RHS.combo = 0;
+    if (RHS.shield > 0) { RHS.shield--; rhJudgeSay('护盾挡住了'); tone(523.25, now0, 0.14, 'triangle', 0.14); tone(392, now0 + 0.09, 0.2, 'sine', 0.12); rhPaint(); return; }
+    RHS.lives--; rhJudgeSay(msg); sfx(now0); rhPaint();
+    if (RHS.lives <= 0) rhFinish(true);
+  }
   function rhExpire(e) {
     if (e.fake) { RHS.dodged++; return; }
-    RHS.realSeen++; RHS.combo = 0; RHS.lives--; rhJudgeSay('溜走了'); tone(110, clock(), 0.18, 'sine', 0.25, 70); rhPaint();
-    if (RHS.lives <= 0) rhFinish(true);
+    RHS.realSeen++; /* still counts against accuracy, so grades stay honest */
+    if (e.i < WARMUP) { rhJudgeSay('差一点～'); tone(330, clock(), 0.16, 'sine', 0.12, 262); return; } /* warm-up: no heart, combo kept */
+    rhLoseLife('溜走了', function (t) { tone(110, t, 0.18, 'sine', 0.25, 70); });
+  }
+  function rhHeal() {
+    if (RHS.combo % HEAL_EVERY || RHS.lives >= MAX_LIVES) return;
+    var now0 = clock(); RHS.lives++; rhJudgeSay('回复一颗心！');
+    tone(783.99, now0 + 0.06, 0.16, 'sine', 0.16); tone(1046.5, now0 + 0.14, 0.16, 'sine', 0.16); tone(1318.51, now0 + 0.22, 0.3, 'sine', 0.16);
   }
   function rhTap(idx) {
     if (!RHS || RHS.ended || !RH.active) return;
@@ -806,8 +820,7 @@
     if (e && Math.abs(t - e.t) <= e.half) {
       var dt = Math.abs(t - e.t); e.done = true; e.doneT = t;
       if (e.fake) {
-        RHS.combo = 0; RHS.lives--; slots[idx].classList.add('bad'); slots[idx].querySelector('.rh-mark').textContent = '纸片！'; rhJudgeSay('假的！'); tone(190, clock(), 0.22, 'sawtooth', 0.22, 70);
-        rhPaint(); if (RHS.lives <= 0) rhFinish(true);
+        slots[idx].classList.add('bad'); slots[idx].querySelector('.rh-mark').textContent = '纸片！'; rhLoseLife('假的！', function (t) { tone(190, t, 0.22, 'sawtooth', 0.22, 70); });
       } else {
         var q = dt <= 0.09 ? 0 : dt <= 0.15 ? 1 : 2, base = [100, 70, 40][q];
         RHS.realSeen++; RHS.hits++; if (q === 0) RHS.perfects++; RHS.combo++; if (RHS.combo > RHS.maxCombo) RHS.maxCombo = RHS.combo;
@@ -815,7 +828,7 @@
         rhJudgeSay(['完美！', '很好', '还行'][q]); slots[idx].classList.remove('bad'); slots[idx].classList.add('ok'); slots[idx].querySelector('.rh-mark').textContent = ['完美', '很好', '摸到啦'][q];
         var f = SCALE[Math.min(RHS.combo - 1, SCALE.length - 1)], now0 = clock(); tone(f, now0, 0.28, 'sine', 0.32); tone(f * 2, now0, 0.14, 'triangle', 0.07);
         if (q < 2) { var r = stage.getBoundingClientRect(), b = slots[idx].getBoundingClientRect(); heartAt(b.left - r.left + b.width / 2, b.top - r.top + 12); }
-        rhPaint();
+        rhHeal(); rhPaint();
       }
     } else {
       RHS.score = Math.max(0, RHS.score - 20); RHS.combo = 0; rhJudgeSay('慢一点点～'); tone(140, clock(), 0.1, 'sine', 0.15, 100); rhPaint();
