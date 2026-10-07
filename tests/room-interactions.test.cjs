@@ -33,6 +33,8 @@ function fixture(initialLayout = {}, options = {}) {
     releasePointerCapture(id) { this.captures.delete(id); this.emit('lostpointercapture', { pointerId: id }); }
     getBoundingClientRect() {
       if (this === stage) return rect(20, 30, 1004, 804);
+      // The arranging toolbar sits outside the scene; by default it takes no space (as when it is display:none).
+      if (this === tools) return options.toolsRect ? rect(...options.toolsRect) : rect(22, 832, 1000, 0);
       const match = (scene.style.transform || '').match(/translate\(([^p]+)px,([^p]+)px\) scale\(([^)]+)\)/);
       const [tx, ty, scale] = match ? match.slice(1).map(Number) : [0, 0, 1];
       if (this === scene) return rect(22 + tx, 32 + ty, 1000 * scale, 800 * scale);
@@ -62,10 +64,15 @@ function fixture(initialLayout = {}, options = {}) {
   const rug = new Element('rug'), win = new Element('win'), bed = new Element('bed');
   catBox.base = [400, 440, 200, 160]; rug.base = [280, 590, 500, 120]; win.base = [100, 80, 250, 200];
   catShadow.base = [450, 591, 100, 18]; bed.base = [540, 600, 240, 100];
-  [catBox, catShadow, rug, win, bed].forEach(el => { el.offsetWidth = el.base[2]; el.offsetHeight = el.base[3]; });
+  // Optional surface-prop scene: a shelf and a nearer table (both obstacles) and a cup that can stand on them.
+  const shelf = new Element('shelf'), table = new Element('table'), cup = new Element('cup');
+  shelf.base = [500, 300, 450, 280]; table.base = [600, 400, 300, 200]; cup.base = [700, 380, 60, 60];
+  cup.dataset.placement = 'surface';
+  [catBox, catShadow, rug, win, bed, shelf, table, cup].forEach(el => { el.offsetWidth = el.base[2]; el.offsetHeight = el.base[3]; });
   catBox.appendChild(cat);
   const window = new Element('window'), document = new Element('document');
-  document.createElement = id => new Element(id); window.NaituanDecor = { items: [] };
+  document.createElement = id => new Element(id);
+  window.NaituanDecor = { items: options.surfaceProps ? [{ id: 'shelf' }, { id: 'table' }, { id: 'cup' }] : [] };
   let time = 0, timerId = 0, resize, savedCat = null, savedLayout = initialLayout;
   const timers = new Map();
   const calls = { taps: 0, holds: 0, ends: [], drags: 0, drops: [], landings: 0, furniture: [], layouts: [], removedKeys: [], onLayout: 0 };
@@ -88,11 +95,13 @@ function fixture(initialLayout = {}, options = {}) {
     interactItem: key => calls.furniture.push(key),
     onLayout: () => calls.onLayout++,
     items: [{ key: 'rug', name: '地毯', el: rug }, { key: 'win', name: '窗户', el: win, anchors: { watch: { x: 0.2, y: 0.8 } } },
-      { key: 'prop:cushion', name: '猫窝', el: bed, depthAware: true, anchors: { rest: { x: 0.2, y: 0.7 } } }]
+      { key: 'prop:cushion', name: '猫窝', el: bed, depthAware: true, anchors: { rest: { x: 0.2, y: 0.7 } } }].concat(options.surfaceProps ? [
+      { key: 'prop:shelf', name: '架子', el: shelf, obstacle: true }, { key: 'prop:table', name: '桌子', el: table, obstacle: true },
+      { key: 'prop:cup', name: '杯子', el: cup }] : [])
   });
   room.refresh();
   return {
-    room, calls, cat, catBox, catShadow, rug, win, bed, scene, controls, window, document, api: window.NaituanRoom,
+    room, calls, cat, catBox, catShadow, rug, win, bed, shelf, table, cup, scene, controls, window, document, api: window.NaituanRoom,
     resize: () => resize(),
     tick(ms) {
       time += ms;
@@ -322,4 +331,40 @@ test('deletion stays in the editing draft until confirmation and Escape restores
   f.controls.roomArrange.emit('click'); select(f.bed, 3); f.controls.roomDelete.emit('click');
   f.controls.roomArrange.emit('click');
   assert.equal(f.calls.layouts.length, 1); assert.deepEqual(f.calls.removedKeys, [[key]]);
+});
+
+test('arranging keeps furniture above the bottom toolbar and lifts pieces already under it', () => {
+  // Toolbar top edge at 80% of the scene height -> lowest bottom edge 0.79; the window is 200px tall (hy = 0.125).
+  const f = fixture({ win: { x: 0.5, y: 0.95 } }, { toolsRect: [22, 32 + 640, 1000, 100] });
+  close(f.room.getItemGeometry('win').center.y, 0.875); // outside arranging the toolbar is gone: room bottom applies
+  f.controls.roomArrange.emit('click');
+  close(f.room.getItemGeometry('win').center.y, 0.665);
+  f.pointer('pointerdown', 1, 500, 500, f.win); f.pointer('pointermove', 1, 500, 790, f.win);
+  close(f.room.getItemGeometry('win').center.y, 0.665);
+  f.pointer('pointerup', 1, 500, 790, f.win);
+  f.win.emit('keydown', { key: 'ArrowDown', shiftKey: true });
+  close(f.room.getItemGeometry('win').center.y, 0.665);
+  f.controls.roomArrange.emit('click');
+  close(f.calls.layouts[0].win.y, 0.665);
+  close(f.room.getItemGeometry('win').center.y, 0.665);
+});
+
+test('a surface prop is drawn just above the nearest furniture it stands on, and normally on the floor', () => {
+  const f = fixture({}, { surfaceProps: true });
+  const tableLayer = 10 + Math.round(0.75 * 1000), shelfLayer = 10 + Math.round(0.725 * 1000);
+  assert.equal(f.table.style.zIndex, tableLayer); assert.equal(f.shelf.style.zIndex, shelfLayer);
+  // The cup's foot (0.73, 0.55) lies on both the shelf and the nearer table: it goes one above the table.
+  assert.equal(f.cup.style.zIndex, tableLayer + 1);
+  f.controls.roomArrange.emit('click');
+  assert.equal(f.cup.style.zIndex, ''); assert.equal(f.table.style.zIndex, '');
+  f.pointer('pointerdown', 1, 730, 410, f.cup); f.pointer('pointermove', 1, 200, 750, f.cup);
+  f.pointer('pointerup', 1, 200, 750, f.cup);
+  assert.equal(f.cup.style.zIndex, '');
+  f.controls.roomArrange.emit('click');
+  assert.equal(f.cup.style.zIndex, ''); // on the floor: back to the stylesheet's layer
+  assert.equal(f.table.style.zIndex, tableLayer);
+
+  const g = fixture({}, { surfaceProps: true });
+  g.table.hidden = true; g.room.refresh();
+  assert.equal(g.cup.style.zIndex, shelfLayer + 1);
 });

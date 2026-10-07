@@ -216,13 +216,21 @@
       for (var i = 0; i < 4; i++) scale = manual * depthScale({ x: p.x, y: p.y + halfHeight * scale });
       return scale;
     }
+    // 布置模式下，家具最低只能到工具栏顶边，免得钻进工具栏下面点不到
+    function editBottomLimit() {
+      if (!editing || tools.hidden) return 1;
+      var t = tools.getBoundingClientRect(), s = scene.getBoundingClientRect();
+      if (!t.height || !s.height || t.top >= s.bottom) return 1;
+      return limit((t.top - s.top) / s.height - 0.01, 0.3, 1);
+    }
     function bounded(it, p) {
       var scale = itemScale(it, p);
       var hx = Math.min(0.5, it.el.offsetWidth * scale / scene.clientWidth / 2);
       var hy = Math.min(0.5, it.el.offsetHeight * scale / scene.clientHeight / 2);
       var x = limit(p.x, hx, 1 - hx);
       var minY = it.depthAware ? Math.max(hy, floorY(x) - hy) : hy;
-      return { x: x, y: limit(p.y, minY, (it.depthAware ? 0.985 : 1) - hy), scale: p.scale || 1, flipX: !!p.flipX, flipY: !!p.flipY };
+      var maxBottom = Math.min(it.depthAware ? 0.985 : 1, editBottomLimit());
+      return { x: x, y: limit(p.y, minY, maxBottom - hy), scale: p.scale || 1, flipX: !!p.flipX, flipY: !!p.flipY };
     }
     function apply(it, p) {
       if (!p && it.depthAware && !it.el.hidden) {
@@ -245,6 +253,23 @@
         if (!it.obstacle || it.el.hidden) return;
         var g = getItemGeometry(it.key);
         if (g) it.el.style.zIndex = editing ? '' : itemLayer(g);
+      });
+      // 小物件（杯子等）落在哪件家具上，就画在那件家具上面一层
+      items.forEach(function (it) {
+        if (it.obstacle || it.el.hidden || it.el.dataset.placement !== 'surface') return;
+        if (editing) { it.el.style.zIndex = ''; return; }
+        var g = getItemGeometry(it.key);
+        if (!g) return;
+        var foot = { x: g.center.x, y: g.center.y + g.size.height * 0.5 }, base = null;
+        items.forEach(function (other) {
+          if (!other.obstacle || other.el.hidden) return;
+          var b = getItemGeometry(other.key);
+          if (!b) return;
+          var inX = Math.abs(foot.x - b.center.x) <= b.size.width * 0.5;
+          var inY = foot.y >= b.center.y - b.size.height * 0.5 && foot.y <= b.center.y + b.size.height * 0.5;
+          if (inX && inY && (!base || itemLayer(b) > itemLayer(base))) base = b;
+        });
+        it.el.style.zIndex = base ? itemLayer(base) + 1 : '';
       });
       if (!editing) catBox.style.zIndex = catLayer(getCatPosition());
     }
@@ -438,6 +463,11 @@
       else {
         stopPointers(); view = { scale: 1, x: 0, y: 0 }; drawView();
         draft = cleanLayout(o.layout()); removed = []; editing = true; editUI();
+        // 以前已经掉到工具栏下面的家具，进入布置时挪到工具栏上方
+        items.forEach(function (it) {
+          if (draft[it.key] && !it.el.hidden) draft[it.key] = bounded(it, draft[it.key]);
+        });
+        paintLayout();
       }
     });
     picker.addEventListener('change', function () { select(byKey[picker.value]); });
