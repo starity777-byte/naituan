@@ -81,7 +81,10 @@
   else window.addEventListener('load', function () { setTimeout(preloadSprites, 400); });
 
   /* ---------- state ---------- */
-  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, bestLion: 0, lionTop: 0, mute: false, vol: 80, bgm: true, bgmVol: 60, cq: null, t: now() }; }
+  /* 躲猫猫的关卡和规则（hide-seek-levels.js）。S.hs 记录关卡进度，S.bestBeat 是无尽模式的最高分。 */
+  var HSL = window.NTHideSeek || null;
+  function freshHs() { return HSL ? HSL.freshHs() : { unlocked: 1, stars: [0, 0, 0, 0, 0], cleared: [false, false, false, false, false], perfect: [false, false, false, false, false], paperSeen: false }; }
+  function fresh() { return { hunger: 72, mood: 70, energy: 80, sleeping: false, secs: 0, fish: 0, best: 0, bestBeat: 0, bestLion: 0, lionTop: 0, hs: freshHs(), mute: false, vol: 80, bgm: true, bgmVol: 60, cq: null, t: now() }; }
   function isPlainObject(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     var proto = Object.getPrototypeOf(value);
@@ -105,6 +108,9 @@
       S.fish = countStat(d.fish, base.fish, true);
       S.best = countStat(d.best, base.best, true);
       S.bestBeat = countStat(d.bestBeat, base.bestBeat, true);
+      /* 老存档没有 hs 时补上；玩过旧版躲猫猫（bestBeat > 0）的直接解锁到第 3 关 */
+      if (HSL) S.hs = HSL.migrate(d.hs, S.bestBeat);
+      else if (isPlainObject(d.hs)) S.hs = JSON.parse(JSON.stringify(d.hs)); /* keep progress even if the levels script failed to load */
       S.bestLion = countStat(d.bestLion, base.bestLion, true);
       S.lionTop = Math.min(12, countStat(d.lionTop, base.lionTop, true));
       S.mute = !!d.mute; S.cq = (d.cq && typeof d.cq === 'object') ? d.cq : null;
@@ -558,13 +564,15 @@
   }
 
   /* ---------- rhythm hide-and-seek ---------- */
-  var NB = 80, COUNTIN = 4, BPM0 = 84, BPM1 = 150, ROWS_AT = [0, 20, 44];
-  var slotsEl = $('#slots'), rhScoreEl = $('#rhScore'), rhLivesEl = $('#rhLives'), rhFill = $('#rhFill'), rhJudge = $('#rhJudge');
-  var rhBpmEl = $('#rhBpm'), rhComboEl = $('#rhCombo'), rhIntro = $('#rhIntro'), rhOver = $('#rhOver'), rhSoundBtn = $('#rhSound');
+  /* 5 个短关卡 + 无尽模式。关卡表、谱子、判定扣心、星星和小鱼干的规则都在 hide-seek-levels.js（纯函数，tests/hide-seek.test.cjs 直接测它）；
+     这里只管画面、声音、存档和流程。 */
+  var COUNTIN = HSL ? HSL.COUNTIN : 4, HIDE_REAL = 118, HIDE_PAPER = 100;
+  var slotsEl = $('#slots'), rhScoreEl = $('#rhScore'), rhLivesEl = $('#rhLives'), rhFill = $('#rhFill'), rhProg = $('#rhProg'), rhJudge = $('#rhJudge');
+  var rhComboEl = $('#rhCombo'), rhLevelEl = $('#rhLevel'), rhTipEl = $('#rhTip'), rhMenu = $('#rhMenu'), rhLevelsEl = $('#rhLevels');
+  var rhPaperIntro = $('#rhPaperIntro'), rhOver = $('#rhOver'), rhSoundBtn = $('#rhSound');
   var metersEl0 = $('#meters'), actionsEl0 = $('#actions'), hintEl0 = $('#hint'), btnShop0 = $('#btnShop'), btnSave0 = $('#btnSave'), app0 = $('#app');
-  var RHS = null, slotEv = [], useAC = false;
+  var RHS = null, slotEv = [], slotParts = [], slotFxT = [], slotWigT = [], useAC = false, paperArt = null;
   var LIFE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C5 15.5 2.5 12 2.5 8.6A5.1 5.1 0 0 1 12 6.4a5.1 5.1 0 0 1 9.5 2.2C21.5 12 19 15.5 12 21z" fill="#e2897d" stroke="#54392f" stroke-width="1.8" stroke-linejoin="round"/></svg>';
-
   /* --- synth: a tiny drum + bass loop, every tap plays a note --- */
   var AC = null, master = null, noiseBuf = null;
   var BASS = [130.81, 110, 87.31, 98];
@@ -623,57 +631,30 @@
     env(g, t, 0.002, 0.05, vol); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + 0.1);
   }
 
-  /* --- timeline: 4 count-in beats, then NB beats that speed up from BPM0 to BPM1 --- */
-  function bpmAt(i) { return BPM0 + (BPM1 - BPM0) * (i / (NB - 1)); }
-  function rowsAt(i) { return i >= ROWS_AT[2] ? 3 : i >= ROWS_AT[1] ? 2 : 1; }
-  function buildBeats() {
-    var beats = [], t = 0, i, ci = 60 / BPM0;
-    for (i = 0; i < COUNTIN; i++) { beats.push({ t: t, ivl: ci }); t += ci; }
-    for (i = 0; i < NB; i++) { var iv = 60 / bpmAt(i); beats.push({ t: t, ivl: iv }); t += iv; }
-    return beats;
+  function puff(t, vol) { /* a soft, low noise burst: the "噗" of a cat slipping away */
+    if (!useAC) return;
+    var s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(); s.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.value = 650;
+    env(g, t, 0.004, 0.16, vol); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + 0.22);
   }
-  function genEvents(beats) {
-    var evs = [], lastReal = -1, prevReal = -1, i, k, tries;
-    for (i = 0; i < NB; i++) {
-      var bt = beats[COUNTIN + i], n = rowsAt(i) * 3, half = bt.ivl * 0.5, used = [];
-      if (i === ROWS_AT[1] - 1 || i === ROWS_AT[2] - 1) continue; /* rest while the grid grows */
-      var fakeOnly = i >= 30 && Math.random() < 0.1;
-      var restP = i < 8 ? 0 : i < 40 ? 0.1 : 0.14;
-      if (!fakeOnly && Math.random() >= restP) {
-        var r; tries = 0; do { r = Math.floor(Math.random() * n); tries++; } while ((r === lastReal || r === prevReal) && tries < 30);
-        prevReal = lastReal; lastReal = r; used.push(r);
-        evs.push({ t: bt.t, half: half, slot: r, fake: false, i: i });
-      }
-      var fp = i < 12 ? 0 : i < 30 ? 0.25 : i < 50 ? 0.4 : 0.5, nf = 0;
-      if (fakeOnly) nf = Math.random() < 0.3 ? 2 : 1; else if (Math.random() < fp) nf = i >= 50 && Math.random() < 0.2 ? 2 : 1;
-      for (k = 0; k < nf; k++) {
-        var f; tries = 0; do { f = Math.floor(Math.random() * n); tries++; } while (used.indexOf(f) >= 0 && tries < 30);
-        if (used.indexOf(f) < 0) { used.push(f); evs.push({ t: bt.t, half: half, slot: f, fake: true, i: i }); }
-      }
-      if (i >= 56 && !fakeOnly && Math.random() < 0.3) { /* an extra cat on the off-beat */
-        var o; tries = 0; do { o = Math.floor(Math.random() * n); tries++; } while ((used.indexOf(o) >= 0 || o === lastReal) && tries < 30);
-        evs.push({ t: bt.t + bt.ivl * 0.5, half: bt.ivl * 0.3, slot: o, fake: false, i: i });
-      }
-    }
-    evs.sort(function (a, b) { return (a.t - a.half) - (b.t - b.half); });
-    var busyUntil = {}, out = [];
-    evs.forEach(function (e) { /* never put two cats in the same box at the same time */
-      var st = e.t - e.half, n = rowsAt(e.i) * 3;
-      if ((busyUntil[e.slot] || -1) > st) {
-        var free = []; for (var q = 0; q < n; q++) if ((busyUntil[q] || -1) <= st) free.push(q);
-        if (!free.length) return; e.slot = pick(free);
-      }
-      busyUntil[e.slot] = e.t + e.half; out.push(e);
-    });
-    return out;
-  }
+  function sfxHit(combo) { var f = SCALE[Math.min(combo - 1, SCALE.length - 1)], t = clock(); tone(f, t, 0.28, 'sine', 0.32); tone(f * 2, t, 0.14, 'triangle', 0.07); }
+  function sfxPoof() { var t = clock(); tone(120, t, 0.2, 'sine', 0.3, 55); puff(t, 0.22); }
+  function sfxTear() { tone(190, clock(), 0.22, 'sawtooth', 0.22, 70); }
+  function sfxThud() { tone(170, clock(), 0.08, 'sine', 0.08, 120); }
+  function sfxChord() { var t = clock(); [1046.5, 1318.51, 1567.98].forEach(function (f, k) { tone(f, t + k * 0.04, 0.55, 'sine', 0.08); }); }
+  /* 震动：只在没静音时；iPhone 没有 navigator.vibrate，就什么也不做。 */
+  function buzz(pattern) { if (S.mute) return; try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {} }
 
   /* --- ui helpers --- */
   function slotImgT(i, y) { return 'translate(-50%, ' + y + '%)' + (i % 3 === 2 ? ' scaleX(-1)' : ''); }
+  function paperT(y) { return 'translateY(' + y + '%)'; }
+  var PAPER_HTML = '<span class="rh-sway"><span class="rh-stick"></span><span class="rh-half l"></span><span class="rh-half r"></span></span>';
   (function buildSlots() {
     for (var i = 0; i < 9; i++) (function (i) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'slot'; b.setAttribute('data-i', i); b.setAttribute('aria-label', '箱子 ' + (i + 1));
-      var im = document.createElement('img'); im.alt = ''; im.src = SPR.peekc; im.style.transform = slotImgT(i, 118); b.appendChild(im);
+      var im = document.createElement('img'); im.alt = ''; im.src = SPR.peekc; im.style.transform = slotImgT(i, HIDE_REAL); b.appendChild(im);
+      var paper = document.createElement('span'); paper.className = 'rh-paper'; paper.setAttribute('aria-hidden', 'true'); paper.innerHTML = PAPER_HTML;
+      paper.style.transform = paperT(HIDE_PAPER); b.appendChild(paper);
+      var smoke = document.createElement('span'); smoke.className = 'rh-smoke'; smoke.setAttribute('aria-hidden', 'true'); b.appendChild(smoke);
       var impact = document.createElement('span'); impact.className = 'rh-impact'; impact.setAttribute('aria-hidden', 'true'); impact.textContent = '✦'; b.appendChild(impact);
       var mark = document.createElement('span'); mark.className = 'rh-mark'; mark.setAttribute('aria-hidden', 'true'); b.appendChild(mark);
       b.addEventListener('pointerdown', function (e) {
@@ -681,54 +662,151 @@
         e.preventDefault(); rhTap(i); /* accept every finger, including non-primary pointers */
       });
       b.addEventListener('click', function (e) { if (e.detail === 0) rhTap(i); }); /* keyboard / assistive activation only */
-      slotsEl.appendChild(b); slots.push(b); slotEv.push(null);
+      slotsEl.appendChild(b); slots.push(b); slotEv.push(null); slotParts.push({ img: im, paper: paper, mark: mark }); slotFxT.push(0); slotWigT.push(0);
     })(i);
   })();
-  function rhLayout(rows) { slotsEl.setAttribute('data-rows', rows); slots.forEach(function (s, i) {
-    var locked = i >= rows * 3; s.hidden = false; s.disabled = locked; s.classList.toggle('locked', locked);
-    s.setAttribute('aria-hidden', locked ? 'true' : 'false');
-  }); }
-  function rhClearSlots() { slots.forEach(function (s, i) { s.className = s.disabled ? 'slot locked' : 'slot'; s.querySelector('.rh-mark').textContent = ''; s.querySelector('img').style.transform = slotImgT(i, 118); slotEv[i] = null; }); }
+  /* Only the boxes this level needs: 3 = one big row, 6 = two rows, 9 = three rows. No locked placeholders. */
+  function rhLayout(boxes) {
+    slotsEl.setAttribute('data-rows', Math.ceil(boxes / 3));
+    slots.forEach(function (s, i) { var off = i >= boxes; s.hidden = off; s.disabled = off; s.setAttribute('aria-hidden', off ? 'true' : 'false'); });
+  }
+  var FX = ['ok', 'bad', 'miss', 'empty'];
+  function slotFxClear(i) { clearTimeout(slotFxT[i]); FX.forEach(function (c) { slots[i].classList.remove(c); }); }
+  /* Feedback lives on the box that was tapped (or that the cat slipped out of). */
+  function slotFx(i, kind, text, ms) {
+    var s = slots[i]; slotFxClear(i); void s.offsetWidth;
+    slotParts[i].mark.textContent = text; s.classList.add(kind);
+    slotFxT[i] = setTimeout(function () { s.classList.remove(kind); }, ms);
+  }
+  /* 提前一拍预告：箱子盖子轻轻抖一下。 */
+  function slotWiggle(i) {
+    var s = slots[i]; clearTimeout(slotWigT[i]); s.classList.remove('wiggle'); void s.offsetWidth; s.classList.add('wiggle');
+    slotWigT[i] = setTimeout(function () { s.classList.remove('wiggle'); }, 300);
+  }
+  function rhClearSlots() {
+    slots.forEach(function (s, i) {
+      clearTimeout(slotFxT[i]); clearTimeout(slotWigT[i]); s.className = 'slot';
+      slotParts[i].mark.textContent = ''; slotParts[i].img.style.transform = slotImgT(i, HIDE_REAL); slotParts[i].paper.style.transform = paperT(HIDE_PAPER);
+      slotEv[i] = null;
+    });
+    slotsEl.classList.remove('glow');
+  }
+  /* 点中真猫：箱子上冒出小心心（画在 #hs 里，才不会被游戏层盖住） */
+  function rhHeart(idx) {
+    var hr = hsEl.getBoundingClientRect(), b = slots[idx].getBoundingClientRect(), h = document.createElement('span');
+    h.className = 'fx rh-heart'; h.innerHTML = HEART;
+    h.style.left = (b.left - hr.left + b.width / 2) + 'px'; h.style.top = (b.top - hr.top + b.height * 0.18) + 'px'; h.style.setProperty('--dx', (Math.random() * 30 - 15) + 'px');
+    hsEl.appendChild(h);
+    setTimeout(function () { if (h.parentNode) h.parentNode.removeChild(h); }, 1050);
+  }
+  function comboGlow() {
+    slotsEl.classList.remove('glow'); void slotsEl.offsetWidth; slotsEl.classList.add('glow'); sfxChord();
+    setTimeout(function () { slotsEl.classList.remove('glow'); }, 950);
+  }
+  /* #rhJudge 只说全局的话：准备、倒数、开始、过关。 */
   function rhJudgeSay(t) { rhJudge.textContent = t; rhJudge.classList.remove('pop'); void rhJudge.offsetWidth; rhJudge.classList.add('pop'); }
   function rhPaint() {
-    rhScoreEl.textContent = RHS ? RHS.score : 0;
-    rhComboEl.textContent = '连击 ' + (RHS ? RHS.combo : 0);
-    var lv = RHS ? RHS.lives : 5, h = ''; for (var i = 0; i < 5; i++) h += i < lv ? LIFE : LIFE.replace('<svg ', '<svg class="off" ');
-    rhLivesEl.innerHTML = h; rhLivesEl.setAttribute('aria-label', '剩余生命 ' + lv);
+    var run = RHS && RHS.run, lv = run ? run.lives : HSL ? HSL.MAX_LIVES : 3, max = HSL ? HSL.MAX_LIVES : 3, h = '';
+    rhScoreEl.textContent = run ? run.score : 0;
+    rhComboEl.textContent = '连击 ' + (run ? run.combo : 0);
+    for (var i = 0; i < max; i++) h += i < lv ? LIFE : LIFE.replace('<svg ', '<svg class="off" ');
+    rhLivesEl.innerHTML = h; rhLivesEl.setAttribute('aria-label', '剩余 ' + lv + ' 颗心');
   }
   function setChrome(hide) {
     metersEl0.hidden = actionsEl0.hidden = hintEl0.hidden = btnShop0.hidden = btnSave0.hidden = hide;
     app0.classList.toggle('rhmode', hide);
   }
+  function rhLevel(idx) { return idx >= 0 && idx < HSL.LEVELS.length ? HSL.LEVELS[idx] : null; }
+  function rhLevelName(idx) { var L = rhLevel(idx); return L ? '第 ' + L.id + ' 关 · ' + L.name : '无尽模式'; }
+  function starsHTML(n, tag) { return [1, 2, 3].map(function (k) { return '<' + tag + ' class="' + (k <= n ? 'on' : '') + '">★</' + tag + '>'; }).join(''); }
+  /* 纸片猫专用图（以后阿琳画的）：assets/peek-paper.webp 能加载就用它，否则用 CSS 做的纸片。 */
+  function checkPaperArt() {
+    if (paperArt !== null) return;
+    paperArt = false;
+    var im = new Image();
+    im.onload = function () { if (im.naturalWidth) { paperArt = true; hsEl.classList.add('paper-art'); } };
+    im.src = 'assets/peek-paper.webp';
+  }
+
+  /* --- level select --- */
+  function rhMenuPaint() {
+    var hs = S.hs, html = '';
+    HSL.LEVELS.forEach(function (L, i) {
+      var ok = HSL.isUnlocked(hs, i);
+      html += '<button type="button" class="rh-lv' + (ok ? '' : ' locked') + '" data-lv="' + i + '"' + (ok ? '' : ' disabled') +
+        ' aria-label="第 ' + L.id + ' 关 ' + L.name + (ok ? '，' + hs.stars[i] + ' 颗星' : '，还没解锁') + '">' +
+        '<b class="no">' + L.id + '</b><span class="nm">' + L.name + '</span>' +
+        '<span class="st">' + (ok ? '<span class="stars">' + starsHTML(hs.stars[i], 'i') + '</span>' : '<span class="lock" aria-hidden="true">🔒</span><small>先通过第 ' + (L.id - 1) + ' 关</small>') + '</span></button>';
+    });
+    var e = HSL.isUnlocked(hs, HSL.ENDLESS), best = S.bestBeat || 0;
+    html += '<button type="button" class="rh-lv rh-endless' + (e ? '' : ' locked') + '" data-lv="' + HSL.ENDLESS + '"' + (e ? '' : ' disabled') +
+      ' aria-label="无尽模式' + (e ? '' : '，通过第 5 关解锁') + '，最高分 ' + best + '">' +
+      '<b class="no">∞</b><span class="nm">无尽模式</span><span class="st">' + (e ? '' : '<span class="lock" aria-hidden="true">🔒</span>') +
+      '<small>' + (e ? '' : '通过第 5 关解锁 · ') + '最高分 ' + best + '</small></span></button>';
+    rhLevelsEl.innerHTML = html;
+  }
+  function rhStopRun() {
+    clearTimeout(RH.goT);
+    if (RHS && !RHS.ended) { RHS.ended = true; clearInterval(RHS.sched); cancelAnimationFrame(RHS.raf); }
+  }
+  function rhMenuShow() {
+    rhStopRun(); RHS = null; RH.level = -1;
+    rhClearSlots(); rhOver.hidden = true; rhPaperIntro.hidden = true; rhTipEl.hidden = true;
+    rhJudge.textContent = ''; rhFill.style.width = '0'; rhLevelEl.textContent = '躲猫猫'; rhPaint();
+    rhSoundBtn.textContent = S.mute ? '音效：关' : '音效：开';
+    rhMenuPaint(); rhMenu.hidden = false; statsEnter('games/hide');
+  }
 
   /* --- flow --- */
   function rhStart() {
     if (S.sleeping) { sound('nope'); say('奶团睡着了，先叫醒它'); return; }
+    if (!HSL) { sound('nope'); say('躲猫猫还没准备好，刷新一下试试'); return; }
     sound('tap');
-    RH.active = true; RHS = null;
+    RH.active = true; RH.fish = 0; RH.cleared = 0; RHS = null;
     hsEl.hidden = false; stage.classList.add('playing'); $('#catbox').style.visibility = 'hidden'; bubble.hidden = true;
-    setBusyUI(true); setChrome(true); window.scrollTo(0, 0); statsEnter('games/hide');
-    rhLayout(1); rhClearSlots(); rhFill.style.width = '0'; rhBpmEl.textContent = 'BPM ' + BPM0; rhJudge.textContent = '';
-    rhPaint(); rhOver.hidden = true; rhIntro.hidden = false;
-    $('#rhBest').textContent = S.bestBeat ? '最高分 ' + S.bestBeat : '还没有记录，来一局吧';
-    rhSoundBtn.textContent = S.mute ? '音效：关' : '音效：开';
+    setBusyUI(true); setChrome(true); window.scrollTo(0, 0);
+    checkPaperArt(); rhLayout(3); rhMenuShow();
   }
-  function rhGo() {
-    audioInit(); rhIntro.hidden = true; rhOver.hidden = true; rhClearSlots(); rhLayout(1); rhFill.style.width = '0'; rhJudgeSay('准备…');
-    RHS = null; rhPaint();
-    setTimeout(function () { if (RH.active) rhBegin(); }, 260); /* let the audio clock start */
+  function rhPick(idx) {
+    if (!HSL.isUnlocked(S.hs, idx)) { sound('nope'); return; }
+    sound('tap');
+    if (idx === 2 && !S.hs.paperSeen) { /* 第一次进第 3 关：先认一认纸片猫 */
+      rhStopRun(); RHS = null; rhMenu.hidden = true; rhOver.hidden = true; rhPaperIntro.hidden = false; return;
+    }
+    rhGo(idx);
   }
-  function rhBegin() {
+  function rhGo(idx) {
+    audioInit(); rhStopRun(); RHS = null;
+    var L = rhLevel(idx);
+    RH.level = idx;
+    rhMenu.hidden = rhOver.hidden = rhPaperIntro.hidden = true;
+    rhClearSlots(); rhLayout(L ? L.boxes : 9);
+    rhLevelEl.textContent = rhLevelName(idx);
+    rhProg.hidden = !L; rhFill.style.width = '0';
+    rhTipEl.textContent = L ? L.tip : ''; rhTipEl.hidden = !(L && L.id === 1); /* 第 1 关倒数时在中间显示提示 */
+    rhJudgeSay('准备…'); rhPaint();
+    statsEnter(L ? 'games/hide/L' + L.id : 'games/hide/endless');
+    RH.goT = setTimeout(function () { if (RH.active && RH.level === idx) rhBegin(idx); }, 260); /* let the audio clock start */
+  }
+  function rhQueuePreviews(evs) {
+    var add = evs.map(function (e) { return { at: e.t - RHS.beats[COUNTIN + e.i].ivl, slot: e.slot }; }); /* one beat before the cat peaks, half-beat cats included */
+    RHS.pre = RHS.pre.slice(RHS.preIdx).concat(add).sort(function (a, b) { return a.at - b.at; }); RHS.preIdx = 0;
+  }
+  function rhBegin(idx) {
     useAC = !!(AC && AC.state === 'running' && AC.currentTime > 0.02);
-    var beats = buildBeats(), evs = genEvents(beats);
-    RHS = { beats: beats, evs: evs, evIdx: 0, active: [], t0: clock() + 0.6, score: 0, combo: 0, maxCombo: 0, lives: 5, hits: 0, perfects: 0, realSeen: 0, dodged: 0,
-            nextBeat: 0, lastBeat: -1, rows: 1, ended: false, settled: false, sched: 0, raf: 0 };
+    var L = rhLevel(idx), beats, evs, gen = null;
+    if (L) { beats = HSL.levelBeats(L); evs = HSL.parseChart(L.chart, L.bpm, { countIn: COUNTIN, boxes: L.boxes }); }
+    else { gen = HSL.createEndless(); evs = gen.extend(32); beats = gen.beats; }
+    RHS = { idx: idx, level: L, gen: gen, beats: beats, evs: evs, evIdx: 0, pre: [], preIdx: 0, active: [], t0: clock() + 0.6,
+            run: HSL.createRun(L || { canFail: true }), nextBeat: 0, lastBeat: -1, ended: false, settled: false, sched: 0, raf: 0 };
+    rhQueuePreviews(evs);
     rhPaint();
     RHS.sched = setInterval(rhSchedule, 25); rhSchedule();
     RHS.raf = requestAnimationFrame(rhFrame);
   }
   function rhSchedule() {
     if (!RHS || RHS.ended) return;
+    if (RHS.gen && RHS.beats.length - RHS.nextBeat < 12) { var more = RHS.gen.extend(16); RHS.evs = RHS.evs.concat(more); rhQueuePreviews(more); } /* 无尽模式：一直往后写 */
     var nowT = clock();
     while (RHS.nextBeat < RHS.beats.length && RHS.t0 + RHS.beats[RHS.nextBeat].t < nowT + 0.15) {
       var k = RHS.nextBeat++, b = RHS.beats[k], T = RHS.t0 + b.t;
@@ -742,48 +820,46 @@
   }
   function onBeat(k) {
     if (k < COUNTIN) { rhJudgeSay(k < COUNTIN - 1 ? String(COUNTIN - 1 - k) : '开始！'); return; }
-    var gi = k - COUNTIN;
-    rhBpmEl.textContent = 'BPM ' + Math.round(bpmAt(gi)); rhBpmEl.classList.remove('beat'); void rhBpmEl.offsetWidth; rhBpmEl.classList.add('beat');
-    rhFill.style.width = Math.round(gi / (NB - 1) * 100) + '%';
-    var want = rowsAt(gi + 1);
-    if (want !== RHS.rows) { RHS.rows = want; rhLayout(want); rhJudgeSay('箱子变多了！'); }
+    if (k === COUNTIN) rhTipEl.hidden = true;
+    if (k === COUNTIN + 1 && rhJudge.textContent === '开始！') rhJudge.textContent = '';
+    if (RHS.level) rhFill.style.width = Math.round((k - COUNTIN + 1) / RHS.level.chart.length * 100) + '%';
   }
   function ease(p) { return 1 - (1 - p) * (1 - p); }
   function rhUpdate(t) {
     if (!RHS || RHS.ended) return;
     var i, e;
     while (RHS.lastBeat + 1 < RHS.beats.length && RHS.beats[RHS.lastBeat + 1].t <= t) onBeat(++RHS.lastBeat);
+    while (RHS.preIdx < RHS.pre.length && RHS.pre[RHS.preIdx].at <= t) { var p0 = RHS.pre[RHS.preIdx++]; if (t - p0.at < 0.2) slotWiggle(p0.slot); }
     /* Retire old occupants before assigning a new cat to the same box. */
     for (i = RHS.active.length - 1; i >= 0; i--) {
       e = RHS.active[i];
-      if (e.done ? t - e.doneT < 0.22 : t <= e.t + e.half) continue;
+      if (e.done ? t - e.doneT < (e.fake ? 0.42 : 0.22) : t <= e.t + e.half) continue;
       RHS.active.splice(i, 1);
       if (slotEv[e.slot] === e) {
-        slotEv[e.slot] = null; slots[e.slot].classList.remove('fake', 'ok', 'bad');
-        slots[e.slot].querySelector('img').style.transform = slotImgT(e.slot, 118);
+        slotEv[e.slot] = null; slots[e.slot].classList.remove('fake');
+        slotParts[e.slot].img.style.transform = slotImgT(e.slot, HIDE_REAL); slotParts[e.slot].paper.style.transform = paperT(HIDE_PAPER);
       }
       if (!e.done) { rhExpire(e); if (RHS.ended) return; }
     }
     while (RHS.evIdx < RHS.evs.length && RHS.evs[RHS.evIdx].t - RHS.evs[RHS.evIdx].half <= t) {
       e = RHS.evs[RHS.evIdx++];
       if (t > e.t + e.half) { rhExpire(e); if (RHS.ended) return; continue; }
-      e.done = false; e.y = 118; RHS.active.push(e); slotEv[e.slot] = e;
-      var el = slots[e.slot]; el.classList.remove('ok', 'bad'); el.classList.toggle('fake', e.fake);
-      el.style.setProperty('--gray', e.i < ROWS_AT[1] ? 1 : e.i < ROWS_AT[2] ? 0.9 : 0.75);
+      e.done = false; e.y = e.fake ? HIDE_PAPER : HIDE_REAL; RHS.active.push(e); slotEv[e.slot] = e;
+      slotFxClear(e.slot); slots[e.slot].classList.toggle('fake', e.fake);
     }
     for (i = RHS.active.length - 1; i >= 0; i--) {
       e = RHS.active[i];
       if (slotEv[e.slot] !== e) continue; /* an older return animation cannot hide its successor */
-      var img = slots[e.slot].querySelector('img'), y;
-      if (!e.done) {
-        var p = Math.max(0, Math.min(1, 1 - Math.abs(t - e.t) / e.half)); y = (1 - ease(p)) * 118; e.y = y;
-      } else {
-        var q = Math.min(1, (t - e.doneT) / 0.22); y = e.y + (118 - e.y) * q;
-      }
-      img.style.transform = slotImgT(e.slot, y);
+      var hide = e.fake ? HIDE_PAPER : HIDE_REAL, y;
+      if (!e.done) { var p = Math.max(0, Math.min(1, 1 - Math.abs(t - e.t) / e.half)); y = (1 - ease(p)) * hide; e.y = y; }
+      else if (e.fake) y = e.y; /* a torn paper cat stays put while it rips apart */
+      else { var q = Math.min(1, (t - e.doneT) / 0.22); y = e.y + (hide - e.y) * q; }
+      if (e.fake) slotParts[e.slot].paper.style.transform = paperT(y); else slotParts[e.slot].img.style.transform = slotImgT(e.slot, y);
     }
-    var last = RHS.beats[RHS.beats.length - 1];
-    if (RHS.evIdx >= RHS.evs.length && !RHS.active.length && t > last.t + last.ivl + 0.5) { rhFinish(false); return; }
+    if (RHS.level) {
+      var last = RHS.beats[RHS.beats.length - 1];
+      if (RHS.evIdx >= RHS.evs.length && !RHS.active.length && t > last.t + last.ivl + 0.5) rhFinish(false);
+    }
   }
   function rhFrame() {
     if (!RHS || RHS.ended) return;
@@ -791,81 +867,122 @@
     if (!RHS.ended) RHS.raf = requestAnimationFrame(rhFrame);
   }
   function rhExpire(e) {
-    if (e.fake) { RHS.dodged++; return; }
-    RHS.realSeen++; RHS.combo = 0; RHS.lives--; rhJudgeSay('溜走了'); tone(110, clock(), 0.18, 'sine', 0.25, 70); rhPaint();
-    if (RHS.lives <= 0) rhFinish(true);
+    var run = RHS.run;
+    if (e.fake) { HSL.onPaperDodged(run); return; }
+    var r = HSL.onEscape(run); /* 第 1–2 关只提示，第 3 关起扣 1 颗心 */
+    slotFx(e.slot, 'miss', '溜～', 720); sfxPoof();
+    if (r.lostLife) buzz([30, 40, 30]);
+    rhPaint();
+    if (run.failed) rhFinish(true);
   }
   function rhTap(idx) {
     if (!RHS || RHS.ended || !RH.active) return;
+    if (slots[idx].hidden) return;
     var t = clock() - RHS.t0;
     if (t < RHS.beats[COUNTIN].t - RHS.beats[COUNTIN].ivl * 0.5) return;
     rhUpdate(t); /* input between animation frames still sees the current cat */
     if (RHS.ended) return;
-    var e = slotEv[idx];
+    var e = slotEv[idx], run = RHS.run;
     if (e && e.done) return; /* a second finger on the same cat is not an empty-box miss */
     if (e && Math.abs(t - e.t) <= e.half) {
-      var dt = Math.abs(t - e.t); e.done = true; e.doneT = t;
+      e.done = true; e.doneT = t;
       if (e.fake) {
-        RHS.combo = 0; RHS.lives--; slots[idx].classList.add('bad'); slots[idx].querySelector('.rh-mark').textContent = '纸片！'; rhJudgeSay('假的！'); tone(190, clock(), 0.22, 'sawtooth', 0.22, 70);
-        rhPaint(); if (RHS.lives <= 0) rhFinish(true);
+        var r = HSL.onPaperTap(run);
+        slotFx(idx, 'bad', '纸片！', 720); sfxTear();
+        if (r.lostLife) buzz([30, 40, 30]);
+        rhPaint(); if (run.failed) rhFinish(true);
       } else {
-        var q = dt <= 0.09 ? 0 : dt <= 0.15 ? 1 : 2, base = [100, 70, 40][q];
-        RHS.realSeen++; RHS.hits++; if (q === 0) RHS.perfects++; RHS.combo++; if (RHS.combo > RHS.maxCombo) RHS.maxCombo = RHS.combo;
-        RHS.score += Math.round(base * (1 + Math.min(RHS.combo, 20) * 0.05));
-        rhJudgeSay(['完美！', '很好', '还行'][q]); slots[idx].classList.remove('bad'); slots[idx].classList.add('ok'); slots[idx].querySelector('.rh-mark').textContent = ['完美', '很好', '摸到啦'][q];
-        var f = SCALE[Math.min(RHS.combo - 1, SCALE.length - 1)], now0 = clock(); tone(f, now0, 0.28, 'sine', 0.32); tone(f * 2, now0, 0.14, 'triangle', 0.07);
-        if (q < 2) { var r = stage.getBoundingClientRect(), b = slots[idx].getBoundingClientRect(); heartAt(b.left - r.left + b.width / 2, b.top - r.top + 12); }
+        var q = HSL.quality(Math.abs(t - e.t)), hit = HSL.onHit(run, q);
+        slotFx(idx, 'ok', ['完美', '很好', '摸到啦'][q], 650); sfxHit(run.combo); buzz(12);
+        rhHeart(idx);
+        if (hit.milestone) comboGlow();
         rhPaint();
       }
-    } else {
-      RHS.score = Math.max(0, RHS.score - 20); RHS.combo = 0; rhJudgeSay('慢一点点～'); tone(140, clock(), 0.1, 'sine', 0.15, 100); rhPaint();
+    } else { /* 点空箱子：第 1–2 关不影响；第 3 关起连击清零，不扣分 */
+      HSL.onEmptyTap(run); slotFx(idx, 'empty', '空的', 560); sfxThud(); rhPaint();
     }
   }
   function rhSettle(dead) {
     if (!RHS || RHS.settled) return RHS && RHS.result;
     RHS.settled = true;
-    var acc = RHS.realSeen ? RHS.hits / RHS.realSeen : 0;
-    var grade = dead ? 'C' : acc >= 0.95 ? 'S' : acc >= 0.85 ? 'A' : acc >= 0.7 ? 'B' : 'C';
-    var coins = Math.round(RHS.hits * 0.5 + RHS.perfects * 0.5) + { S: 10, A: 6, B: 3, C: 0 }[grade];
-    var record = RHS.score > (S.bestBeat || 0);
-    if (record) S.bestBeat = RHS.score;
-    S.mood = clamp(S.mood + Math.min(25, Math.round(RHS.hits / 3))); S.hunger = clamp(S.hunger - 2); S.energy = clamp(S.energy - 3);
-    addFish(coins); save();
-    return (RHS.result = { grade: grade, coins: coins, record: record, dead: dead, acc: acc });
+    var run = RHS.run, res;
+    if (RHS.level) {
+      var s = HSL.settleLevel(S.hs, RHS.idx, !dead, run.hits, run.paperTaps);
+      S.hs = s.hs;
+      res = { level: true, cleared: !dead, stars: s.stars, total: s.total, fish: s.fish, firstClear: s.firstClear, firstPerfect: s.firstPerfect, unlockedNext: s.unlockedNext };
+    } else {
+      var er = HSL.endlessReward(run.hits, run.perfects, run.realSeen, dead), record = run.score > (S.bestBeat || 0);
+      if (record) S.bestBeat = run.score;
+      res = { level: false, grade: er.grade, fish: er.fish, record: record, dead: dead };
+    }
+    S.mood = clamp(S.mood + Math.min(25, Math.round(run.hits / 3))); S.hunger = clamp(S.hunger - 2); S.energy = clamp(S.energy - 3);
+    addFish(res.fish); save();
+    RH.fish += res.fish; if (res.cleared) RH.cleared++;
+    return (RHS.result = res);
   }
   function rhFinish(dead) {
     if (!RHS || RHS.ended) return;
     RHS.ended = true; clearInterval(RHS.sched); cancelAnimationFrame(RHS.raf);
-    var r = rhSettle(dead);
-    rhClearSlots();
-    $('#rhTitle').textContent = dead ? '奶团躲远了……' : '等级 ' + r.grade;
-    $('#rhSub').textContent = '得分 ' + RHS.score + (r.record ? ' · 新纪录！' : ' · 最高 ' + S.bestBeat);
-    $('#rhStats').textContent = '命中 ' + RHS.hits + ' / ' + RHS.realSeen + ' · 完美 ' + RHS.perfects + ' · 最高连击 ' + RHS.maxCombo + ' · 识破假猫 ' + RHS.dodged;
-    $('#rhRew').textContent = '小鱼干 +' + r.coins;
+    var r = rhSettle(dead), run = RHS.run, idx = RHS.idx;
+    rhClearSlots(); rhTipEl.hidden = true;
+    var starsEl = $('#rhStars'), next = $('#rhNext'), note = '';
+    if (r.level) {
+      if (r.cleared) rhJudgeSay('过关！');
+      $('#rhTitle').textContent = r.cleared ? '过关！' : '奶团躲远了……';
+      $('#rhSub').textContent = rhLevelName(idx);
+      starsEl.hidden = false; starsEl.innerHTML = starsHTML(r.stars, 'span'); starsEl.setAttribute('aria-label', r.stars + ' 颗星');
+      $('#rhStats').textContent = '命中 ' + run.hits + ' / ' + r.total + ' · 最高连击 ' + run.maxCombo + ' · 识破纸片猫 ' + run.dodged + ' 只';
+      if (r.firstClear) note = '第一次通过这一关！';
+      if (r.firstPerfect) note += (note ? '\n' : '') + '第一次三星，多送 ' + HSL.PERFECT_BONUS + ' 个';
+      if (r.unlockedNext) note += (note ? '\n' : '') + (idx + 1 === HSL.ENDLESS ? '无尽模式解锁了' : '第 ' + (idx + 2) + ' 关解锁了');
+      var canNext = r.cleared && HSL.isUnlocked(S.hs, idx + 1);
+      next.hidden = !canNext; next.textContent = idx + 1 === HSL.ENDLESS ? '无尽模式' : '下一关';
+      next.classList.toggle('main', canNext); $('#rhAgain').classList.toggle('main', !canNext);
+    } else {
+      $('#rhTitle').textContent = dead ? '奶团躲远了……' : '无尽模式';
+      $('#rhSub').textContent = '得分 ' + run.score + (r.record ? ' · 新纪录！' : ' · 最高 ' + S.bestBeat);
+      starsEl.hidden = true; starsEl.innerHTML = '';
+      $('#rhStats').textContent = '命中 ' + run.hits + ' / ' + run.realSeen + ' · 最高连击 ' + run.maxCombo + ' · 识破纸片猫 ' + run.dodged + ' 只';
+      next.hidden = true; $('#rhAgain').classList.add('main');
+    }
+    $('#rhNote').textContent = note; $('#rhNote').hidden = !note;
+    $('#rhRew').textContent = '小鱼干 +' + r.fish;
     paintWish(rhOver.querySelector('.sg-card'), rhLeave);
-    setTimeout(function () { if (RH.active && RHS && RHS.ended) rhOver.hidden = false; }, 500);
+    setTimeout(function () { if (RH.active && RHS && RHS.ended && RHS.idx === idx) rhOver.hidden = false; }, r.cleared ? 750 : 500);
+  }
+  /* 「不玩了」：关卡打到一半就回选关（这局不算）；无尽模式没有终点，就在这里结算；在选关页就回房间。 */
+  function rhQuit() {
+    if (RHS && !RHS.ended) { if (!RHS.level) rhFinish(false); else rhMenuShow(); return; }
+    if (!rhMenu.hidden) { rhLeave(); return; }
+    rhMenuShow();
   }
   function rhLeave() {
-    if (RHS && !RHS.ended) { RHS.ended = true; clearInterval(RHS.sched); cancelAnimationFrame(RHS.raf); rhSettle(false); }
-    var r = RHS && RHS.result;
-    RH.active = false; hsEl.hidden = true; rhIntro.hidden = true; rhOver.hidden = true; rhClearSlots();
+    if (RHS && !RHS.ended && !RHS.level) { RHS.ended = true; clearInterval(RHS.sched); cancelAnimationFrame(RHS.raf); rhSettle(false); }
+    rhStopRun();
+    RH.active = false; RH.level = -1; hsEl.hidden = true; rhMenu.hidden = true; rhPaperIntro.hidden = true; rhOver.hidden = true; rhTipEl.hidden = true; rhClearSlots();
     stage.classList.remove('playing'); bubble.hidden = false; $('#catbox').style.visibility = ''; setChrome(false); setBusyUI(false); statsLeave();
-    if (r && RHS.hits > 0) {
-      if (r.grade === 'S' || r.grade === 'A') { setPose('happy', 2600); say('节奏躲猫猫 ' + r.grade + '，小鱼干 +' + r.coins + '！', 4200); }
-      else { setPose('shy', 2600); say('躲猫猫玩完了，小鱼干 +' + r.coins, 4200); }
+    if (RH.fish > 0) {
+      if (RH.cleared) { setPose('happy', 2600); say('躲猫猫过关啦，小鱼干 +' + RH.fish + '！', 4200); }
+      else { setPose('shy', 2600); say('躲猫猫玩完了，小鱼干 +' + RH.fish, 4200); }
     } else { setPose('sit', 2000); say('下次一起玩吧', 3200); }
     RHS = null; render(); save();
   }
   document.addEventListener('visibilitychange', function () {
     if (!RH.active || !RHS || RHS.ended) return;
-    if (document.hidden) { if (useAC) { try { AC.suspend(); } catch (e) {} } else rhLeave(); }
+    if (document.hidden) { if (useAC) { try { AC.suspend(); } catch (e) {} } else rhQuit(); }
     else if (useAC) { try { AC.resume(); } catch (e) {} }
   });
-  $('#rhGo').addEventListener('click', rhGo);
-  $('#rhAgain').addEventListener('click', rhGo);
-  $('#rhBack').addEventListener('click', rhLeave);
+  rhLevelsEl.addEventListener('click', function (ev) {
+    var b = ev.target && ev.target.closest ? ev.target.closest('.rh-lv') : null;
+    if (b && !b.disabled) rhPick(+b.getAttribute('data-lv'));
+  });
+  $('#rhPaperGo').addEventListener('click', function () { S.hs.paperSeen = true; save(); rhGo(2); });
+  $('#rhPaperBack').addEventListener('click', rhMenuShow);
+  $('#rhNext').addEventListener('click', function () { if (RHS) rhPick(RHS.idx + 1); });
+  $('#rhAgain').addEventListener('click', function () { if (RH.level >= 0) rhGo(RH.level); });
+  $('#rhBack').addEventListener('click', rhMenuShow);
   $('#rhIntroQuit').addEventListener('click', rhLeave);
-  $('#hsQuit').addEventListener('click', rhLeave);
+  $('#hsQuit').addEventListener('click', rhQuit);
   rhSoundBtn.addEventListener('click', function () { setMute(!S.mute); });
 
 

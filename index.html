@@ -54,7 +54,7 @@
 @keyframes splash-fallback { to { visibility: hidden; pointer-events: none; } }
 @media (prefers-reduced-motion: reduce) { .splash-cat img, .splash-paws svg, .splash-status { animation: none !important; } .splash-paws svg { opacity: .6; } }
 </style>
-<link rel="stylesheet" href="style.css?v=acc-20261007">
+<link rel="stylesheet" href="style.css?v=levels-20261007">
 <link rel="stylesheet" href="decor-shop.css?v=cake-peach-20261007">
 <link rel="stylesheet" href="house.css?v=hints-20261004">
 <link rel="stylesheet" href="planner.css?v=immersive-20260929">
@@ -153,32 +153,44 @@
 
     <div class="hs" id="hs" hidden>
       <div class="hs-bar">
-        <span class="hs-score" id="rhScore">0</span>
-        <span class="rh-lives" id="rhLives" role="img" aria-label="剩余生命"></span>
         <button class="hs-quit" id="hsQuit" type="button">不玩了</button>
+        <span class="rh-level" id="rhLevel">躲猫猫</span>
+        <span class="rh-right"><span class="rh-lives" id="rhLives" role="img" aria-label="剩余 3 颗心"></span><span class="rh-score" id="rhScore" aria-label="得分">0</span></span>
       </div>
-      <div class="rh-prog" aria-hidden="true"><div class="rh-fill" id="rhFill"></div></div>
+      <div class="rh-prog" id="rhProg" aria-hidden="true"><div class="rh-fill" id="rhFill"></div></div>
       <div class="rh-judge" id="rhJudge" role="status"></div>
       <div class="slots" id="slots" data-rows="1"></div>
-      <div class="rh-info"><span id="rhBpm">BPM 84</span><span id="rhCombo">连击 0</span></div>
+      <div class="rh-tip" id="rhTip" hidden></div>
+      <div class="rh-info"><span id="rhCombo">连击 0</span></div>
 
-      <div class="sg-over" id="rhIntro" hidden>
-        <div class="sg-card" role="dialog" aria-label="躲猫猫的玩法">
+      <div class="sg-over" id="rhMenu" hidden>
+        <div class="sg-card rh-menucard" role="dialog" aria-label="躲猫猫选关">
           <h2>躲猫猫</h2>
-          <p>跟着节拍，在奶团从箱子里探出头的那一拍点它。箱子会越来越多，节奏会越来越快。</p>
-          <p><b>灰灰的纸片假猫</b>是陷阱，别点！点错或者让真猫溜走，都会掉一颗心。</p>
-          <p id="rhBest">最高分 0</p>
-          <div class="sg-btns"><button id="rhSound" type="button">音效：开</button><button id="rhGo" class="main" type="button">开始</button></div>
-          <button class="hs-quit" id="rhIntroQuit" type="button">回房间</button>
+          <p>跟着节拍，在奶团探出头的那一拍点它。哪个箱子先抖一下，下一拍奶团就从那里探头。</p>
+          <div class="rh-levels" id="rhLevels"></div>
+          <div class="sg-btns"><button id="rhSound" type="button">音效：开</button><button id="rhIntroQuit" type="button">回房间</button></div>
+        </div>
+      </div>
+      <div class="sg-over" id="rhPaperIntro" hidden>
+        <div class="sg-card rh-papercard" role="dialog" aria-label="纸片猫来了">
+          <h2>纸片猫来了</h2>
+          <div class="rh-demo" aria-hidden="true">
+            <figure><div class="slot demo"><img src="assets/peekc.webp" alt=""></div><figcaption>真奶团：点它</figcaption></figure>
+            <figure><div class="slot demo fake"><span class="rh-paper"><span class="rh-sway"><span class="rh-stick"></span><span class="rh-half l"></span><span class="rh-half r"></span></span></span></div><figcaption>纸片猫：别点</figcaption></figure>
+          </div>
+          <p><b>插在小棍上、会晃的是纸片猫，别点它！</b></p>
+          <div class="sg-btns"><button id="rhPaperBack" type="button">返回选关</button><button id="rhPaperGo" class="main" type="button">知道啦，开始</button></div>
         </div>
       </div>
       <div class="sg-over" id="rhOver" hidden>
-        <div class="sg-card" role="dialog" aria-label="本局结果">
-          <h2 id="rhTitle">等级 S</h2>
+        <div class="sg-card rh-resultcard" role="dialog" aria-label="本局结果">
+          <h2 id="rhTitle">过关！</h2>
           <p id="rhSub"></p>
+          <div class="cq-stars rh-stars" id="rhStars" role="img"></div>
           <p id="rhStats"></p>
+          <p class="rh-note" id="rhNote" hidden></p>
           <div class="rew" id="rhRew">小鱼干 +0</div>
-          <div class="sg-btns"><button id="rhBack" type="button">回房间</button><button id="rhAgain" class="main" type="button">再来一次</button></div>
+          <div class="sg-btns rh-btns"><button id="rhNext" type="button" hidden>下一关</button><button id="rhAgain" type="button">再来一次</button><button id="rhBack" type="button">返回选关</button></div>
         </div>
       </div>
     </div>
@@ -407,7 +419,8 @@
 <script src="sound.js?v=jelly-20261004"></script>
 <script src="bgm.js?v=games-music-20261003"></script>
 <script src="accessory-slots.js?v=acc-20261004"></script>
-<script src="game.js?v=hints-20261004"></script>
+<script src="hide-seek-levels.js?v=levels-20261007"></script>
+<script src="game.js?v=levels-20261007"></script>
 <script src="queue.js?v=wish-20261007"></script>
 <script src="lion-physics.js?v=lion-20261004e"></script>
 <script src="lion.js?v=lion-20261004e"></script>
