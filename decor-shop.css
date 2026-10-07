@@ -18,3 +18,5 @@
 .app.shopping .bubble { display: none; }
 .shop .item, .shop .tab, .shop .buybtn { scroll-margin-top: 35svh; }
 
+/* 布置时小物件浮在家具上面，方便摆放（家具此时是 4，选中的仍是 6） */
+.room-scene.arranging .prop.decor-prop[data-placement="surface"]:not(.room-selected) { z-index: 5; }
