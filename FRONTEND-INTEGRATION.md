@@ -2,7 +2,7 @@
 
 本次主前端施工只修改 index.html、house.css、house.js、life.js，以及 game.js / queue.js 的小范围接口。
 最新分工：日历、自习室、待办专项独立创建或修改 planner-state.js、planner.js、planner.css；主前端不会写这些文件。
-当前 index.html 引入顺序为 game.js → queue.js → life.js → photo-store.js → journal-state.js → journal.js → planner-state.js → study-ambience.js → planner.js → backup.js → house.js。
+当前 index.html 引入顺序为 hide-seek-levels.js → game.js → queue.js → life.js → photo-store.js → journal-state.js → journal.js → planner-state.js → study-ambience.js → planner.js → backup.js → house.js。
 life.js 只拥有单词与饮食卡片、公共存档 API；待办的渲染与事件也由专项接管。
 专项可以把独立状态放在 life.planner；read/update 完整保留该对象。
 如果暴露 NaituanPlanner.totalFocusMinutes()，我的页面会用它显示累计专注分钟。

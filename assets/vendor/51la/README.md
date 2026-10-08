@@ -32,7 +32,9 @@ sha256sum assets/vendor/51la/js-sdk-pro-1.58.3.min.js
 | `#/games` | 小游戏列表 |
 | `#/profile` | 我的 |
 | `#/shop` | 小铺 |
-| `#/games/hide` | 躲猫猫 |
+| `#/games/hide` | 躲猫猫（选关页） |
+| `#/games/hide/L1` … `#/games/hide/L5` | 躲猫猫第 1–5 关 |
+| `#/games/hide/endless` | 躲猫猫无尽模式 |
 | `#/games/stack` | 堆纸箱 |
 | `#/games/cake` | 蛋糕店（排好队） |
 | `#/cake-book` | 蛋糕图鉴 |

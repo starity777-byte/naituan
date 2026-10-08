@@ -238,14 +238,13 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .rh-info span { padding: 1px 10px; background: var(--panel); border: 2px solid var(--ink); border-radius: 12px; }
 .rh-info span.beat { animation: beatpulse .18s ease-out; }
 @keyframes beatpulse { 0% { transform: scale(1.14); } 100% { transform: scale(1); } }
-.slots { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr)); gap: 8px; flex: 0 1 auto; min-height: 0;
+.slots { position: relative; isolation: isolate; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr)); gap: 8px; flex: 0 1 auto; min-height: 0;
   height: calc(var(--rows, 1) * 200px + (var(--rows, 1) - 1) * 8px); align-self: stretch; touch-action: none; }
 .slots[data-rows="1"] { --rows: 1; } .slots[data-rows="2"] { --rows: 2; } .slots[data-rows="3"] { --rows: 3; }
 .slot { position: relative; min-width: 0; min-height: 0; padding: 0; overflow: hidden; cursor: pointer; touch-action: none;
   border: 2.5px solid var(--ink); border-radius: 46% 46% 12px 12px / 30% 30% 12px 12px; background: var(--hole); box-shadow: inset 0 6px 0 rgba(0, 0, 0, .12); }
 .slot[hidden] { display: none; }
 .slot img { position: absolute; left: 50%; bottom: 3%; height: 92%; width: auto; max-width: none; pointer-events: none; will-change: transform; }
-.slot.fake img { filter: grayscale(var(--gray, 1)) contrast(.92) drop-shadow(0 0 2px #fff); }
 .slot.ok { border-color: var(--heart); animation: slotpop .28s ease-out; }
 .slot.bad { border-color: var(--alert); background: color-mix(in srgb, var(--alert) 38%, var(--hole)); animation: slotshake .3s linear; }
 @keyframes slotpop { 40% { transform: scale(1.07); } }
@@ -465,32 +464,112 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .cq-menu-note { font-size: 12px; color: #795944; background: #f4e8d5; padding: 9px 11px; border-radius: 12px; }
 .cq-foot .cq-btn { min-height: 42px; }
 
-/* Rhythm game: nine fixed cardboard boxes, revealed row by row. */
+/* Rhythm game: a level select page, then only the boxes a level needs (3 = one big row, 6 = two rows, 9 = three rows). */
 .house-app .hs { background: radial-gradient(ellipse at 50% 10%, #fff9ed 0%, #f0e2cb 65%); gap: 12px; }
+#hs > .hs-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
+.rh-level { min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: center; font: 15px var(--font-display); color: #684a36; }
+.rh-right { display: inline-flex; align-items: center; gap: 5px; }
+.rh-score { min-width: 2.4em; text-align: right; font-size: 12px; color: #7f624c; font-variant-numeric: tabular-nums; }
 .house-app .rh-judge { flex: 0 0 42px; min-height: 42px; font-size: 23px; }
 .house-app .rh-prog { height: 10px; border: 1.5px solid #c3ab91; background: #fff8ea; }
+.house-app .rh-prog[hidden] { display: none; }
 .house-app .rh-fill { background: #b0c7aa; transition: width .12s linear; }
-.house-app .slots { grid-template-rows: repeat(3, minmax(0, 1fr)); flex: 1 1 0; height: auto; max-height: 420px; margin: auto 0; gap: 13px 10px; padding: 10px 2px 4px; }
+.house-app .slots { grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr)); flex: 1 1 0; height: auto; max-height: 420px; margin: auto 0; gap: 13px 10px; padding: 10px 2px 4px; }
+.house-app .slots[data-rows="2"] { max-height: 320px; }
+.house-app .slots[data-rows="1"] { flex: 0 0 auto; height: min(200px, 34vh); gap: 10px 8px; }
 .house-app .slot { isolation: isolate; border: 2px solid #8c6950; border-radius: 12px 12px 16px 16px; background: linear-gradient(#bb9470, #9c7355); box-shadow: inset 0 7px 0 #72533a33, 0 3px 0 #c5ac8d; }
-.house-app .slot::before { content: ''; position: absolute; z-index: 2; left: -2px; right: -2px; top: -1px; height: 10%; border-bottom: 2px solid #8c6950; background: #e4c6a2; transform: skewX(-3deg); }
+.house-app .slot::before { content: ''; position: absolute; z-index: 2; left: -2px; right: -2px; top: -1px; height: 10%; border-bottom: 2px solid #8c6950; background: #e4c6a2; transform: skewX(-3deg); transform-origin: 50% 100%; }
 .house-app .slot::after { content: ''; position: absolute; z-index: 2; inset: 62% -2px -2px; border-top: 2px solid #8c6950; background: linear-gradient(90deg, #dfbc94 43%, #f5dfb8 43%, #f5dfb8 58%, #dfbc94 58%); border-radius: 0 0 12px 12px; box-shadow: inset 0 4px 0 #efcfaa; }
 .house-app .slot img { z-index: 1; bottom: 13%; width: 96%; height: auto; max-width: none; filter: drop-shadow(0 2px 0 #54392f28); }
-.house-app .slot.locked { opacity: .24; filter: saturate(.5); box-shadow: none; }
 .house-app .slot:active:not(:disabled) { border-color: #bd8970; }
-.house-app .slot.fake img { filter: grayscale(1) contrast(.8) drop-shadow(3px 0 0 #fff7e8) drop-shadow(-3px 0 0 #fff7e8); }
-.house-app .slot.fake { background-image: repeating-linear-gradient(125deg, #b99876 0 14px, #c3a383 14px 16px); }
 .house-app .slot.ok { border-color: #b8876c; animation: rh-box-soft .22s ease-out; }
 .house-app .slot.ok img { animation: rh-cat-soft .22s ease-out; }
-.house-app .slot.bad { border-color: #a67460; background: #bb9470; }
+.house-app .slot.bad { border-color: #a67460; }
+/* 预告：下一拍有猫的箱子，盖子先轻轻抖一下（约 0.25 秒） */
+.house-app .slot.wiggle::before { animation: rh-lid .25s ease-in-out; }
+.house-app .slot.wiggle { animation: rh-box-nudge .25s ease-in-out; }
+@keyframes rh-lid { 0%, 100% { transform: skewX(-3deg); } 25% { transform: translateY(-6px) rotate(-5deg) skewX(-3deg); background: #f2dcbc; } 55% { transform: translateY(-3px) rotate(4deg) skewX(-3deg); background: #f2dcbc; } 80% { transform: translateY(-1px) rotate(-1.5deg) skewX(-3deg); } }
+@keyframes rh-box-nudge { 25% { translate: -2px 0; } 60% { translate: 2px 0; } }
+
+/* 纸片猫：插在小棍上、颜色平平的纸片、右上角折角，升起来以后左右摇晃 ±6° */
+.rh-paper { position: absolute; inset: 0; z-index: 1; pointer-events: none; transform: translateY(100%); will-change: transform; }
+.rh-sway { position: absolute; left: 16%; right: 16%; top: 4%; bottom: 0; transform-origin: 50% 100%; }
+.slot.fake .rh-sway { animation: paper-sway .9s ease-in-out infinite alternate; }
+.slot.fake.bad .rh-sway { animation-play-state: paused; }
+@keyframes paper-sway { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+.rh-stick { position: absolute; left: calc(50% - 2.5px); width: 5px; top: 36%; bottom: -6%; border-radius: 2px; background: #9b6b44; box-shadow: inset -1.5px 0 0 #7a5034; }
+.rh-half { position: absolute; left: 0; right: 0; top: 0; height: 40%; overflow: hidden; border: 1.5px solid #cdbfac; border-radius: 4px; background: #fbf8f1; box-shadow: 0 2px 0 #54392f26; }
+.rh-half::before { content: ''; position: absolute; inset: 0; background: url(assets/peekc.webp) 50% 30% / 92% auto no-repeat; filter: grayscale(1) brightness(1.12) contrast(.8); }
+.rh-half.l { clip-path: polygon(0 0, 52% 0, 47% 18%, 54% 36%, 46% 54%, 53% 72%, 47% 88%, 51% 100%, 0 100%); }
+.rh-half.r { clip-path: polygon(52% 0, 100% 0, 100% 100%, 51% 100%, 47% 88%, 53% 72%, 46% 54%, 54% 36%, 47% 18%); }
+.rh-half.r::after { content: ''; position: absolute; top: -1px; right: -1px; width: 24%; aspect-ratio: 1; background: linear-gradient(225deg, #a98060 0 50%, #ddd2c2 50% 100%); border-bottom-left-radius: 3px; box-shadow: -1px 1px 1.5px #54392f40; }
+.slot.bad .rh-half.l { animation: rh-tear-l .42s ease-in forwards; }
+.slot.bad .rh-half.r { animation: rh-tear-r .42s ease-in forwards; }
+.slot.bad .rh-stick { animation: rh-fade .42s ease-in forwards; }
+@keyframes rh-tear-l { 20% { transform: translateX(-2px) rotate(-3deg); } 100% { transform: translate(-32%, 30%) rotate(-26deg); opacity: 0; } }
+@keyframes rh-tear-r { 20% { transform: translateX(2px) rotate(3deg); } 100% { transform: translate(32%, 30%) rotate(26deg); opacity: 0; } }
+@keyframes rh-fade { to { opacity: 0; } }
+/* assets/peek-paper.webp 存在时（阿琳画的纸片猫）：用这张图代替 CSS 纸片，小棍和摇晃保留 */
+.hs.paper-art .rh-half { height: 56%; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.hs.paper-art .rh-half::before { background: url(assets/peek-paper.webp) 50% 0 / contain no-repeat; filter: none; }
+.hs.paper-art .rh-half.r::after { display: none; }
+.hs.paper-art .rh-stick { top: 50%; }
+
+/* 箱子上的反馈：点中 / 溜走 / 纸片 / 空的 */
 .rh-impact { position: absolute; z-index: 4; top: 10%; right: 6%; color: #fff2ac; font-size: 26px; opacity: 0; pointer-events: none; }
 .slot.ok .rh-impact { animation: rh-spark .22s ease-out; }
-.rh-mark { position: absolute; z-index: 4; left: 0; right: 0; top: 30%; font: 15px var(--font-display); color: #684a36; text-shadow: 0 1px 0 #fff8e8, 1px 0 0 #fff8e8, -1px 0 0 #fff8e8; opacity: 0; pointer-events: none; }
-.slot.ok .rh-mark, .slot.bad .rh-mark { opacity: 1; animation: rh-label .22s ease-out; }
-.house-app .rh-info { margin-top: auto; color: #7f624c; }
+.rh-mark { position: absolute; z-index: 4; left: 0; right: 0; top: 30%; font: 15px var(--font-display); color: #684a36; text-shadow: 0 1px 0 #fff8e8, 1px 0 0 #fff8e8, -1px 0 0 #fff8e8, 0 -1px 0 #fff8e8; opacity: 0; pointer-events: none; }
+.slot.ok .rh-mark { animation: rh-label .65s ease-out forwards; }
+.slot.bad .rh-mark { color: #a0503c; animation: rh-label .72s ease-out forwards; }
+.slot.miss .rh-mark { top: 22%; color: #7d6a5c; animation: rh-label .72s ease-out forwards; }
+.slot.empty .rh-mark { top: 36%; font-size: 13px; color: #8f7866; animation: rh-label-soft .56s ease-out forwards; }
+.rh-smoke { position: absolute; z-index: 3; left: 27%; width: 46%; top: 40%; aspect-ratio: 1.3; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle at 28% 62%, #f4eee5 0 21%, transparent 22%), radial-gradient(circle at 54% 42%, #ece4d8 0 25%, transparent 26%), radial-gradient(circle at 76% 60%, #f4eee5 0 19%, transparent 20%), radial-gradient(circle at 50% 74%, #e6ddcf 0 18%, transparent 19%); }
+.slot.miss .rh-smoke { animation: rh-smoke .72s ease-out; }
+.house-app .slot.miss { animation: rh-dim .72s ease-out; }
+@keyframes rh-smoke { 0% { opacity: 0; transform: translateY(25%) scale(.5); } 25% { opacity: .95; } 100% { opacity: 0; transform: translateY(-60%) scale(1.15); } }
+@keyframes rh-dim { 0%, 55% { filter: brightness(.76) saturate(.8); } 100% { filter: none; } }
 @keyframes rh-box-soft { 30% { scale: 1.035 .98; } 70% { scale: .995 1.015; } }
 @keyframes rh-cat-soft { 25% { scale: 1.1 .87; } 65% { scale: .95 1.08; } }
 @keyframes rh-spark { 0% { opacity: 0; transform: scale(.5); } 35% { opacity: 1; } 100% { opacity: 0; transform: translate(5px,-10px) scale(1.25); } }
-@keyframes rh-label { from { transform: translateY(5px) scale(.9); } to { transform: translateY(-5px) scale(1); } }
+@keyframes rh-label { 0% { opacity: 0; transform: translateY(5px) scale(.9); } 18% { opacity: 1; transform: translateY(-3px) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-7px); } }
+@keyframes rh-label-soft { 0% { opacity: 0; } 25% { opacity: .6; } 70% { opacity: .6; } 100% { opacity: 0; } }
+/* 连击 10 / 20 / 30：箱子区域背后闪一圈淡淡的光 */
+.slots::before { content: ''; position: absolute; z-index: -1; inset: -16px -10px; border-radius: 30px; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at 50% 50%, #fff4c2 0%, #ffe7a066 48%, transparent 72%); }
+.slots.glow::before { animation: rh-glow .9s ease-out; }
+@keyframes rh-glow { 0% { opacity: 0; transform: scale(.94); } 30% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05); } }
+.house-app .rh-info { margin-top: auto; justify-content: center; color: #7f624c; }
+/* 第 1 关倒数时的小提示 */
+.rh-tip { position: absolute; z-index: 2; left: 50%; top: 27%; transform: translate(-50%, -50%); white-space: nowrap; padding: 10px 18px; border-radius: 18px;
+  background: #fffaf0f2; border: 1.5px solid #d8c4ab; box-shadow: 0 4px 16px #5b403424; font: 18px var(--font-display); color: #684a36; text-align: center; pointer-events: none; animation: judgepop .36s ease-out; }
+/* 选关页 */
+.rh-menucard { max-width: 340px; max-height: 100%; overflow-y: auto; }
+.rh-levels { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 2px; }
+.rh-lv { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 50px; padding: 8px 12px; text-align: left; color: inherit; font: inherit;
+  background: #fffaf2; border: 1px solid #d5c4b2; border-radius: 14px; box-shadow: 0 2px 0 #d5c4b2; cursor: pointer; }
+.rh-lv:active:not(:disabled) { translate: 0 2px; box-shadow: none; }
+.rh-lv:disabled { cursor: default; opacity: .6; box-shadow: none; background: #f3eadf; }
+.rh-lv .no { font: 400 20px var(--font-display); text-align: center; color: #8c6950; }
+.rh-lv .nm { font: 16px var(--font-display); color: #54392f; }
+.rh-lv .st { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; white-space: nowrap; }
+.rh-lv .stars { font-size: 17px; letter-spacing: 1px; line-height: 1; }
+.rh-lv .stars i { font-style: normal; color: #ddd0bd; }
+.rh-lv .stars i.on { color: var(--sun); -webkit-text-stroke: .8px #8c6950; }
+.rh-lv .lock { font-size: 15px; line-height: 1; }
+.rh-lv small { font-size: 11px; color: var(--ink-soft); }
+.rh-endless { background: #eef2e6; }
+/* 第一次进第 3 关：真奶团和纸片猫并排 */
+.rh-papercard { max-width: 320px; }
+.rh-demo { display: flex; justify-content: center; gap: 14px; margin: 4px 0 2px; }
+.rh-demo figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-soft); }
+.rh-demo .slot { position: relative; width: 104px; height: 124px; cursor: default; }
+.rh-demo .slot img { transform: translate(-50%, 0); }
+.rh-demo .slot .rh-paper { transform: none; }
+.rh-resultcard { max-width: 320px; }
+.rh-stars[hidden] { display: none; }
+.rh-note { color: #8a5a3c !important; font-size: 12.5px !important; white-space: pre-line; }
+.rh-btns button { padding-inline: 2px; font-size: 13.5px; }
 .cq-chapter { grid-column: 1 / -1; }
 .cq-lvbtn .nm { white-space: normal; align-items: flex-start; }
 

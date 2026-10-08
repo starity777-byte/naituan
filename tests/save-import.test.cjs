@@ -103,7 +103,7 @@ function boot(stored) {
     getComputedStyle: window.getComputedStyle, performance: { now: () => 0 }, console
   };
   vm.createContext(sandbox);
-  for (const file of ['decor-catalog.js', 'room.js', 'game.js', 'planner-state.js', 'life.js']) {
+  for (const file of ['decor-catalog.js', 'room.js', 'hide-seek-levels.js', 'game.js', 'planner-state.js', 'life.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), sandbox, { filename: file });
   }
   return { window, document, audio, store };
@@ -475,4 +475,58 @@ test('importSave restores the previous house when save() returns false', () => {
   assert.equal(store.get('naituan-house-v1'), before);
   assert.equal(sets, 1);
   assert.notEqual(document.getElementById('bubble').textContent, '存档导入好了');
+});
+
+/* ---------- 躲猫猫关卡进度 S.hs ---------- */
+test('an old save without hs gets hide-and-seek progress; bestBeat > 0 unlocks level 3', () => {
+  const stored = realisticHouse(JPEG);
+  assert.equal(stored.bestBeat, 2);
+  assert.equal(Object.prototype.hasOwnProperty.call(stored, 'hs'), false);
+  const { window } = boot(JSON.stringify(stored));
+  const state = window.NT.S();
+  assert.deepEqual(plain(state.hs), { unlocked: 3, stars: [0, 0, 0, 0, 0], cleared: [false, false, false, false, false], perfect: [false, false, false, false, false], paperSeen: false });
+  assert.equal(state.bestBeat, 2);
+  assertPlayerData(state, JPEG);
+  const fresh = boot(null).window.NT.S();
+  assert.equal(fresh.hs.unlocked, 1);
+  const neverPlayed = Object.assign(realisticHouse(JPEG), { bestBeat: 0 });
+  assert.equal(boot(JSON.stringify(neverPlayed)).window.NT.S().hs.unlocked, 1);
+});
+
+test('hide-and-seek progress survives export and import, and an old NT1 code without hs still imports', () => {
+  const { window, document } = boot(null);
+  const state = window.NT.S();
+  Object.assign(state, realisticHouse(JPEG));
+  state.hs = { unlocked: 6, stars: [3, 3, 2, 1, 2], cleared: [true, true, true, true, true], perfect: [true, true, false, false, false], paperSeen: true };
+  state.bestBeat = 4321;
+  click(document, 'btnSave');
+  const code = document.getElementById('saveText').value;
+  assert.deepEqual(decode(code).hs, state.hs);
+  assert.deepEqual(plain(window.NT.exportState().hs), plain(state.hs));
+  state.hs = { unlocked: 1, stars: [0, 0, 0, 0, 0], cleared: [false, false, false, false, false], perfect: [false, false, false, false, false], paperSeen: false };
+  document.getElementById('saveText').value = code;
+  click(document, 'saveLoad');
+  click(document, 'saveLoad');
+  assert.equal(document.getElementById('bubble').textContent, '存档导入好了');
+  assert.deepEqual(plain(window.NT.S().hs), { unlocked: 6, stars: [3, 3, 2, 1, 2], cleared: [true, true, true, true, true], perfect: [true, true, false, false, false], paperSeen: true });
+  assert.equal(window.NT.S().bestBeat, 4321);
+
+  const old = realisticHouse(JPEG);
+  old.bestBeat = 999;
+  document.getElementById('saveText').value = encode(old);
+  click(document, 'saveLoad');
+  click(document, 'saveLoad');
+  assert.equal(document.getElementById('bubble').textContent, '存档导入好了');
+  assert.equal(window.NT.S().hs.unlocked, 3);
+  assert.equal(window.NT.S().bestBeat, 999);
+  assertPlayerData(window.NT.S(), JPEG);
+
+  /* the full-backup path (backup.js → NT.restoreState) migrates the same way */
+  const restored = realisticHouse(JPEG);
+  assert.equal(window.NT.restoreState(restored), true);
+  assert.equal(window.NT.S().hs.unlocked, 3);
+  restored.hs = { unlocked: 2, stars: [1, 0, 0, 0, 0], cleared: [true, false, false, false, false], perfect: [false, false, false, false, false] };
+  assert.equal(window.NT.restoreState(restored), true);
+  assert.deepEqual(plain(window.NT.S().hs.stars), [1, 0, 0, 0, 0]);
+  assert.equal(window.NT.S().hs.unlocked, 2);
 });
