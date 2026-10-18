@@ -792,6 +792,8 @@
     if (RHS && !RHS.ended) { RHS.ended = true; clearInterval(RHS.sched); cancelAnimationFrame(RHS.raf); }
   }
   function rhMenuShow() {
+    // Returning keeps earned fish, without clearing or unlocking an unfinished level.
+    if (RHS && !RHS.ended) rhSettle(true);
     rhStopRun(); RHS = null; RH.level = -1;
     rhClearSlots(); rhOver.hidden = true; rhPaperIntro.hidden = true; rhTipEl.hidden = true;
     rhJudge.textContent = ''; rhFill.style.width = '0'; rhLevelEl.textContent = '躲猫猫'; rhPaint();
@@ -992,7 +994,7 @@
     paintWish(rhOver.querySelector('.sg-card'), rhLeave);
     setTimeout(function () { if (RH.active && RHS && RHS.ended && RHS.idx === idx) rhOver.hidden = false; }, r.cleared ? 750 : 500);
   }
-  /* 「不玩了」：关卡打到一半就回选关（这局不算）；无尽模式没有终点，就在这里结算；在选关页就回房间。 */
+  /* 「不玩了」：关卡中途回选关并按命中结算，不算通关；无尽模式在这里结算；选关页则回房间。 */
   function rhQuit() {
     if (RHS && !RHS.ended) { if (!RHS.level) rhFinish(false); else rhMenuShow(); return; }
     if (!rhMenu.hidden) { rhLeave(); return; }
@@ -1071,7 +1073,7 @@
   function sgSettle() {
     if (SG.settled) return; SG.settled = true;
     SG.floors = SG.tower.length - 1;
-    var earned = SG.floors + SG.perfects;
+    var earned = SG.floors * 4 + SG.perfects * 2 + Math.floor(SG.floors / 5) * 5;
     SG.earned = earned; SG.record = SG.floors > S.best;
     if (SG.record) S.best = SG.floors;
     S.mood = clamp(S.mood + Math.min(20, SG.floors * 2)); S.hunger = clamp(S.hunger - 2); S.energy = clamp(S.energy - 3);

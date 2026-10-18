@@ -239,50 +239,51 @@ test('星星：通过 1 星；命中率 ≥80% 2 星；≥95% 且没点纸片猫
   assert.equal(H.starsFor(true, 20, 20, 0), 3);
 });
 
-test('首次通关奖励 15/20/25/30/40，首次三星 +10，重复游玩 命中×0.5 四舍五入、最多 10', () => {
+test('首通保底 35/50/65/80/100，首次三星 +20，重玩按命中和星级计奖', () => {
   const total = L.map(l => H.realCount(l));
   for (let i = 0; i < 5; i++) {
     const r = H.settleLevel(H.freshHs(), i, true, Math.ceil(total[i] * 0.85), 0);
     assert.equal(r.firstClear, true);
     assert.equal(r.stars, 2);
-    assert.equal(r.fish, [15, 20, 25, 30, 40][i]);
+    assert.equal(r.fish, [35, 50, 65, 80, 100][i]);
   }
-  /* 第一次就三星：首通 + 10 */
+  /* 第一次就三星：命中 24 + 星级 15 高于保底 35，再加首次三星 20。 */
   const perfect = H.settleLevel(H.freshHs(), 0, true, total[0], 0);
-  assert.equal(perfect.stars, 3); assert.equal(perfect.fish, 25); assert.equal(perfect.firstPerfect, true);
+  assert.equal(perfect.stars, 3); assert.equal(perfect.fish, 59); assert.equal(perfect.firstPerfect, true);
   assert.equal(perfect.hs.perfect[0], true);
-  /* 已经通过，这次第一次三星：重复奖励 + 10 */
+  /* 已经通过，这次第一次三星：正常收入 + 20。 */
   let hs = H.settleLevel(H.freshHs(), 3, true, Math.floor(total[3] * 0.78), 0).hs;
   assert.equal(hs.stars[3], 1);
   const later = H.settleLevel(hs, 3, true, total[3], 0);
   assert.equal(later.firstClear, false); assert.equal(later.firstPerfect, true);
-  assert.equal(later.fish, Math.min(10, Math.round(total[3] * 0.5)) + 10);
-  /* 再拿一次三星，不再给 +10 */
+  assert.equal(later.fish, 79);
+  /* 再拿一次三星，不重复发首次三星奖励。 */
   const again = H.settleLevel(later.hs, 3, true, total[3], 0);
-  assert.equal(again.firstPerfect, false); assert.equal(again.fish, 10);
-  /* 重复游玩上限与四舍五入 */
+  assert.equal(again.firstPerfect, false); assert.equal(again.fish, 59);
+  /* 重玩无旧的 10 条封顶，收入随命中与星级增长。 */
   hs = H.settleLevel(H.freshHs(), 0, true, 12, 0).hs;
-  assert.equal(H.settleLevel(hs, 0, true, 5, 0).fish, 3);   /* 2.5 → 3 */
-  assert.equal(H.settleLevel(hs, 0, true, 7, 0).fish, 4);   /* 3.5 → 4 */
-  assert.equal(H.settleLevel(hs, 0, true, 12, 1).fish, 6);
+  assert.equal(H.settleLevel(hs, 0, true, 5, 0).fish, 15);
+  assert.equal(H.settleLevel(hs, 0, true, 7, 0).fish, 19);
+  assert.equal(H.settleLevel(hs, 0, true, 12, 1).fish, 34);
   hs = H.settleLevel(H.freshHs(), 4, true, total[4], 1).hs;
-  assert.equal(H.settleLevel(hs, 4, true, 28, 1).fish, 10); /* 14 → 最多 10 */
-  /* 没过关：不算首通，按重复游玩算，星星和进度不变 */
+  assert.equal(H.settleLevel(hs, 4, true, 28, 1).fish, 66);
+  /* 没过关：只按已有命中计奖，星星和进度不变。 */
   const fail = H.settleLevel(H.freshHs(), 2, false, 4, 1);
-  assert.equal(fail.stars, 0); assert.equal(fail.fish, 2); assert.equal(fail.firstClear, false);
+  assert.equal(fail.stars, 0); assert.equal(fail.fish, 8); assert.equal(fail.firstClear, false);
   assert.deepEqual(plain(fail.hs), plain(H.freshHs()));
   /* 星星只记最好成绩 */
   const best = H.settleLevel(H.settleLevel(H.freshHs(), 0, true, 12, 0).hs, 0, true, 2, 0);
   assert.equal(best.stars, 1); assert.equal(best.hs.stars[0], 3);
 });
 
-test('无尽模式沿用原来的小鱼干公式', () => {
-  assert.deepEqual(H.endlessReward(40, 20, 41, false), { grade: 'S', acc: 40 / 41, fish: 40 });
+test('无尽模式按命中、完美和评级计奖，零命中为零', () => {
+  assert.deepEqual(H.endlessReward(40, 20, 41, false), { grade: 'S', acc: 40 / 41, fish: 120 });
   assert.equal(H.endlessReward(17, 4, 20, false).grade, 'A');
-  assert.equal(H.endlessReward(17, 4, 20, false).fish, 17);
+  assert.equal(H.endlessReward(17, 4, 20, false).fish, 50);
   assert.equal(H.endlessReward(30, 10, 31, true).grade, 'C');
-  assert.equal(H.endlessReward(30, 10, 31, true).fish, 20);
+  assert.equal(H.endlessReward(30, 10, 31, true).fish, 70);
   assert.equal(H.endlessReward(0, 0, 0, true).fish, 0);
+  assert.equal(H.endlessReward(0, 0, 0, false).fish, 0);
 });
 
 /* ---------- 解锁 ---------- */

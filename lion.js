@@ -18,10 +18,11 @@
   root.innerHTML =
     '<div class="ml-play">' +
       '<div class="ml-bar"><span class="cq-chip" id="mlScore">0</span><span class="cq-chip" id="mlBest">最高 0</span><button class="hs-quit" id="mlQuit" type="button">不玩了</button></div>' +
+      '<p class="ml-income" id="mlIncome">本局小鱼干 +0 · 随合成存入</p>' +
       '<canvas id="mlCanvas" aria-label="合成大狮子：点一下或拖动选位置，放开就放下动物"></canvas>' +
     '</div>' +
     '<div class="sg-over" id="mlIntro" hidden><div class="sg-card" role="dialog" aria-label="合成大狮子的玩法">' +
-      '<h2>合成大狮子</h2><p>点一下或拖动选位置，放开就放下动物。</p><p>两只一样的碰在一起，会变成更大的一种，一路合成到最大的白虎。</p><p>动物堆过虚线太久，这一局就结束啦。</p><p id="mlIntroBest"></p>' +
+      '<h2>合成大狮子</h2><p>点一下或拖动选位置，放开就放下动物。</p><p>两只一样的碰在一起，会变成更大的一种，一路合成到最大的白虎。</p><p>动物堆过虚线太久，这一局就结束啦。</p><p>每 10 分换 1 条小鱼干，合成高级动物另有奖励。小鱼干随合成存入，中途回小屋也保留。</p><p id="mlIntroBest"></p>' +
       '<div class="sg-btns"><button id="mlIntroBack" type="button">回房间</button><button id="mlGo" class="main" type="button">开始</button></div></div></div>' +
     '<div class="sg-over" id="mlOver" hidden><div class="sg-card" role="dialog" aria-label="本局结果">' +
       '<h2 id="mlTitle"></h2><p id="mlSub"></p><p id="mlTopLine"></p><p class="rew" id="mlRew"></p>' +
@@ -68,13 +69,25 @@
   function pick() { return POOL[Math.floor(Math.random() * POOL.length)]; }
   function newGame() {
     world = PH.create();
-    G = { state: 'idle', score: 0, held: pick(), next: pick(), aimX: world.width / 2, aiming: false, cool: 0, combo: 0, comboAt: -9, topLevel: -1, lion: false, parts: [], pops: [], settled: false, earned: 0, record: false, shake: 0, overAt: 0, landAt: -9 };
+    G = { state: 'idle', score: 0, held: pick(), next: pick(), aimX: world.width / 2, aiming: false, cool: 0, combo: 0, comboAt: -9, topLevel: -1, lion: false, parts: [], pops: [], settled: false, earned: 0, paid: 0, record: false, shake: 0, overAt: 0, landAt: -9 };
     acc = 0; paintBar(); elOver.hidden = true;
   }
   function paintBar() {
     var S = NT.S();
     elScore.textContent = G ? G.score : 0;
     elBest.textContent = '最高 ' + Math.max(S.bestLion || 0, G ? G.score : 0);
+    $('#mlIncome').textContent = '本局小鱼干 +' + (G ? lionReward() : 0) + ' · 随合成存入';
+  }
+  function lionReward() {
+    if (!G || !G.score) return 0;
+    var milestones = [0, 0, 0, 0, 5, 10, 20, 35, 55, 85, 130, 190, 280];
+    return Math.max(1, Math.floor(G.score / 10)) + milestones[Math.max(0, Math.min(TOP, G.topLevel))];
+  }
+  function bankReward() {
+    if (!G || G.settled) return;
+    var total = lionReward(), delta = total - G.paid;
+    if (delta <= 0) return;
+    G.paid = total; NT.addFish(delta); NT.save();
   }
   function canDrop() { return active && G && G.state === 'play' && G.held != null && G.cool <= 0 && !world.over; }
   function clampAim(x) { var r = G.held != null ? world.radius(G.held) : 20; return Math.max(r, Math.min(world.width - r, x)); }
@@ -112,7 +125,7 @@
         finish();
       }
     });
-    paintBar();
+    bankReward(); paintBar();
   }
   function settle() {
     if (!G || G.settled || !G.score) return;
@@ -121,9 +134,9 @@
     G.record = G.score > (S.bestLion || 0);
     if (G.record) S.bestLion = G.score;
     if (top > (S.lionTop || 0)) S.lionTop = top;
-    G.earned = Math.min(40, Math.floor(G.score / 100) + (top >= 7 ? top - 6 : 0) + (G.lion ? 10 : 0));
+    G.earned = lionReward();
     S.mood = NT.clamp(S.mood + Math.min(20, Math.floor(G.score / 60))); S.hunger = NT.clamp(S.hunger - 2); S.energy = NT.clamp(S.energy - 3);
-    NT.addFish(G.earned); NT.save();
+    NT.addFish(Math.max(0, G.earned - G.paid)); G.paid = G.earned; NT.save();
   }
   function finish() {
     if (!G || G.state === 'over') return;

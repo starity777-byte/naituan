@@ -243,7 +243,7 @@
     var targets = starTargets();
     note.textContent = (G.revealDepth === 1 ? '只看队首' : '前两只看得见') + ' · 揭晓后会记住 · 撤销免费' +
       (G.challenge || lv >= 20 ? '，探索计步' : '，慢慢想') +
-      (targets ? ' · 3 星 ≤ ' + targets[0] + ' 步' : '') + (G.challenge ? ' · 本关奖励 +' + G.rules.reward : '');
+      (targets ? ' · 3 星 ≤ ' + targets[0] + ' 步' : '') + (G.challenge ? ' · 基础奖励 +' + (G.rules.reward * 2) : '');
     for (var i = 0; i < G.lanes.length; i++) (function (i) {
       var d = document.createElement('div'); d.className = 'cq-lane'; d.setAttribute('data-i', i);
       d.setAttribute('role', 'button'); d.tabIndex = 0;
@@ -409,7 +409,7 @@
     var targets = starTargets(), c = cq(), S = NT.S(), lv = G.lv;
     var st = targets ? (G.steps <= targets[0] ? 3 : G.steps <= targets[1] ? 2 : 1) : stars(G.steps, G.par, G.limit);
     var first = !G.challenge && c.cleared[lv] === 0;
-    var fish = G.challenge ? G.rules.reward + st * 3 : 3 + (lv + 1) * 2 + st * 2;
+    var fish = G.challenge ? G.rules.reward * 2 + st * 5 : 15 + (lv + 1) * 5 + st * 5;
     if (G.challenge) c.challenges[G.challenge.mode].best = Math.max(c.challenges[G.challenge.mode].best, G.challenge.round);
     else c.cleared[lv] = Math.max(c.cleared[lv], st);
     NT.addFish(fish); S.mood = NT.clamp(S.mood + 8); S.hunger = NT.clamp(S.hunger - 1); S.energy = NT.clamp(S.energy - 2);

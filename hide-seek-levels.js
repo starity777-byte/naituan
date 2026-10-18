@@ -46,9 +46,8 @@
               '8','', '4+f6','f1','','5h', '4+f8',''] }
   ];
   var ENDLESS = 5;                          /* level index used for 无尽模式 */
-  var FIRST_CLEAR = [15, 20, 25, 30, 40];   /* 第一次通过第 1–5 关 */
-  var PERFECT_BONUS = 10;                   /* 第一次拿到这关的三星 */
-  var REPLAY_CAP = 10;                      /* 重复游玩每局最多 */
+  var FIRST_CLEAR = [35, 50, 65, 80, 100];   /* 第一次通过第 1–5 关的保底 */
+  var PERFECT_BONUS = 20;                   /* 第一次拿到这关的三星 */
   var MAX_LIVES = 3;
 
   /* 露头时间（单边）：不少于 0.3 秒，也就是从探头到缩回至少 0.6 秒。 */
@@ -176,7 +175,7 @@
   function settleLevel(hs, idx, cleared, hits, paperTaps) {
     var total = realCount(LEVELS[idx]), stars = starsFor(cleared, hits, total, paperTaps), next = copyHs(hs);
     var firstClear = cleared && !hs.cleared[idx], firstPerfect = stars === 3 && !hs.perfect[idx];
-    var base = firstClear ? FIRST_CLEAR[idx] : Math.min(REPLAY_CAP, Math.round(hits * 0.5));
+    var base = Math.max(firstClear ? FIRST_CLEAR[idx] : 0, hits * 2 + stars * 5);
     var fish = base + (firstPerfect ? PERFECT_BONUS : 0);
     if (cleared) {
       next.cleared[idx] = true;
@@ -187,11 +186,11 @@
     return { hs: next, stars: stars, total: total, fish: fish, firstClear: firstClear, firstPerfect: firstPerfect,
       unlockedNext: cleared && hs.unlocked < idx + 2 };
   }
-  /* 无尽模式：原来 rhSettle 的公式。 */
+  /* 无尽模式：命中、完美和等级共同计奖，零命中不发奖。 */
   function endlessReward(hits, perfects, realSeen, dead) {
     var acc = realSeen ? hits / realSeen : 0;
     var grade = dead ? 'C' : acc >= 0.95 ? 'S' : acc >= 0.85 ? 'A' : acc >= 0.7 ? 'B' : 'C';
-    return { grade: grade, acc: acc, fish: Math.round(hits * 0.5 + perfects * 0.5) + { S: 10, A: 6, B: 3, C: 0 }[grade] };
+    return { grade: grade, acc: acc, fish: hits ? hits * 2 + perfects + { S: 20, A: 12, B: 6, C: 0 }[grade] : 0 };
   }
 
   /* ---- 存档：清理 / 老存档迁移 ---- */
@@ -214,7 +213,7 @@
     return hs;
   }
 
-  return { COUNTIN: COUNTIN, LEVELS: LEVELS, ENDLESS: ENDLESS, FIRST_CLEAR: FIRST_CLEAR, PERFECT_BONUS: PERFECT_BONUS, REPLAY_CAP: REPLAY_CAP, MAX_LIVES: MAX_LIVES,
+  return { COUNTIN: COUNTIN, LEVELS: LEVELS, ENDLESS: ENDLESS, FIRST_CLEAR: FIRST_CLEAR, PERFECT_BONUS: PERFECT_BONUS, MAX_LIVES: MAX_LIVES,
     ENDLESS_BPM0: ENDLESS_BPM0, ENDLESS_BPM1: ENDLESS_BPM1,
     halfFor: halfFor, parseCell: parseCell, parseChart: parseChart, levelBeats: levelBeats, realCount: realCount, paperCount: paperCount,
     endlessBpm: endlessBpm, createEndless: createEndless,

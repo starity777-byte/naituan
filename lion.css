@@ -6,6 +6,7 @@
 .ml-play { height: 100%; display: flex; flex-direction: column; gap: 4px; padding: max(12px, env(safe-area-inset-top, 0px)) 12px 8px; box-sizing: border-box; }
 .ml-bar { display: flex; align-items: center; gap: 8px; flex: none; }
 .ml-bar .hs-quit { margin-left: auto; }
+.ml-income { flex: none; margin: 0; color: #87664e; font-size: 12px; line-height: 1.6; }
 .ml-play canvas { flex: 1; min-height: 0; width: 100%; display: block; touch-action: none; cursor: pointer; user-select: none; -webkit-user-select: none; }
 .lion-art { background: #efdfb4; }
 .lion-art img { width: 65%; max-height: 90px; }
