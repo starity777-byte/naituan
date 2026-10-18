@@ -322,16 +322,32 @@
   /* 毫秒。注意别叫 clock：躲猫猫里已经有一个按秒算的 clock()。 */
   function accNow() { return window.performance && performance.now ? performance.now() : Date.now(); }
   function accSheet(pose) {
-    if (!ACC_SHEETS[pose]) {
-      var im = new Image(); im.decoding = 'async';
-      im.onload = function () { accRefresh(); };
-      im.src = 'assets/sheets/' + pose + '.webp?v=acc-20261004';
-      ACC_SHEETS[pose] = im;
+    if (!Object.prototype.hasOwnProperty.call(ACC_SHEETS, pose)) {
+      ACC_SHEETS[pose] = null;
+      if (window.NaituanAssets) {
+        window.NaituanAssets.image('assets/sheets/' + pose + '.webp', '饰品贴图').then(function (im) {
+          ACC_SHEETS[pose] = im; accRefresh();
+        }).catch(function () {});
+      } else {
+        var im = new Image(); im.decoding = 'async';
+        im.onload = function () { accRefresh(); };
+        im.src = 'assets/sheets/' + pose + '.webp?v=acc-20261004';
+        ACC_SHEETS[pose] = im;
+      }
     }
     return ACC_SHEETS[pose];
   }
   function accLook(src) {
-    if (!ACC_LOOKS[src]) { var im = new Image(); im.onload = function () { accDrawn = ''; }; im.src = src + '?v=acc-20261004'; ACC_LOOKS[src] = im; }
+    if (!Object.prototype.hasOwnProperty.call(ACC_LOOKS, src)) {
+      ACC_LOOKS[src] = null;
+      if (window.NaituanAssets) {
+        window.NaituanAssets.image(src, '饰品').then(function (im) {
+          ACC_LOOKS[src] = im; accDrawn = '';
+        }).catch(function () {});
+      } else {
+        var im = new Image(); im.onload = function () { accDrawn = ''; }; im.src = src + '?v=acc-20261004'; ACC_LOOKS[src] = im;
+      }
+    }
     return ACC_LOOKS[src];
   }
   function accWorn() { var id = S && S.acc && S.acc.wear; return id && ACC_ITEMS[id] ? ACC_ITEMS[id] : null; }
