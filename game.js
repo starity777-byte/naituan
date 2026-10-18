@@ -92,7 +92,7 @@
       var failure = results.find(function (result) { return result.status === 'rejected'; });
       if (failure) throw failure.reason;
     });
-    /* Splash progress stays on core stills; await looks + sit sheet alongside so flower is decoded before enter. */
+    /* Splash progress stays on core stills; await looks + wave/sit sheets so flower is on for the enter greeting. */
     return Promise.all([core, preloadWornAcc({ critical: true })]);
   }
   function preloadSprites() {
@@ -386,7 +386,8 @@
       seen[name] = 1;
       priority.push(name);
     }
-    ['sit', 'happy', 'fish'].forEach(addPose);
+    /* Enter greets with wave; idle falls back to sit. Both must be warm or the flower pops in late. */
+    ['wave', 'sit', 'happy', 'fish'].forEach(addPose);
     PRELOAD_FIRST.forEach(addPose);
     if (opts.all) {
       Object.keys(ACC_SLOTS.poses).forEach(addPose);
@@ -394,11 +395,12 @@
       priority.forEach(function (pose) { accSheetPromise(pose, true); });
       return Promise.resolve();
     }
+    var criticalPoses = ['wave', 'sit'].filter(function (name) { return ACC_SLOTS.poses[name]; });
     var critical = lookSrcs.map(function (src) { return accLookPromise(src, false); });
-    if (ACC_SLOTS.poses.sit) critical.push(accSheetPromise('sit', false));
+    criticalPoses.forEach(function (name) { critical.push(accSheetPromise(name, false)); });
     for (i = 0; i < priority.length; i++) {
       p = priority[i];
-      if (p !== 'sit') accSheetPromise(p, true);
+      if (criticalPoses.indexOf(p) < 0) accSheetPromise(p, true);
     }
     return Promise.allSettled(critical).then(function () {});
   }
