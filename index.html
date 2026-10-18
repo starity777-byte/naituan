@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="奶团小屋">
 <title>奶团小屋</title>
+<script src="loading.js?v=load-20261018-v1"></script>
 <!-- Anonymous visit statistics: reviewed, self-hosted 51.LA SDK. See assets/vendor/51la/README.md -->
 <script src="stats.js?v=stats-20261003"></script>
 <script>window.LA = { config: { id: '3ROZRjfJ2i6G8O02', ck: '3ROZRjfJ2i6G8O02', hashMode: true, autoTrack: false } };</script>
@@ -22,11 +23,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=ZCOOL+KuaiLe&display=swap" media="print" onload="this.media='all'">
 <link rel="preload" as="image" href="assets/peek.webp">
 <style>
-/* Splash: inline so it paints before anything else loads. splash.js takes over; if it never runs, the CSS fallback hides it after 12s. */
+/* Keep startup and connection messages visible even if an application stylesheet fails. */
 .splash { position: fixed; inset: 0; z-index: 2147483000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
   background: radial-gradient(circle at 50% 42%, #fffaf2 0, #f8f1e6 34%, #f3ebde 70%); color: #54392f; cursor: pointer; user-select: none; -webkit-user-select: none;
   font-family: 'ZCOOL KuaiLe', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; transition: opacity .45s ease, transform .45s ease;
-  animation: splash-fallback 0s 12s forwards; -webkit-tap-highlight-color: transparent; }
+  -webkit-tap-highlight-color: transparent; }
 .splash.js { animation: none; }
 .splash:focus { outline: none; }
 .splash.leaving { opacity: 0; transform: scale(1.04); pointer-events: none; }
@@ -46,6 +47,15 @@
 .splash.ready .splash-paws svg { animation: none; opacity: .85; }
 .splash-status { margin: 0; min-height: 1.4em; font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif; font-size: 14px; color: #8c6f63; letter-spacing: .04em; }
 .splash.ready .splash-status { color: #54392f; animation: splash-breathe 1.6s ease-in-out .5s infinite; }
+.splash-detail { max-width: 300px; min-height: 3em; margin: 4px 24px; text-align: center; font: 13px/1.7 'Microsoft YaHei', system-ui, sans-serif; color: #8c6f63; }
+.splash progress { width: min(65vw, 260px); height: 8px; accent-color: #bd8b69; }
+.splash-actions { display: flex; gap: 10px; margin-top: 8px; }
+.splash-actions button, .resource-notice button { border: 1px solid #d2b5a0; border-radius: 18px; background: #fff8ec; color: #54392f; padding: 9px 18px; font: 14px 'Microsoft YaHei', system-ui, sans-serif; cursor: pointer; }
+.splash-actions button:disabled { opacity: .45; cursor: wait; }
+.resource-notice { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 2147483001; width: min(90vw, 450px); box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid #d2b5a0; border-radius: 16px; background: #fff8ec; color: #54392f; box-shadow: 0 4px 20px #54392f20; font: 13px/1.6 'Microsoft YaHei', system-ui, sans-serif; }
+.resource-notice[hidden], .resource-notice button[hidden], .splash-actions button[hidden] { display: none; }
+.resource-notice span { flex: 1; }
+.resource-notice button { flex-shrink: 0; padding: 6px 12px; }
 @keyframes splash-peek { 0%, 100% { transform: rotate(-3deg) translateX(-2%); } 50% { transform: rotate(3deg) translateX(2%); } }
 @keyframes splash-hop { 0% { transform: translateY(8%) scale(1.06, .9); } 45% { transform: translateY(-9%) scale(.96, 1.05); } 75% { transform: translateY(0) scale(1.04, .96); } 100% { transform: none; } }
 @keyframes splash-jump { 30% { transform: translateY(4%) scale(1.06, .92); } 100% { transform: translateY(-22%) scale(.96, 1.05); } }
@@ -63,12 +73,17 @@
 <link rel="stylesheet" href="lion.css?v=lion-20261004e">
 </head>
 <body>
-<div class="splash" id="splash" role="button" tabindex="0" aria-label="奶团小屋，正在加载">
+<div class="splash" id="splash" role="region" aria-label="奶团小屋，资源准备">
   <div class="splash-cat" aria-hidden="true"><img class="peek" src="assets/peek.webp" alt="" draggable="false"><img class="hello" src="assets/happy.webp" alt="" draggable="false"></div>
   <p class="splash-title">奶团小屋</p>
   <div class="splash-paws" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="14" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19" cy="9" rx="2" ry="2.7"/></svg><svg viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="14" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19" cy="9" rx="2" ry="2.7"/></svg><svg viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="14" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19" cy="9" rx="2" ry="2.7"/></svg><svg viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="14" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19" cy="9" rx="2" ry="2.7"/></svg></div>
   <p class="splash-status" id="splashStatus" aria-live="polite">奶团正在醒来…</p>
+  <progress id="splashProgress" max="1" value="0" aria-label="常用资源下载进度"></progress>
+  <p class="splash-detail" id="splashDetail" aria-live="polite">首次需要下载，之后会优先使用本机缓存。</p>
+  <div class="splash-actions"><button id="splashEnter" type="button" disabled>进入小屋</button><button id="splashRetry" type="button" hidden>重试下载</button></div>
+  <noscript>请开启浏览器的 JavaScript 后重新打开小屋。</noscript>
 </div>
+<div class="resource-notice" id="resourceNotice" role="status" aria-live="polite" hidden><span id="resourceMessage"></span><button id="resourceRetry" type="button" hidden>重试</button></div>
 <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <symbol id="i-paw" viewBox="0 0 24 24"><path d="M7 17c0-3 3-6 5-6s5 3 5 6c0 3-3 3-5 2-2 1-5 1-5-2Z"/><ellipse cx="5" cy="9" rx="2" ry="2.7"/><ellipse cx="10" cy="5.5" rx="2" ry="2.7"/><ellipse cx="15" cy="5.5" rx="2" ry="2.7"/><ellipse cx="19.5" cy="10" rx="2" ry="2.7"/></symbol>
   <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v11h-6v-7H9v7H3Z"/></symbol>
@@ -417,10 +432,10 @@
 <script src="walking.js?v=walk-20260929"></script>
 <script src="room.js?v=layer-20261007"></script>
 <script src="sound.js?v=jelly-20261004"></script>
-<script src="bgm.js?v=games-music-20261003"></script>
+<script src="bgm.js?v=load-20261018-v1"></script>
 <script src="accessory-slots.js?v=acc-20261004"></script>
 <script src="hide-seek-levels.js?v=levels-20261007"></script>
-<script src="game.js?v=levels-20261007"></script>
+<script src="game.js?v=load-20261018-v1"></script>
 <script src="queue.js?v=wish-20261007"></script>
 <script src="lion-physics.js?v=lion-20261004e"></script>
 <script src="lion.js?v=lion-20261004e"></script>
@@ -434,6 +449,6 @@
 <script src="planner.js?v=journal-20261003"></script>
 <script src="backup.js?v=journal-20261003"></script>
 <script src="house.js?v=acc-20261004"></script>
-<script src="splash.js?v=splash-20261003"></script>
+<script src="splash.js?v=load-20261018-v1"></script>
 </body>
 </html>

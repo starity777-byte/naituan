@@ -1,59 +1,73 @@
-/* Startup splash: 奶团 peeks out while the house loads, then hops and waits for a tap.
-   The tap plays the opening jingle and (through game.js's own pointerdown handler) unlocks
-   sound effects and background music — browsers only allow audio after a gesture.
-   Tapping early also works; after 7s the splash is ready even if some pictures are still coming. */
+/* Prepare common animations before entry. Progress counts completed files, never elapsed time. */
 (function () {
   'use strict';
   var splash = document.getElementById('splash');
   if (!splash) return;
   var status = document.getElementById('splashStatus');
-  var ready = false, leaving = false, readyTimer = 0;
-  splash.classList.add('js');
+  var detail = document.getElementById('splashDetail');
+  var progress = document.getElementById('splashProgress');
+  var enterButton = document.getElementById('splashEnter');
+  var retryButton = document.getElementById('splashRetry');
+  var ready = false, loading = false, failed = false, leaving = false;
+  var done = 0, total = 0, started = Date.now();
+  var assets = window.NaituanAssets;
 
-  function markReady() {
-    if (ready || leaving) return;
-    ready = true; clearTimeout(readyTimer);
-    splash.classList.add('ready');
-    status.textContent = '轻点进入小屋';
-    splash.setAttribute('aria-label', '轻点进入奶团小屋');
+  function paint() {
+    if (leaving) return;
+    var state = assets ? assets.status() : { kind: 'startup', text: '加载组件未能启动，请重新打开。' };
+    var broken = state.kind === 'startup';
+    enterButton.disabled = !ready || broken;
+    retryButton.hidden = !failed && !broken;
+    retryButton.textContent = broken ? '重新打开' : '重试下载';
+    if (ready) status.textContent = '准备好了，轻点进入小屋';
+    else status.textContent = '准备奶团的常用动作 ' + done + ' / ' + total;
+    progress.max = total || 1; progress.value = done;
+    detail.textContent = state.text || (ready ? '常用动作已备好。音乐会在进入后加载。' : '首次需要下载，之后会优先使用本机缓存。');
+    if (!ready && !state.text && Date.now() - started > 5000) detail.textContent = '资源仍在下载，连接较慢，请稍等；正在准备常用动作。';
+    splash.classList.toggle('ready', ready);
+  }
+  function prepare() {
+    if (loading || leaving || ready) return;
+    if (!window.NT || !assets) { paint(); return; }
+    loading = true; failed = false;
+    var roomPictures = Array.from(document.querySelectorAll('#roomScene img[src]')).filter(function (img) { return img.id !== 'catimg' && !img.hidden; });
+    total = window.NT.sprites.core.length + roomPictures.length;
+    var spritesDone = 0, roomDone = 0;
+    function update() { done = spritesDone + roomDone; paint(); }
+    function roomNext() {
+      var img = roomPictures.shift();
+      if (!img) return Promise.resolve();
+      if (img.dataset.prepared) { roomDone++; update(); return roomNext(); }
+      return assets.image(img.getAttribute('src'), '房间画面').then(function (loaded) {
+        img.src = loaded.src; img.dataset.prepared = '1'; roomDone++; update(); return roomNext();
+      });
+    }
+    Promise.allSettled([
+      window.NT.sprites.prepare(function (n) { spritesDone = n; update(); }),
+      roomNext()
+    ]).then(function (results) {
+      loading = false;
+      failed = results.some(function (result) { return result.status === 'rejected'; });
+      ready = !failed;
+      paint();
+    });
   }
   function enter() {
-    if (leaving) return;
-    leaving = true; clearTimeout(readyTimer);
-    if (!ready) splash.classList.add('ready');
-    var NT = window.NT;
-    try {
-      if (NT) {
-        var muted = NT.S && NT.S() && NT.S().mute;
-        if (window.NaituanSound) window.NaituanSound.unlock(muted);
-        if (window.NaituanBGM) window.NaituanBGM.unlock();
-        NT.sound('hello');
-        var S = NT.S && NT.S();
-        // Greet again now that the player can actually see it (the greeting at load time was behind the splash).
-        if (S && !S.sleeping && !(NT.isBusy && NT.isBusy())) { NT.setPose('wave', 3600); NT.say('你回来啦！给你挥挥爪~', 3600); }
-      }
-    } catch (e) {}
-    requestAnimationFrame(function () { splash.classList.add('leaving'); });
-    setTimeout(function () { splash.remove(); }, 520);
+    if (!ready || enterButton.disabled || leaving) return;
+    leaving = true;
+    var NT = window.NT, S = NT.S();
+    if (window.NaituanSound) window.NaituanSound.unlock(S.mute);
+    if (window.NaituanBGM) window.NaituanBGM.unlock();
+    NT.sound('hello');
+    if (!S.sleeping && !NT.isBusy()) { NT.setPose('wave', 3600); NT.say('你回来啦！给你挥挥爪~', 3600); }
+    splash.classList.add('leaving');
+    setTimeout(function () { splash.remove(); window.dispatchEvent(new CustomEvent('naituan:entered')); }, 520);
+    clearInterval(timer);
   }
-
-  splash.addEventListener('click', enter);
-  splash.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); enter(); }
-  });
-  try { splash.focus({ preventScroll: true }); } catch (e) {}
-
-  // Ready once 奶团 and the room pictures on screen have arrived. (Not window "load": a slow font server would hold that up.)
-  function roomShown() {
-    var cat = document.getElementById('catimg');
-    if (!cat || !cat.getAttribute('src') || !cat.complete) return false;
-    var pics = document.querySelectorAll('#roomScene img[src]');
-    for (var i = 0; i < pics.length; i++) if (!pics[i].hidden && !pics[i].complete) return false;
-    return true;
-  }
-  (function check() {
-    if (ready || leaving) return;
-    if (roomShown()) markReady(); else setTimeout(check, 120);
-  })();
-  readyTimer = setTimeout(markReady, 7000);
+  enterButton.addEventListener('click', enter);
+  retryButton.addEventListener('click', function () { if (assets) assets.retry(); else window.location.reload(); });
+  window.addEventListener('naituan:retry', prepare);
+  window.addEventListener('naituan:loading', paint);
+  var timer = setInterval(function () { if (!ready && !failed && !loading) prepare(); paint(); }, 1000);
+  prepare();
 })();

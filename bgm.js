@@ -39,14 +39,18 @@
   function load(id) {
     if (buffers.has(id)) return buffers.get(id);
     function decode(extension) {
-      return root.fetch(assetBase + 'naituan-' + id + '.' + extension + '?v=' + MUSIC_VERSION).then(function (response) {
+      var url = assetBase + 'naituan-' + id + '.' + extension + '?v=' + MUSIC_VERSION;
+      return (root.NaituanAssets ? root.NaituanAssets.fetch(url, '背景音乐') : root.fetch(url)).then(function (response) {
         if (!response.ok) throw new Error('Music file unavailable');
         return response.arrayBuffer();
       }).then(function (bytes) { return ctx.decodeAudioData(bytes); });
     }
     // Ogg preserves the exact loop. MP3 includes gapless encoder metadata and
     // provides a fallback for browsers which cannot decode Vorbis.
-    var promise = decode('ogg').catch(function () { return decode('mp3'); }).catch(function (failure) {
+    var promise = decode('ogg').catch(function () { return decode('mp3'); }).then(function (buffer) {
+      if (root.NaituanAssets) root.NaituanAssets.forget(assetBase + 'naituan-' + id + '.ogg?v=' + MUSIC_VERSION);
+      return buffer;
+    }).catch(function (failure) {
       buffers.delete(id); throw failure;
     });
     buffers.set(id, promise);
@@ -138,10 +142,10 @@
   }
   function unlock() {
     if (!enabled || volume <= 0 || (document && document.hidden)) return false;
-    if (!ctx && !create()) return false;
+    if (!ctx && !create()) { error = '当前浏览器无法开启音乐，可以换用系统浏览器继续玩。'; return false; }
     unlocked = true; failedId = ''; error = '';
     // Resume remains inside the real pointer/key gesture, before any fetch.
-    if (ctx.state === 'suspended') ctx.resume().then(refresh).catch(function () {});
+    if (ctx.state === 'suspended') ctx.resume().then(refresh).catch(function () { error = '浏览器暂未允许播放音乐，请点重试开启。'; });
     refresh(); return true;
   }
   function status() {

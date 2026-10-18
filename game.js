@@ -59,10 +59,32 @@
   var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
   var now = function () { return Date.now(); };
 
-  /* preload sprites — the pose on screen loads by itself. The other animations (about 12 MB) wait until the page
-     has finished loading and then come in two at a time, most-used first, so they don't slow down the first look at 奶团. */
-  var IMG = {};
+  /* Load complete animations before displaying them. Fonts and analytics never gate this queue. */
+  var IMG = {}, spritePromises = {}, spriteFailures = {}, pendingPose = '';
   var PRELOAD_FIRST = ['sit', 'wave', 'walkSide', 'walkFront', 'happy', 'shy', 'fish', 'curious', 'ear', 'nose', 'chin', 'paw', 'rub', 'sniff', 'watch', 'knead', 'roll'];
+  var CORE_SPRITES = ['sit', 'wave', 'happy', 'fish', 'sleep', 'ear', 'nose', 'chin', 'paw', 'rub', 'walkSide', 'walkFront'];
+  function loadSprite(k, background) {
+    if (IMG[k]) return Promise.resolve(IMG[k]);
+    if (!spritePromises[k]) {
+      spritePromises[k] = window.NaituanAssets.image(SPR[k], '奶团动作', background).then(function (im) {
+        IMG[k] = im; delete spriteFailures[k]; delete spritePromises[k]; return im;
+      }, function (error) { delete spritePromises[k]; throw error; });
+    } else if (!background) window.NaituanAssets.foreground(SPR[k]);
+    return spritePromises[k];
+  }
+  function prepareSprites(progress) {
+    var queue = CORE_SPRITES.slice(), done = 0;
+    progress(0, CORE_SPRITES.length);
+    function next() {
+      var k = queue.shift();
+      if (!k) return Promise.resolve();
+      return loadSprite(k, false).then(function () { progress(++done, CORE_SPRITES.length); return next(); });
+    }
+    return Promise.allSettled([next(), next()]).then(function (results) {
+      var failure = results.find(function (result) { return result.status === 'rejected'; });
+      if (failure) throw failure.reason;
+    });
+  }
   function preloadSprites() {
     var queue = PRELOAD_FIRST.concat(Object.keys(SPR)).filter(function (k, i, all) { return SPR[k] && all.indexOf(k) === i; });
     /* 戴着饰品时奶团用逐帧图播放，这些动图只是备用，放到最后再下。 */
@@ -71,14 +93,13 @@
     function next() {
       var k = queue.shift();
       if (!k) return;
-      var im = new Image(); IMG[k] = im;
-      im.onload = im.onerror = next;
-      im.src = SPR[k];
+      loadSprite(k, true).then(next, next);
     }
     next(); next();
   }
-  if (document.readyState === 'complete') setTimeout(preloadSprites, 400);
-  else window.addEventListener('load', function () { setTimeout(preloadSprites, 400); });
+  window.addEventListener('naituan:entered', function () { setTimeout(preloadSprites, 400); });
+  window.addEventListener('naituan:retry', function () { spriteFailures = {}; pendingPose = ''; render(); });
+  function starting() { return !!window.NaituanAssets && !!document.getElementById('splash'); }
 
   /* ---------- state ---------- */
   /* 躲猫猫的关卡和规则（hide-seek-levels.js）。S.hs 记录关卡进度，S.bestBeat 是无尽模式的最高分。 */
@@ -161,7 +182,10 @@
     bubble.style.setProperty('--bubble-scale', scale);
     bubble.style.setProperty('--bubble-tail-x', Math.max(18, Math.min(bubble.offsetWidth - 18, bubble.offsetWidth / 2 + (headX - x) / scale)) + 'px');
   }
-  function say(t, ms) { sayText = t; sayUntil = now() + (ms || 3800); bubble.textContent = t; }
+  function say(t, ms) {
+    sayText = t; sayUntil = now() + (ms || 3800); bubble.textContent = t;
+    if (override && override.pending) { override.speech = { text: t, ms: ms || 3800 }; sayUntil = Infinity; }
+  }
   function idleLine() {
     if (S.sleeping) return '呼……呼……';
     if (S.hunger < 25) return '肚子咕咕叫，想吃小鱼……';
@@ -207,7 +231,11 @@
   window.addEventListener('naituan:page', function (e) { if (e.detail && e.detail.page === 'games' && S) learned('game'); });
 
   /* ---------- pose ---------- */
-  function setPose(name, ms) { override = { name: name, until: now() + ms }; render(); }
+  function setPose(name, ms) {
+    var waiting = !!window.NaituanAssets && !IMG[name];
+    override = { name: name, ms: ms, pending: waiting, until: waiting ? Infinity : now() + ms };
+    render();
+  }
   function computePose() {
     if (S.sleeping) return 'sleep';
     if (roomView && roomView.isWalking()) return walkPose;
@@ -217,11 +245,25 @@
     return 'sit';
   }
   function applyPose(p) {
+    if (window.NaituanAssets && !IMG[p]) {
+      if (pendingPose !== p && !spriteFailures[p]) {
+        pendingPose = p;
+        loadSprite(p, false).then(function () {
+          if (pendingPose === p) pendingPose = '';
+          if (computePose() === p) render();
+        }, function () { spriteFailures[p] = true; if (pendingPose === p) pendingPose = ''; });
+      }
+      return;
+    }
+    if (override && override.name === p && override.pending) {
+      override.pending = false; override.until = now() + override.ms;
+      if (override.speech) { sayText = override.speech.text; bubble.textContent = sayText; sayUntil = now() + override.speech.ms; }
+    }
     if (visiting && p !== visiting.pose) endVisit();
     if (p === curPose) return;
     var walkingChange = /^walk/.test(p) || /^walk/.test(curPose);
     curPose = p;
-    catimg.src = SPR[p];
+    catimg.src = IMG[p] ? IMG[p].src : SPR[p];
     cat.setAttribute('data-pose', p);
     catimg.classList.remove('pop'); accCanvas.classList.remove('pop');
     if (!walkingChange) { void catimg.offsetWidth; catimg.classList.add('pop'); accCanvas.classList.add('pop'); }
@@ -402,7 +444,7 @@
     paw: { ms: 5600, lines: ['小爪交给你，牵好了~', '轻轻握住，陪我待一会儿'] }
   };
   function roomEnabled() {
-    return !busy() && !SH.open && saveModal.hidden && !$('#homeView').hidden && !document.querySelector('dialog[open]');
+    return !starting() && !busy() && !SH.open && saveModal.hidden && !$('#homeView').hidden && !document.querySelector('dialog[open]');
   }
   function roomAvailable() { return roomEnabled() && !(roomView && roomView.isEditing()); }
   function sound(kind, shift, delay) { return window.NaituanSound.play(kind, S.mute, shift, delay); }
@@ -1436,7 +1478,7 @@
     setTimeout(function tryGift() {
       if (S.acc.gift) return;
       var homeShown = !$('#homeView') || !$('#homeView').hidden;
-      if (busy() || SH.open || S.sleeping || !homeShown || document.hidden || (accDialog && accDialog.open) || document.querySelector('dialog[open]')) { setTimeout(tryGift, 6000); return; }
+      if (starting() || busy() || SH.open || S.sleeping || !homeShown || document.hidden || (accDialog && accDialog.open) || document.querySelector('dialog[open]')) { setTimeout(tryGift, 6000); return; }
       S.acc.gift = 1; S.acc.own.flower = 1; save();
       setPose('happy', 3000); say('我捡到一小枝花！', 4000);
       setTimeout(function () { openAccessories(true); }, 900);
@@ -1601,7 +1643,7 @@
 
   /* ---------- clock ---------- */
   function tick() {
-    if (document.hidden) return;
+    if (document.hidden || starting()) return;
     S.secs += 1;
     if (S.sleeping) {
       S.energy = clamp(S.energy + 0.5); S.hunger = clamp(S.hunger - 0.25 / 60);
@@ -1627,8 +1669,9 @@
     paintDecor(); if (!S.shopSeen) btnShop.setAttribute('data-new', '1');
     greet();
     /* 见面礼：每份存档送一次 666 小鱼干，等开场画面过去再给，和下一次自动保存一起存下。 */
-    setTimeout(function () {
+    setTimeout(function welcome() {
       if (S.welcome) return;
+      if (starting()) { setTimeout(welcome, 1000); return; }
       S.welcome = 1; addFish(666);
       if (busy() || SH.open) return;
       setPose('happy', 3000); say('见面礼！送你 666 个小鱼干，点右上角的小鱼去小铺逛逛吧~', 6500);
@@ -1645,6 +1688,7 @@
   }
   /* small bridge for the separate mini-games (queue.js) */
   window.NT = {
+    sprites: { prepare: prepareSprites, core: CORE_SPRITES },
     exportState: function () { return JSON.parse(JSON.stringify(S)); },
     restoreState: function (data) {
       if (busy()) return false;
