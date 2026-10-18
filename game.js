@@ -88,10 +88,12 @@
       if (!k) return Promise.resolve();
       return loadStill(k).then(function () { progress(++done, CORE_SPRITES.length); return next(); });
     }
-    return Promise.allSettled([next(), next()]).then(function (results) {
+    var core = Promise.allSettled([next(), next()]).then(function (results) {
       var failure = results.find(function (result) { return result.status === 'rejected'; });
       if (failure) throw failure.reason;
     });
+    /* Splash progress stays on core stills; await looks + sit sheet alongside so flower is decoded before enter. */
+    return Promise.all([core, preloadWornAcc({ critical: true })]);
   }
   function preloadSprites() {
     var queue = PRELOAD_FIRST.slice();
@@ -111,6 +113,7 @@
     // Cached scenery may never fire another refresh after roomEnabled() changes at entry.
     if (roomView) roomView.refresh();
     render(); deferIdle(); setTimeout(preloadSprites, 400);
+    preloadWornAcc({ all: true });
   });
   window.addEventListener('naituan:retry', function () { spriteFailures = {}; pendingPose = ''; paintDecor(); render(); });
   function starting() { return !!window.NaituanAssets && !!document.getElementById('splash'); }
@@ -317,45 +320,94 @@
   accCanvas.setAttribute('aria-hidden', 'true');
   cat.appendChild(accCanvas);
   var accCtx = accCanvas.getContext('2d');
-  var ACC_SHEETS = {}, ACC_LOOKS = {};
+  var ACC_SHEETS = {}, ACC_LOOKS = {}, ACC_SHEET_P = {}, ACC_LOOK_P = {};
   var accRaf = 0, accPose = null, accStart = 0, accDrawn = '';
   /* 毫秒。注意别叫 clock：躲猫猫里已经有一个按秒算的 clock()。 */
   function accNow() { return window.performance && performance.now ? performance.now() : Date.now(); }
-  function accSheet(pose) {
+  function accSheet(pose, background) {
     if (!Object.prototype.hasOwnProperty.call(ACC_SHEETS, pose)) {
       ACC_SHEETS[pose] = null;
       if (window.NaituanAssets) {
-        window.NaituanAssets.image('assets/sheets/' + pose + '.webp', '饰品贴图').then(function (im) {
-          ACC_SHEETS[pose] = im; accRefresh();
-        }).catch(function () {});
+        ACC_SHEET_P[pose] = window.NaituanAssets.image('assets/sheets/' + pose + '.webp', '饰品贴图', !!background).then(function (im) {
+          ACC_SHEETS[pose] = im; delete ACC_SHEET_P[pose]; accRefresh(); return im;
+        }).catch(function () { delete ACC_SHEET_P[pose]; });
       } else {
         var im = new Image(); im.decoding = 'async';
         im.onload = function () { accRefresh(); };
         im.src = 'assets/sheets/' + pose + '.webp?v=acc-20261004';
         ACC_SHEETS[pose] = im;
       }
+    } else if (window.NaituanAssets && !background && ACC_SHEET_P[pose]) {
+      window.NaituanAssets.foreground('assets/sheets/' + pose + '.webp');
     }
     return ACC_SHEETS[pose];
   }
-  function accLook(src) {
+  function accSheetPromise(pose, background) {
+    accSheet(pose, background);
+    if (accReady(ACC_SHEETS[pose])) return Promise.resolve(ACC_SHEETS[pose]);
+    return ACC_SHEET_P[pose] || Promise.resolve(null);
+  }
+  function accLook(src, background) {
     if (!Object.prototype.hasOwnProperty.call(ACC_LOOKS, src)) {
       ACC_LOOKS[src] = null;
       if (window.NaituanAssets) {
-        window.NaituanAssets.image(src, '饰品').then(function (im) {
-          ACC_LOOKS[src] = im; accDrawn = '';
-        }).catch(function () {});
+        ACC_LOOK_P[src] = window.NaituanAssets.image(src, '饰品', !!background).then(function (im) {
+          ACC_LOOKS[src] = im; delete ACC_LOOK_P[src]; accDrawn = ''; return im;
+        }).catch(function () { delete ACC_LOOK_P[src]; });
       } else {
         var im = new Image(); im.onload = function () { accDrawn = ''; }; im.src = src + '?v=acc-20261004'; ACC_LOOKS[src] = im;
       }
+    } else if (window.NaituanAssets && !background && ACC_LOOK_P[src]) {
+      window.NaituanAssets.foreground(src);
     }
     return ACC_LOOKS[src];
   }
+  function accLookPromise(src, background) {
+    accLook(src, background);
+    if (accReady(ACC_LOOKS[src])) return Promise.resolve(ACC_LOOKS[src]);
+    return ACC_LOOK_P[src] || Promise.resolve(null);
+  }
   function accWorn() { var id = S && S.acc && S.acc.wear; return id && ACC_ITEMS[id] ? ACC_ITEMS[id] : null; }
   function accReady(im) { return !!(im && im.complete && im.naturalWidth > 0); }
+  /* Warm worn accessory art so flower is on before enter. Critical = looks + sit sheet; rest is background. */
+  function preloadWornAcc(opts) {
+    opts = opts || {};
+    var item = accWorn();
+    if (!item || !window.NaituanAssets) return Promise.resolve();
+    var lookSrcs = [], side;
+    for (side in item.looks) {
+      if (Object.prototype.hasOwnProperty.call(item.looks, side) && item.looks[side] && item.looks[side].src) {
+        lookSrcs.push(item.looks[side].src);
+      }
+    }
+    var seen = {}, priority = [], i, p;
+    function addPose(name) {
+      if (!name || seen[name] || !ACC_SLOTS.poses[name]) return;
+      seen[name] = 1;
+      priority.push(name);
+    }
+    ['sit', 'happy', 'fish'].forEach(addPose);
+    PRELOAD_FIRST.forEach(addPose);
+    if (opts.all) {
+      Object.keys(ACC_SLOTS.poses).forEach(addPose);
+      lookSrcs.forEach(function (src) { accLookPromise(src, true); });
+      priority.forEach(function (pose) { accSheetPromise(pose, true); });
+      return Promise.resolve();
+    }
+    var critical = lookSrcs.map(function (src) { return accLookPromise(src, false); });
+    if (ACC_SLOTS.poses.sit) critical.push(accSheetPromise('sit', false));
+    for (i = 0; i < priority.length; i++) {
+      p = priority[i];
+      if (p !== 'sit') accSheetPromise(p, true);
+    }
+    return Promise.allSettled(critical).then(function () {});
+  }
   function accRefresh() {
     clearTimeout(accRaf); accRaf = 0;
-    if (window.NaituanAssets && !IMG[curPose]) { accCanvas.hidden = true; catimg.style.visibility = ''; accPose = null; return; }
-    var item = accWorn(), data = item && ACC_SLOTS.poses[curPose], sheet = data ? accSheet(curPose) : null;
+    var item = accWorn(), data = item && ACC_SLOTS.poses[curPose];
+    /* Wearing uses sheet frames, not the animated sprite — do not wait on IMG when a sheet pose exists. */
+    if (window.NaituanAssets && !IMG[curPose] && !data) { accCanvas.hidden = true; catimg.style.visibility = ''; accPose = null; return; }
+    var sheet = data ? accSheet(curPose) : null;
     var on = accReady(sheet);
     accCanvas.hidden = !on; catimg.style.visibility = on ? 'hidden' : '';
     if (!on) { accPose = null; return; }
