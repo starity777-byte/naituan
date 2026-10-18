@@ -63,11 +63,10 @@
   var IMG = {}, spritePromises = {}, spriteFailures = {}, pendingPose = '', STILLS = {}, stillPromises = {};
   var PRELOAD_FIRST = ['ear', 'nose', 'chin', 'paw', 'rub', 'happy', 'fish', 'sit'];
   var CORE_SPRITES = ['sit', 'happy', 'fish'];
-  var STILL_POSES = { wave: 'happy', sleep: 'sit', roll: 'happy', curious: 'peek', ear: 'happy', rub: 'happy', sniff: 'peek', watch: 'peek', paw: 'happy', chin: 'happy', nose: 'happy', knead: 'happy', walkSide: 'sit', walkFront: 'sit' };
   function loadStill(p) {
-    var key = STILL_POSES[p] || p;
+    var key = p;
     if (STILLS[key]) return Promise.resolve(STILLS[key]);
-    if (!stillPromises[key]) stillPromises[key] = window.NaituanAssets.image('assets/' + key + '.webp', '奶团画面').then(function (im) {
+    if (!stillPromises[key]) stillPromises[key] = window.NaituanAssets.image('assets/posters/' + key + '.webp', '奶团画面').then(function (im) {
       STILLS[key] = im; delete stillPromises[key]; return im;
     }, function (error) { delete stillPromises[key]; throw error; });
     return stillPromises[key];
@@ -108,7 +107,11 @@
     }
     next();
   }
-  window.addEventListener('naituan:entered', function () { setTimeout(preloadSprites, 400); });
+  window.addEventListener('naituan:entered', function () {
+    // Cached scenery may never fire another refresh after roomEnabled() changes at entry.
+    if (roomView) roomView.refresh();
+    render(); deferIdle(); setTimeout(preloadSprites, 400);
+  });
   window.addEventListener('naituan:retry', function () { spriteFailures = {}; pendingPose = ''; paintDecor(); render(); });
   function starting() { return !!window.NaituanAssets && !!document.getElementById('splash'); }
 
@@ -256,15 +259,21 @@
     return 'sit';
   }
   function applyPose(p) {
-    var still = STILLS[STILL_POSES[p] || p];
+    var still = STILLS[p];
     if (window.NaituanAssets && !IMG[p]) {
-      if (!still && !stillPromises[STILL_POSES[p] || p]) loadStill(p).then(function () { if (computePose() === p) render(); }, function () {});
+      if (!still && !stillPromises[p]) loadStill(p).then(function () { if (computePose() === p) render(); }, function () {});
       if (!starting() && pendingPose !== p && !spriteFailures[p]) {
         pendingPose = p;
         loadSprite(p, false).then(function () {
           if (pendingPose === p) pendingPose = '';
           if (computePose() === p) render();
-        }, function () { spriteFailures[p] = true; if (pendingPose === p) pendingPose = ''; });
+        }, function () {
+          spriteFailures[p] = true; if (pendingPose === p) pendingPose = '';
+          if (override && override.name === p && override.pending) {
+            override.pending = false; override.until = now() + override.ms;
+            if (sayUntil === Infinity) sayUntil = now() + Math.min(override.ms, 3800);
+          }
+        });
       }
       if (!still) return;
     }
@@ -412,10 +421,10 @@
     stage.appendChild(h);
     setTimeout(function () { if (h.parentNode) h.parentNode.removeChild(h); }, 1050);
   }
-  function textAt(t, x, y) {
+  function textAt(t, x, y, parent) {
     var h = document.createElement('span');
     h.className = 'fx txt'; h.textContent = t; h.style.left = x + 'px'; h.style.top = y + 'px'; h.style.setProperty('--dx', '0px');
-    stage.appendChild(h);
+    (parent || stage).appendChild(h);
     setTimeout(function () { if (h.parentNode) h.parentNode.removeChild(h); }, 1050);
   }
   function shake() { cat.classList.remove('shake'); void cat.offsetWidth; cat.classList.add('shake'); setTimeout(function () { cat.classList.remove('shake'); }, 420); }
@@ -1059,7 +1068,7 @@
     SG.ground = Math.round(SG.H * 0.86);
     var bw = Math.min(150, Math.round(SG.W * 0.4));
     SG.baseW = bw; SG.tower = [{ x: Math.round((SG.W - bw) / 2), w: bw }];
-    SG.perfects = 0; SG.combo = 0; SG.hit = null; SG.cam = 0; SG.debris = []; SG.pose = 'sit'; SG.poseUntil = 0; SG.over = false; SG.settled = false; SG.floors = 0;
+    SG.perfects = 0; SG.combo = 0; SG.hit = null; SG.cam = 0; SG.debris = []; SG.pose = 'sit'; SG.poseUntil = 0; SG.poseWaiting = false; SG.over = false; SG.settled = false; SG.floors = 0;
     spawn();
     sgScore.textContent = '0 层'; sgOver.hidden = true; sgHint.hidden = false;
   }
@@ -1070,6 +1079,7 @@
     SG.active = true;
     sgEl.hidden = false; stage.classList.add('stacking'); $('#catbox').style.visibility = 'hidden'; bubble.hidden = true; setBusyUI(true); statsEnter('games/stack');
     sgReset(); SG.last = performance.now();
+    if (window.NaituanAssets) loadSprite('happy', false).catch(function () { spriteFailures.happy = true; });
     cancelAnimationFrame(SG.raf); SG.raf = requestAnimationFrame(sgLoop);
   }
   function sgSettle() {
@@ -1082,7 +1092,7 @@
     addFish(earned); save();
   }
   function sgFinish() {
-    SG.over = true; SG.pose = 'cry'; SG.poseUntil = Infinity;
+    SG.over = true; SG.pose = 'cry'; SG.poseUntil = Infinity; SG.poseWaiting = false;
     sgSettle();
     setTimeout(function () {
       if (!SG.active || !SG.over) return;
@@ -1108,15 +1118,16 @@
       SG.combo++; SG.perfects++;
       placed = { x: prev.x, w: m.w };
       if (SG.combo >= 3 && placed.w < SG.baseW) { var nw = Math.min(SG.baseW, placed.w + 8); placed.x = Math.max(0, Math.min(SG.W - nw, placed.x - (nw - placed.w) / 2)); placed.w = nw; }
-      SG.pose = 'happy'; SG.poseUntil = performance.now() + 700;
-      textAt(SG.combo >= 3 ? '连击 ×' + SG.combo : '好准！', SG.W / 2 + 2, SG.H * 0.3);
+      SG.pose = 'happy'; SG.poseWaiting = !!window.NaituanAssets && !IMG.happy && !spriteFailures.happy;
+      SG.poseUntil = SG.poseWaiting ? Infinity : performance.now() + 700;
+      textAt(SG.combo >= 3 ? '完美 ×' + SG.combo : '完美！', SG.W / 2 + 2, SG.H * 0.3, sgEl);
       sound('boxland'); sound('chime', PENTA[Math.min(SG.combo, PENTA.length) - 1]); /* the chime climbs a pentatonic scale with the combo */
       SG.hit = { t: performance.now(), amp: 1.25 };
     } else {
       SG.combo = 0;
       if (dx > 0) { placed = { x: m.x, w: overlap }; SG.debris.push({ x: prev.x + prev.w, y: topY, w: dx, h: BH, vx: 40, vy: 0, rot: 0, vr: 1.6, i: m.level }); }
       else { placed = { x: prev.x, w: overlap }; SG.debris.push({ x: m.x, y: topY, w: -dx, h: BH, vx: -40, vy: 0, rot: 0, vr: -1.6, i: m.level }); }
-      SG.pose = 'sit'; SG.poseUntil = 0;
+      SG.pose = 'sit'; SG.poseUntil = 0; SG.poseWaiting = false;
       sound('boxland'); sound('chop');
       SG.hit = { t: performance.now(), amp: 1 };
     }
@@ -1164,10 +1175,16 @@
     } else {
       catX = top.x + top.w / 2 - size / 2; catY = stackY - footY;
     }
-    var pose = SG.pose; if (pose === 'happy' && t > SG.poseUntil) { SG.pose = pose = 'sit'; }
+    var pose = SG.pose;
+    if (pose === 'happy' && SG.poseWaiting && (IMG.happy || spriteFailures.happy)) { SG.poseWaiting = false; SG.poseUntil = t + 700; }
+    if (pose === 'happy' && t > SG.poseUntil) { SG.pose = pose = 'sit'; }
     /* A DOM image keeps animated WebP playing; canvas drawImage only uses its default frame. */
-    if (sgCat.getAttribute('data-pose') !== pose) {
-      sgCat.src = SPR[pose]; sgCat.setAttribute('data-pose', pose);
+    if (window.NaituanAssets && !STILLS[pose] && !stillPromises[pose]) loadStill(pose).catch(function () {});
+    if (window.NaituanAssets && !IMG[pose] && !spritePromises[pose] && !spriteFailures[pose]) loadSprite(pose, false).catch(function () { spriteFailures[pose] = true; });
+    var frame = IMG[pose] || STILLS[pose], source = frame ? frame.src : !window.NaituanAssets ? SPR[pose] : '';
+    if (source && sgCat.getAttribute('src') !== source) {
+      sgCat.src = source; sgCat.setAttribute('data-pose', pose);
+      sgCat.setAttribute('data-render', IMG[pose] || !window.NaituanAssets ? 'animated' : 'still');
     }
     sgCat.style.transform = 'translate(' + catX + 'px,' + (catY + SG.cam) + 'px) scale(' + (1 + .1 * catS).toFixed(3) + ',' + (1 - .14 * catS).toFixed(3) + ')';
     SG.debris.forEach(function (d) {

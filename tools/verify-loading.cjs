@@ -50,7 +50,7 @@ const base = process.env.NAITUAN_PREVIEW || 'http://127.0.0.1:8775/';
       // Wait until asynchronous cache writes have completed, rather than treating a render as disk proof.
       await page.waitForFunction(async () => {
         const names = await caches.keys(); const store = await caches.open(names.find(n => n.startsWith('naituan-media-')));
-        return (await store.keys()).filter(r => /\/assets\/(sit|happy|fish)\.webp/.test(r.url)).length === 3;
+        return (await store.keys()).filter(r => /\/assets\/posters\/(sit|happy|fish)\.webp/.test(r.url)).length === 3;
       });
       let mediaAttempts = 0;
       await page.route('**/assets/animated/**', route => {
@@ -105,7 +105,7 @@ const base = process.env.NAITUAN_PREVIEW || 'http://127.0.0.1:8775/';
     for (const problem of [404, 503, 'connection']) {
       const { context, page, errors } = await fixture();
       let broken = true;
-      await page.route('**/assets/fish.webp*', route => {
+      await page.route('**/assets/posters/fish.webp*', route => {
         if (!broken) return route.continue();
         return problem === 'connection' ? route.abort('failed') : route.fulfill({ status: problem, body: 'unavailable' });
       });
