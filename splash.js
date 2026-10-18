@@ -1,4 +1,4 @@
-/* Prepare common animations before entry. Progress counts completed files, never elapsed time. */
+/* Only three tiny stills gate entry; full animations and scenery arrive progressively. */
 (function () {
   'use strict';
   var splash = document.getElementById('splash');
@@ -20,37 +20,20 @@
     retryButton.hidden = !failed && !broken;
     retryButton.textContent = broken ? '重新打开' : '重试下载';
     if (ready) status.textContent = '准备好了，轻点进入小屋';
-    else status.textContent = '准备奶团的常用动作 ' + done + ' / ' + total;
+    else status.textContent = '准备小屋画面 ' + done + ' / ' + total;
     progress.max = total || 1; progress.value = done;
-    detail.textContent = state.text || (ready ? '常用动作已备好。音乐会在进入后加载。' : '首次需要下载，之后会优先使用本机缓存。');
-    if (!ready && !state.text && Date.now() - started > 5000) detail.textContent = '资源仍在下载，连接较慢，请稍等；正在准备常用动作。';
+    detail.textContent = state.text || (ready ? '可以进屋啦，动画和音乐会陆续加载。' : '只准备轻量画面，动画会在进入后加载。');
+    if (!ready && !state.text && Date.now() - started > 5000) detail.textContent = '连接较慢，基础画面仍在下载，请稍等。';
     splash.classList.toggle('ready', ready);
   }
   function prepare() {
     if (loading || leaving || ready) return;
     if (!window.NT || !assets) { paint(); return; }
     loading = true; failed = false;
-    var roomPictures = Array.from(document.querySelectorAll('#roomScene img[src]')).filter(function (img) { return img.id !== 'catimg' && !img.hidden; });
-    total = window.NT.sprites.core.length + roomPictures.length;
-    var spritesDone = 0, roomDone = 0;
-    function update() { done = spritesDone + roomDone; paint(); }
-    function roomNext() {
-      var img = roomPictures.shift();
-      if (!img) return Promise.resolve();
-      if (img.dataset.prepared) { roomDone++; update(); return roomNext(); }
-      return assets.image(img.getAttribute('src'), '房间画面').then(function (loaded) {
-        img.src = loaded.src; img.dataset.prepared = '1'; roomDone++; update(); return roomNext();
-      });
-    }
-    Promise.allSettled([
-      window.NT.sprites.prepare(function (n) { spritesDone = n; update(); }),
-      roomNext()
-    ]).then(function (results) {
-      loading = false;
-      failed = results.some(function (result) { return result.status === 'rejected'; });
-      ready = !failed;
-      paint();
-    });
+    total = window.NT.sprites.core.length;
+    window.NT.sprites.prepare(function (n) { done = n; paint(); }).then(function () {
+      ready = true; loading = false; paint();
+    }, function () { loading = false; failed = true; paint(); });
   }
   function enter() {
     if (!ready || enterButton.disabled || leaving) return;

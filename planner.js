@@ -48,7 +48,7 @@
     if (!started) return;
     var pref = ambiencePrefs(), scene = scenes.find(function (s) { return s.id === pref.scene; }) || scenes[0];
     var src = 'assets/study/' + scene.id + '.webp';
-    if ($('studyBackdropImage').getAttribute('src') !== src) $('studyBackdropImage').src = src;
+    if ($('plannerStudy').open && $('studyBackdropImage').getAttribute('src') !== src) $('studyBackdropImage').src = src;
     $('studyBackdropImage').style.setProperty('--study-focal-x', scene.position);
     $('studySceneName').textContent = scene.name;
     document.querySelectorAll('[data-study-scene]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.studyScene === scene.id)); });
@@ -119,7 +119,7 @@
       '<details class="planner-records" id="plannerRecords"><summary><span>留下的专注</span><span id="plannerRecordTotal"></span></summary><ol id="plannerRecordList"></ol></details>';
     document.querySelector('.focus-card').innerHTML =
       '<div class="planner-focus-top"><span class="planner-room-label">' + icon('book') + '奶团自习室</span><span class="planner-focus-today" id="plannerFocusToday"></span></div>' +
-      '<div class="planner-focus-main"><div><h2 id="focusTitle">一起，专注一小会儿</h2><output id="focusTime" aria-label="专注剩余时间">25:00</output><p id="focusNote">把眼前的一件小事，慢慢做好。</p></div><img class="planner-card-cat" src="assets/animated/眨眼.webp" alt="安静陪伴的奶团" draggable="false"></div>' +
+      '<div class="planner-focus-main"><div><h2 id="focusTitle">一起，专注一小会儿</h2><output id="focusTime" aria-label="专注剩余时间">25:00</output><p id="focusNote">把眼前的一件小事，慢慢做好。</p></div><img class="planner-card-cat" loading="lazy" src="assets/sit.webp" alt="安静陪伴的奶团" draggable="false"></div>' +
       '<div class="planner-focus-bottom"><span id="plannerFocusHint">留一点安静的时间给自己</span><button class="primary-button" id="focusToggle" type="button" data-planner-action="study">去自习 ' + icon('back') + '</button></div>';
     var calendar = document.querySelector('.calendar-card'), tasks = document.querySelector('.todo-card'), focus = document.querySelector('.focus-card');
     calendar.insertAdjacentElement('afterend', tasks);
@@ -130,7 +130,7 @@
       '<dialog class="house-dialog planner-task-dialog" id="plannerTaskDialog" aria-labelledby="plannerTaskHeading"><button class="dialog-close icon-button" type="button" data-planner-action="close-task" aria-label="关闭待办编辑">' + icon('close') + '</button>' +
       '<span class="planner-eyebrow">一张小小的计划纸</span><h2 id="plannerTaskHeading">添一件想做的事</h2><form id="plannerTaskForm"><label for="plannerTaskTitle">想做什么</label><input id="plannerTaskTitle" type="text" maxlength="120" placeholder="比如：看完书的第 3 章" required autocomplete="off"><label for="plannerTaskDate">放在哪一天</label><input id="plannerTaskDate" type="date" required><p class="planner-form-error" id="plannerTaskError" role="status"></p><button class="primary-button" type="submit">记到日历里</button></form><button class="text-button planner-delete" id="plannerTaskDelete" type="button" data-planner-action="delete">删除这件待办</button></dialog>' +
       '<dialog class="planner-study" id="plannerStudy" aria-labelledby="studyTitle"><div class="study-backdrop" id="studyBackdrop" aria-hidden="true" hidden><img id="studyBackdropImage" alt="" draggable="false"></div><div class="study-shell"><header class="study-header"><button class="text-button" type="button" data-planner-action="close-study">' + icon('back') + '回到生活</button><span>奶团自习室</span><span class="study-quiet">安静陪伴</span></header>' +
-      '<div class="study-scene" aria-hidden="true"><div class="study-window"><span></span><i></i></div><div class="study-surface"></div><img class="study-books" src="assets/decor/attic/15-books-notebook.webp" alt=""><img class="study-cat" id="studyCat" src="assets/animated/眨眼.webp" alt=""><img class="study-lamp" src="assets/decor/attic/16-table-lamp.webp" alt=""></div>' +
+      '<div class="study-scene" aria-hidden="true"><div class="study-window"><span></span><i></i></div><div class="study-surface"></div><img class="study-books" loading="lazy" src="assets/decor/attic/15-books-notebook.webp" alt=""><img class="study-cat" id="studyCat" loading="lazy" src="assets/sit.webp" alt=""><img class="study-lamp" loading="lazy" src="assets/decor/attic/16-table-lamp.webp" alt=""></div>' +
       '<div class="study-content"><span class="study-kicker" id="studyKicker">现在，只管这一件事</span><h2 id="studyTitle">今天想专注做什么？</h2><p class="study-caption" id="studyCaption">奶团找好位置，准备陪你啦。</p>' +
       '<form id="studySetup"><label for="studyTask">带上一件待办 <span>可不选</span></label><select id="studyTask" aria-label="关联待办"></select><label for="studyGoal">这一小段的目标</label><input id="studyGoal" maxlength="120" placeholder="例如：看完书的第 3 章" autocomplete="off"><fieldset class="study-durations"><legend>留多少时间给它？</legend><div class="study-presets"><button type="button" data-minutes="15">15 <small>分钟</small></button><button type="button" data-minutes="25">25 <small>分钟</small></button><button type="button" data-minutes="50">50 <small>分钟</small></button><button type="button" id="studyCustom" data-planner-action="custom">自定义</button></div><label class="study-custom-row" id="studyCustomRow" hidden><input id="studyMinutes" type="number" min="1" max="180" step="1" aria-label="自定义专注分钟数"><span>分钟 · 1–180 分钟</span></label></fieldset><p class="planner-form-error" id="studyError" role="status"></p><button class="primary-button study-primary" type="submit">让奶团陪我开始</button><p class="study-small-note">先专注一小会儿，随时可以暂停。</p></form>' +
       '<section id="studyRunning" hidden><p id="studyRunningGoal" class="study-running-goal"></p><div class="study-clock" id="studyClock"><div><span id="studyPhase">正在专注</span><output id="studyTime" role="timer" aria-live="off">25:00</output><small id="studyElapsed"></small></div></div><p class="study-running-note" id="studyRunningNote"></p><div class="study-running-actions"><button class="primary-button study-primary" id="studyPause" type="button" data-planner-action="pause">暂停一下</button><button class="text-button" id="studyFinish" type="button" data-planner-action="finish">结束并保存</button></div><p class="study-small-note">回到生活页后，计时也会继续。</p></section>' +
@@ -236,8 +236,8 @@
       if (!state().result) prepare(taskId);
     }
     mode = '';
-    renderStudy();
     if (!$('plannerStudy').open) $('plannerStudy').showModal();
+    renderStudy();
     syncAmbience(true);
   }
   function renderDurations() {
@@ -290,6 +290,7 @@
     tickDisplay();
   }
   function setCat(name) {
+    if (!$('plannerStudy').open) return;
     var el = $('studyCat'), src = 'assets/animated/' + name + '.webp';
     if (el.getAttribute('src') !== src) el.src = src;
   }

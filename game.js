@@ -60,9 +60,18 @@
   var now = function () { return Date.now(); };
 
   /* Load complete animations before displaying them. Fonts and analytics never gate this queue. */
-  var IMG = {}, spritePromises = {}, spriteFailures = {}, pendingPose = '';
-  var PRELOAD_FIRST = ['sit', 'wave', 'walkSide', 'walkFront', 'happy', 'shy', 'fish', 'curious', 'ear', 'nose', 'chin', 'paw', 'rub', 'sniff', 'watch', 'knead', 'roll'];
-  var CORE_SPRITES = ['sit', 'wave', 'happy', 'fish', 'sleep', 'ear', 'nose', 'chin', 'paw', 'rub', 'walkSide', 'walkFront'];
+  var IMG = {}, spritePromises = {}, spriteFailures = {}, pendingPose = '', STILLS = {}, stillPromises = {};
+  var PRELOAD_FIRST = ['ear', 'nose', 'chin', 'paw', 'rub', 'happy', 'fish', 'sit'];
+  var CORE_SPRITES = ['sit', 'happy', 'fish'];
+  var STILL_POSES = { wave: 'happy', sleep: 'sit', roll: 'happy', curious: 'peek', ear: 'happy', rub: 'happy', sniff: 'peek', watch: 'peek', paw: 'happy', chin: 'happy', nose: 'happy', knead: 'happy', walkSide: 'sit', walkFront: 'sit' };
+  function loadStill(p) {
+    var key = STILL_POSES[p] || p;
+    if (STILLS[key]) return Promise.resolve(STILLS[key]);
+    if (!stillPromises[key]) stillPromises[key] = window.NaituanAssets.image('assets/' + key + '.webp', '奶团画面').then(function (im) {
+      STILLS[key] = im; delete stillPromises[key]; return im;
+    }, function (error) { delete stillPromises[key]; throw error; });
+    return stillPromises[key];
+  }
   function loadSprite(k, background) {
     if (IMG[k]) return Promise.resolve(IMG[k]);
     if (!spritePromises[k]) {
@@ -78,7 +87,7 @@
     function next() {
       var k = queue.shift();
       if (!k) return Promise.resolve();
-      return loadSprite(k, false).then(function () { progress(++done, CORE_SPRITES.length); return next(); });
+      return loadStill(k).then(function () { progress(++done, CORE_SPRITES.length); return next(); });
     }
     return Promise.allSettled([next(), next()]).then(function (results) {
       var failure = results.find(function (result) { return result.status === 'rejected'; });
@@ -86,19 +95,21 @@
     });
   }
   function preloadSprites() {
-    var queue = PRELOAD_FIRST.concat(Object.keys(SPR)).filter(function (k, i, all) { return SPR[k] && all.indexOf(k) === i; });
+    var queue = PRELOAD_FIRST.slice();
     /* 戴着饰品时奶团用逐帧图播放，这些动图只是备用，放到最后再下。 */
     var worn = S && S.acc && S.acc.wear && window.NT_ACC_SLOTS;
     if (worn) queue = queue.filter(function (k) { return !window.NT_ACC_SLOTS.poses[k]; }).concat(queue.filter(function (k) { return window.NT_ACC_SLOTS.poses[k]; }));
     function next() {
+      // Music and requested actions take priority over speculative animation downloads.
+      if (document.hidden || (window.NaituanBGM && window.NaituanBGM.status().loading) || window.NaituanAssets.status().kind !== 'ok') { setTimeout(next, 1500); return; }
       var k = queue.shift();
       if (!k) return;
       loadSprite(k, true).then(next, next);
     }
-    next(); next();
+    next();
   }
   window.addEventListener('naituan:entered', function () { setTimeout(preloadSprites, 400); });
-  window.addEventListener('naituan:retry', function () { spriteFailures = {}; pendingPose = ''; render(); });
+  window.addEventListener('naituan:retry', function () { spriteFailures = {}; pendingPose = ''; paintDecor(); render(); });
   function starting() { return !!window.NaituanAssets && !!document.getElementById('splash'); }
 
   /* ---------- state ---------- */
@@ -245,29 +256,34 @@
     return 'sit';
   }
   function applyPose(p) {
+    var still = STILLS[STILL_POSES[p] || p];
     if (window.NaituanAssets && !IMG[p]) {
-      if (pendingPose !== p && !spriteFailures[p]) {
+      if (!still && !stillPromises[STILL_POSES[p] || p]) loadStill(p).then(function () { if (computePose() === p) render(); }, function () {});
+      if (!starting() && pendingPose !== p && !spriteFailures[p]) {
         pendingPose = p;
         loadSprite(p, false).then(function () {
           if (pendingPose === p) pendingPose = '';
           if (computePose() === p) render();
         }, function () { spriteFailures[p] = true; if (pendingPose === p) pendingPose = ''; });
       }
-      return;
+      if (!still) return;
     }
-    if (override && override.name === p && override.pending) {
+    if (IMG[p] && override && override.name === p && override.pending) {
       override.pending = false; override.until = now() + override.ms;
       if (override.speech) { sayText = override.speech.text; bubble.textContent = sayText; sayUntil = now() + override.speech.ms; }
     }
     if (visiting && p !== visiting.pose) endVisit();
-    if (p === curPose) return;
+    var image = IMG[p] || still;
+    var source = image ? image.src : SPR[p];
+    if (p === curPose && catimg.src === source) return;
     var walkingChange = /^walk/.test(p) || /^walk/.test(curPose);
     curPose = p;
-    catimg.src = IMG[p] ? IMG[p].src : SPR[p];
+    catimg.src = source;
+    catimg.setAttribute('data-render', IMG[p] || !window.NaituanAssets ? 'animated' : 'still');
     cat.setAttribute('data-pose', p);
     catimg.classList.remove('pop'); accCanvas.classList.remove('pop');
     if (!walkingChange) { void catimg.offsetWidth; catimg.classList.add('pop'); accCanvas.classList.add('pop'); }
-    accRefresh();
+    if (!starting()) accRefresh();
   }
 
   /* ---------- 饰品 ----------
@@ -305,20 +321,6 @@
     }
     return ACC_SHEETS[pose];
   }
-  /* 戴上饰品后，把所有动作的逐帧图在后台陆续下好（常用的先下，两张两张来），
-     这样点一下换动作时花能马上出现，不用等。 */
-  var accPreloading = false;
-  function accPreloadAll() {
-    if (accPreloading) return; accPreloading = true;
-    var queue = PRELOAD_FIRST.concat(Object.keys(ACC_SLOTS.poses)).filter(function (k, i, all) { return ACC_SLOTS.poses[k] && all.indexOf(k) === i; });
-    function next() {
-      var k = queue.shift(); if (!k) return;
-      var im = accSheet(k);
-      if (accReady(im)) { next(); return; }
-      im.addEventListener('load', next); im.addEventListener('error', next);
-    }
-    next(); next();
-  }
   function accLook(src) {
     if (!ACC_LOOKS[src]) { var im = new Image(); im.onload = function () { accDrawn = ''; }; im.src = src + '?v=acc-20261004'; ACC_LOOKS[src] = im; }
     return ACC_LOOKS[src];
@@ -327,8 +329,8 @@
   function accReady(im) { return !!(im && im.complete && im.naturalWidth > 0); }
   function accRefresh() {
     clearTimeout(accRaf); accRaf = 0;
+    if (window.NaituanAssets && !IMG[curPose]) { accCanvas.hidden = true; catimg.style.visibility = ''; accPose = null; return; }
     var item = accWorn(), data = item && ACC_SLOTS.poses[curPose], sheet = data ? accSheet(curPose) : null;
-    if (item) accPreloadAll();
     var on = accReady(sheet);
     accCanvas.hidden = !on; catimg.style.visibility = on ? 'hidden' : '';
     if (!on) { accPose = null; return; }
@@ -1306,6 +1308,16 @@
   }
   function itemState(cat, id) { return equipped(cat, id) ? 'eq' : owned(cat, id) ? 'own' : 'buy'; }
 
+  function roomPicture(img, source) {
+    if (!window.NaituanAssets) { img.src = source; return; }
+    if (img.dataset.roomSource === source) return;
+    img.dataset.roomSource = source;
+    window.NaituanAssets.image(source, '房间画面').then(function (loaded) {
+      if (img.dataset.roomSource !== source) return;
+      img.src = loaded.src;
+      if (roomView) roomView.refresh();
+    }, function () { if (img.dataset.roomSource === source) delete img.dataset.roomSource; });
+  }
   function paintDecor() {
     var e = { wall: S.eq.wall, rug: S.eq.rug, win: S.eq.win, prop: S.eq.prop.slice() };
     var hiddenFixtures = Object.assign({}, S.hiddenFixtures);
@@ -1322,7 +1334,7 @@
     }
     var wallItem = findItem('wall', e.wall), scenic = !!wallItem.image;
     roomBackdrop.hidden = !scenic;
-    if (scenic && roomBackdrop.getAttribute('src') !== wallItem.image) roomBackdrop.src = wallItem.image;
+    if (scenic) roomPicture(roomBackdrop, wallItem.image);
     stage.classList.toggle('has-scene', scenic);
     winEl.hidden = hiddenFixtures.win || scenic || e.prop.some(function (id) { return findItem('prop', id).placement === 'window'; });
     rugEl.hidden = hiddenFixtures.rug || scenic || e.prop.some(function (id) { return findItem('prop', id).placement === 'rug'; });
@@ -1330,7 +1342,7 @@
     [].forEach.call(propsEl.children, function (el) {
       el.hidden = e.prop.indexOf(el.getAttribute('data-prop')) < 0;
       var img = el.querySelector('img[data-src]');
-      if (!el.hidden && img && !img.getAttribute('src')) img.src = img.dataset.src;
+      if (!el.hidden && img) roomPicture(img, img.dataset.src);
     });
     if (roomView) roomView.refresh();
   }

@@ -9,6 +9,9 @@ const base = process.env.NAITUAN_PREVIEW || 'http://127.0.0.1:8775/';
     const context = await browser.newContext({ viewport: { width: 430, height: 900 } });
     const page = await context.newPage(), errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    page.on('requestfailed', request => {
+      if (request.url().startsWith(base) && /\.(js|css)(?:\?|$)/.test(request.url())) console.log('COMPONENT_REQUEST_FAILED', request.url(), request.failure()?.errorText);
+    });
     await page.route(/https:\/\//, route => route.abort()); // Fonts/statistics are optional.
     return { context, page, errors };
   }
@@ -28,17 +31,26 @@ const base = process.env.NAITUAN_PREVIEW || 'http://127.0.0.1:8775/';
     // Cold start prepares usable sprites; a second visit survives failed media network requests.
     {
       const { context, page, errors } = await fixture();
+      const earlyAnimations = [];
+      const onRequest = request => { if (request.url().includes('/animated/')) earlyAnimations.push(request.url()); };
+      page.on('request', onRequest);
+      const start = Date.now();
       await page.goto(base, { waitUntil: 'domcontentloaded' });
+      await ready(page);
+      assert.deepEqual(earlyAnimations, [], 'Full animations must not compete with first entry');
+      console.log('ENTRY_READY_MS', Date.now() - start, 'ANIMATIONS_BEFORE_ENTRY', earlyAnimations.length);
+      page.off('request', onRequest);
       await enter(page);
       await page.locator('#quickFeed').click();
       assert.equal(await page.locator('#cat').getAttribute('data-pose'), 'fish');
       await page.waitForFunction(() => NaituanBGM.status().playing);
+      await page.waitForFunction(() => document.querySelector('#cat').dataset.pose === 'fish' && document.querySelector('#catimg').dataset.render === 'animated');
       await page.waitForFunction(() => NT.S().welcome);
       const before = await page.evaluate(() => { NT.S().fish = 731; NT.S().hunger = 72; NT.S().acc.gift = 1; NT.save(); return NT.S().fish; });
       // Wait until asynchronous cache writes have completed, rather than treating a render as disk proof.
       await page.waitForFunction(async () => {
         const names = await caches.keys(); const store = await caches.open(names.find(n => n.startsWith('naituan-media-')));
-        return (await store.keys()).filter(r => r.url.includes('/animated/')).length >= 12;
+        return (await store.keys()).filter(r => /\/assets\/(sit|happy|fish)\.webp/.test(r.url)).length === 3;
       });
       let mediaAttempts = 0;
       await page.route('**/assets/animated/**', route => {
@@ -77,10 +89,11 @@ const base = process.env.NAITUAN_PREVIEW || 'http://127.0.0.1:8775/';
         console.log('SLOW', await page.evaluate(() => ({ loading: NaituanAssets.status(), pose: document.querySelector('#cat').dataset.pose, errors: document.querySelector('#splashDetail')?.textContent })));
         throw error;
       });
-      assert.notEqual(await page.locator('#cat').getAttribute('data-pose'), 'roll');
+      assert.equal(await page.locator('#cat').getAttribute('data-pose'), 'roll');
+      assert.equal(await page.locator('#catimg').getAttribute('data-render'), 'still');
       assert.match(await page.locator('#resourceMessage').innerText(), /仍在下载|连接较慢/);
       release();
-      await page.waitForFunction(() => document.querySelector('#cat').dataset.pose === 'roll');
+      await page.waitForFunction(() => document.querySelector('#cat').dataset.pose === 'roll' && document.querySelector('#catimg').dataset.render === 'animated');
       await page.waitForTimeout(800);
       assert.equal(await page.locator('#cat').getAttribute('data-pose'), 'roll');
       await page.waitForFunction(() => document.querySelector('#cat').dataset.pose !== 'roll');
@@ -92,8 +105,8 @@ const base = process.env.NAITUAN_PREVIEW || 'http://127.0.0.1:8775/';
     for (const problem of [404, 503, 'connection']) {
       const { context, page, errors } = await fixture();
       let broken = true;
-      await page.route('**/assets/animated/**', route => {
-        if (!broken || !decodeURI(route.request().url()).includes('吃小鱼.webp')) return route.continue();
+      await page.route('**/assets/fish.webp*', route => {
+        if (!broken) return route.continue();
         return problem === 'connection' ? route.abort('failed') : route.fulfill({ status: problem, body: 'unavailable' });
       });
       await page.goto(base, { waitUntil: 'domcontentloaded' });
