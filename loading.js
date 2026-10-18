@@ -7,6 +7,15 @@
   var pending = new Map(), failures = new Map(), startupError = '';
   var notice, message, retryButton;
   var cache = root.caches ? root.caches.open(cacheName).catch(function () { return null; }) : Promise.resolve(null);
+  if (root.caches) {
+    root.caches.keys().then(function (names) {
+      names.forEach(function (name) {
+        if (name.indexOf('naituan-media-') === 0 && name !== cacheName) {
+          root.caches.delete(name).catch(function () {});
+        }
+      });
+    }).catch(function () {});
+  }
 
   function notify() { root.dispatchEvent(new CustomEvent('naituan:loading')); }
   function describe(error) {
