@@ -26,6 +26,7 @@
     peekc: 'assets/peekc.webp'
   }/*SPR:END*/;
   var KEY = 'naituan-house-v1';
+  var rawRescue = null;
   var $ = function (s) { return document.querySelector(s); };
   var cat = $('#cat'), catimg = $('#catimg'), catBox = $('#catbox'), stage = $('#stage'), bubble = $('#bubble'), zzz = $('#zzz');
   var btnFeed = $('#btnFeed'), btnSleep = $('#btnSleep'), btnHide = $('#btnHide'), sleepLabel = $('#sleepLabel');
@@ -164,24 +165,38 @@
     applyAudio();
   }
   function backupStored(raw) {
-    if (raw == null || raw === '') return;
-    try { localStorage.setItem(KEY + '-backup', raw); } catch (e) {}
+    if (raw == null || raw === '') return false;
+    try {
+      localStorage.setItem(KEY + '-backup', raw);
+      return localStorage.getItem(KEY + '-backup') === raw;
+    } catch (e) { return false; }
   }
   function load(hotData) {
     var d = null, fromStore = true, raw = null;
     if (hotData && typeof hotData.hunger === 'number') { d = hotData; fromStore = false; }
     else {
       raw = localStorage.getItem(KEY);
-      try { d = JSON.parse(raw || 'null'); } catch (e) { backupStored(raw); d = null; }
+      try { d = JSON.parse(raw || 'null'); } catch (e) { rawRescue = raw; backupStored(raw); d = null; }
     }
     try { installState(d); }
     catch (e) {
       if (!fromStore) throw e;
+      rawRescue = raw;
       backupStored(raw);
       try { installState(null); } catch (e2) { S = fresh(); S.life = null; }
     }
   }
-  function save() { S.t = now(); try { localStorage.setItem(KEY, JSON.stringify(S)); return true; } catch (e) { return false; } }
+  function save() {
+    S.t = now();
+    try {
+      if (rawRescue != null) {
+        if (!backupStored(rawRescue)) return false;
+      }
+      localStorage.setItem(KEY, JSON.stringify(S));
+      rawRescue = null;
+      return true;
+    } catch (e) { return false; }
+  }
 
   /* ---------- speech ---------- */
   function positionBubble() {
@@ -717,10 +732,12 @@
   /* Sound settings from 我的: SFX volume (S.vol), background music on/off (S.bgm) and its volume (S.bgmVol). */
   function miniGain() { return S.vol / 100 * 1.5; } /* mini-games keep their own mix; the volume slider scales it (x1.2 at the default 80) */
   function applyAudio() {
-    window.NaituanSound.setVolume(S.vol);
-    if (window.NaituanBGM) window.NaituanBGM.configure({ enabled: S.bgm, volume: S.bgmVol });
-    if (master) master.gain.value = S.mute ? 0 : 0.55 * miniGain();
-    window.dispatchEvent(new CustomEvent('naituan:sound-change'));
+    try {
+      if (window.NaituanSound) window.NaituanSound.setVolume(S.vol);
+      if (window.NaituanBGM) window.NaituanBGM.configure({ enabled: S.bgm, volume: S.bgmVol });
+      if (master) master.gain.value = S.mute ? 0 : 0.55 * miniGain();
+      window.dispatchEvent(new CustomEvent('naituan:sound-change'));
+    } catch (e) {}
   }
   function setVolume(v, final) {
     S.vol = Math.round(clamp(+v || 0)); applyAudio();

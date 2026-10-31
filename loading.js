@@ -2,6 +2,9 @@
 (function (root) {
   'use strict';
   var VERSION = '20261018-v1';
+  try {
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  } catch (e) {}
   var base = new URL('.', document.currentScript.src);
   var cacheName = 'naituan-media-' + encodeURIComponent(base.pathname) + '-' + VERSION;
   var pending = new Map(), failures = new Map(), startupError = '';
