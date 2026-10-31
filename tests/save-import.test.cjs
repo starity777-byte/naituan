@@ -52,7 +52,8 @@ function makeEl() {
   };
 }
 
-function boot(stored) {
+function boot(stored, options) {
+  const opts = options || {};
   const store = new Map();
   if (stored != null) store.set('naituan-house-v1', stored);
   const byId = new Map();
@@ -73,10 +74,13 @@ function boot(stored) {
   class Image { set src(value) { this._src = value; } get src() { return this._src || ''; } }
   class ResizeObserver { observe() {} unobserve() {} disconnect() {} }
   class MutationObserver { constructor() {} observe() {} disconnect() {} }
-  const audio = { play() { return false; }, stop() {}, unlock() { return false; }, setVolume() {} };
+  const audio = {
+    play() { return false; }, stop() {}, unlock() { return false; },
+    setVolume() { if (opts.soundThrows) throw new Error('audio failed'); }
+  };
   const window = {
     document, Image, ResizeObserver, MutationObserver,
-    NaituanSound: audio,
+    NaituanSound: opts.noSound ? undefined : audio,
     NaituanBGM: { configure() {}, unlock() {}, status() { return {}; }, setGate() {}, stop() {} },
     addEventListener() {}, removeEventListener() {}, dispatchEvent() {},
     scrollTo() {}, scrollBy() {}, devicePixelRatio: 1,
@@ -87,7 +91,13 @@ function boot(stored) {
     getComputedStyle() { return { getPropertyValue() { return ''; }, objectFit: 'contain', objectPosition: '50% 50%' }; },
     localStorage: {
       getItem(key) { return store.has(key) ? store.get(key) : null; },
-      setItem(key, value) { store.set(key, String(value)); },
+      setItem(key, value) {
+        if (opts.failBackup && key === 'naituan-house-v1-backup') {
+          if (opts.failBackup === 'throw') throw new Error('quota');
+          return;
+        }
+        store.set(key, String(value));
+      },
       removeItem(key) { store.delete(key); }
     }
   };
@@ -190,6 +200,34 @@ test('a throwing stored save is backed up before falling back to a fresh house',
   assert.equal(state.eq.wall, 'scene-attic');
   assert.equal(state.life.gems, 0);
   assert.equal(Array.isArray(state.life.todos), true);
+  assert.equal(window.NT.save(), true);
+  assert.equal(store.get('naituan-house-v1-backup'), original);
+  assert.notEqual(store.get('naituan-house-v1'), original);
+  assert.equal(JSON.parse(store.get('naituan-house-v1')).hunger, 72);
+  assert.equal(window.NT.save(), true);
+});
+
+test('save refuses to overwrite KEY when the failed-load backup cannot be written', () => {
+  const original = '{"hunger":61,"fish":8,"life":{"gems":6,"note":"玩家原档"';
+  for (const failBackup of ['throw', 'silent']) {
+    const { window, store } = boot(original, { failBackup });
+    assert.equal(store.has('naituan-house-v1-backup'), false);
+    assert.equal(store.get('naituan-house-v1'), original);
+    assert.equal(window.NT.S().hunger, 72);
+    assert.equal(window.NT.save(), false);
+    assert.equal(store.get('naituan-house-v1'), original);
+    assert.equal(store.has('naituan-house-v1-backup'), false);
+  }
+});
+
+test('a missing or throwing NaituanSound still loads a stored house', () => {
+  const photo = JPEG;
+  const stored = JSON.stringify(realisticHouse(photo));
+  for (const options of [{ noSound: true }, { soundThrows: true }]) {
+    const { window, store } = boot(stored, options);
+    assertPlayerData(window.NT.S(), photo);
+    assert.equal(store.get('naituan-house-v1'), stored);
+  }
 });
 
 test('a normal save code imports back to the same data', () => {
@@ -235,13 +273,13 @@ test('a normal save code imports back to the same data', () => {
 });
 
 test('a thrown import restores the previous house and does not save', () => {
-  const { window, document, audio, store } = boot(null);
+  const { window, document, store } = boot(null);
   window.NT.S().fish = 7;
   click(document, 'btnSave');
   const before = store.get('naituan-house-v1');
   document.getElementById('saveText').value = document.getElementById('saveText').value;
   click(document, 'saveLoad');
-  audio.setVolume = () => { throw new Error('audio failed'); };
+  window.NaituanLife.sanitize = () => { throw new Error('life failed'); };
   click(document, 'saveLoad');
   assert.equal(document.getElementById('saveMsg').textContent, '这串码有问题，没有导入');
   assert.equal(window.NT.S().fish, 7);
