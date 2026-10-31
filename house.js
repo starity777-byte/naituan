@@ -85,7 +85,13 @@
         var music = window.NaituanBGM.status();
         $('profileBgmTrack').textContent = music.period + ' · ' + music.title + '（随当地时间变化）';
       }
+      syncRescue();
     }
+  }
+  function syncRescue() {
+    var button = $('profileRescue');
+    if (!button || !window.NaituanRescue) return;
+    button.hidden = !window.NaituanRescue.shouldShow();
   }
   function action(name) {
     if (name === 'home' || name === 'life' || name === 'games' || name === 'profile') { navigate(name); return; }
@@ -120,6 +126,29 @@
   // Mini-games keep the afternoon loop; the study room keeps its own ambience.
   if (window.NaituanBGM) window.NaituanBGM.setGate(function () { var study = $('plannerStudy'); return !(study && study.open); });
   $('profileSave').addEventListener('click', function () { $('btnSave').click(); });
+  $('profileRescue').addEventListener('click', function () {
+    var Rescue = window.NaituanRescue;
+    if (!Rescue) return;
+    var data = Rescue.readBackup();
+    if (!data) {
+      notify('这份备份暂时读不了，先不用找了。');
+      $('profileRescue').hidden = true;
+      return;
+    }
+    if (!window.confirm(Rescue.summary(data) + '\n\n用这份存档替换现在的进度？现在的进度会先收好，还能再找回来。')) return;
+    var result = Rescue.restore();
+    if (!result || !result.ok) {
+      notify((result && result.message) || '这次没能找回，现在的进度还在。');
+      if (!Rescue.readBackup()) $('profileRescue').hidden = true;
+      return;
+    }
+    sync();
+    window.dispatchEvent(new CustomEvent('naituan:life-change'));
+    NT.say('找回来啦！', 3200);
+    NT.sound('save');
+    notify('上次的存档找回来啦。');
+    $('profileRescue').hidden = true;
+  });
   document.addEventListener('pointerdown', function (event) {
     if (!$('pawMenu').hidden && !$('pawMenu').contains(event.target) && !$('pawToggle').contains(event.target)) menu(false);
   });
@@ -163,5 +192,6 @@
   window.NaituanHouse = { navigate: navigate, notify: notify, currentPage: function () { return page; } };
   setInterval(sync, 1000);
   sync();
+  syncRescue();
   syncFullscreen();
 })();
